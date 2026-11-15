@@ -1,0 +1,6 @@
+{
+  "name": "@servrsit/target-helper",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ServrSit target-side restricted gateway, operation adapter, signed manifests, and remote ledger (Python)"
+}

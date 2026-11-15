@@ -1,0 +1,6 @@
+{
+  "name": "@servrsit/web",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ServrSit web application — React + TypeScript + Vite"
+}

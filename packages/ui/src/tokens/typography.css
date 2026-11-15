@@ -1,0 +1,186 @@
+/**
+ * ServrSit — Typography tokens
+ * Source: UX Spec §4.1 and §4.2 type scale table
+ *
+ * Font families
+ * ─────────────
+ * Bricolage Grotesque — brand/display headings (weight 650–700, normal width)
+ * Geist Sans          — interface, body, forms, buttons (400 prose; 500–600 labels)
+ * Geist Mono          — addresses, versions, timestamps, transcripts (400–500)
+ *
+ * Fonts are NOT bundled here. See src/fonts/README.md for how to obtain and
+ * place the font files, plus the @font-face declarations to add once they are
+ * in place. The fallbacks below ensure readable text before fonts load.
+ *
+ * Implementation rules (from spec):
+ *   - Use relative units (rem/em) so browser font size settings remain effective.
+ *   - Provide system fallbacks; never show blank text while fonts load.
+ *   - Load only the styles/weights actually required.
+ *   - Sentence case throughout; uppercase only for short eyebrow labels.
+ *   - Avoid ultra-light weights, tight body tracking, or tiny timestamps.
+ *   - Stage A is light theme only — no OS dark-mode inversion.
+ */
+
+:root {
+  /* ── Font family stacks ─────────────────────────────────────────────────── */
+
+  /**
+   * Brand and display headings (Bricolage Grotesque, weight 650–700).
+   * Falls back to a wide geometric sans then to system-ui so text is never
+   * invisible while the custom font loads.
+   */
+  --font-display: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+
+  /**
+   * Interface, body, forms, buttons (Geist Sans, weight 400–600).
+   * Clean geometric fallback chain before Geist loads.
+   */
+  --font-sans: "Geist", "Inter", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /**
+   * Addresses, package versions, timestamps, transcripts (Geist Mono, weight 400–500).
+   * Monospaced fallback ensures aligned numeric values before the custom font loads.
+   */
+  --font-mono: "Geist Mono", "Fira Code", ui-monospace, "Cascadia Code",
+    "Source Code Pro", Menlo, Monaco, Consolas, "Courier New", monospace;
+
+
+  /* ── Font weight constants ───────────────────────────────────────────────── */
+
+  /** Body prose weight (Geist Sans) */
+  --font-weight-regular: 400;
+
+  /** Labels, metadata (Geist Sans / Geist Mono) */
+  --font-weight-medium: 500;
+
+  /** Actions, buttons, prominent labels (Geist Sans) */
+  --font-weight-semibold: 600;
+
+  /** Display headings, brand statements (Bricolage Grotesque) */
+  --font-weight-bold: 700;
+
+
+  /* ── Type scale — desktop ────────────────────────────────────────────────── */
+  /*
+   * Token naming: --text-{role}-size, --text-{role}-line-height
+   * Roles: display | page-title | section-title | card-title |
+   *        body | compact | technical
+   *
+   * Values: UX Spec §4.1 type scale table, desktop column.
+   * rem values derived from a 16 px browser default.
+   */
+
+  /**
+   * Display — 52 px / 56 px
+   * Use: Fleet briefing headline; maximum two short lines.
+   * Font: Bricolage Grotesque, weight 650–700.
+   */
+  --text-display-size: 3.25rem;        /* 52px */
+  --text-display-line-height: 3.5rem;  /* 56px */
+  --text-display-weight: var(--font-weight-bold);
+  --text-display-family: var(--font-display);
+
+  /**
+   * Page title — 36 px / 42 px
+   * Use: Server name, activity header, settings.
+   * Font: Bricolage Grotesque, weight 650–700.
+   */
+  --text-page-title-size: 2.25rem;        /* 36px */
+  --text-page-title-line-height: 2.625rem; /* 42px */
+  --text-page-title-weight: var(--font-weight-bold);
+  --text-page-title-family: var(--font-display);
+
+  /**
+   * Section title — 24 px / 30 px
+   * Use: Main section headings within a page.
+   * Font: Geist Sans, weight 600.
+   */
+  --text-section-title-size: 1.5rem;       /* 24px */
+  --text-section-title-line-height: 1.875rem; /* 30px */
+  --text-section-title-weight: var(--font-weight-semibold);
+  --text-section-title-family: var(--font-sans);
+
+  /**
+   * Card title — 22 px / 28 px
+   * Use: Server identity cards.
+   * Font: Geist Sans, weight 600.
+   */
+  --text-card-title-size: 1.375rem;       /* 22px */
+  --text-card-title-line-height: 1.75rem; /* 28px */
+  --text-card-title-weight: var(--font-weight-semibold);
+  --text-card-title-family: var(--font-sans);
+
+  /**
+   * Body — 16 px / 24 px
+   * Use: Explanations, field labels, general prose.
+   * Font: Geist Sans, weight 400.
+   */
+  --text-body-size: 1rem;         /* 16px */
+  --text-body-line-height: 1.5rem; /* 24px */
+  --text-body-weight: var(--font-weight-regular);
+  --text-body-family: var(--font-sans);
+
+  /**
+   * Compact interface — 14 px / 20 px
+   * Use: Metadata, dense lists, timestamps, secondary labels.
+   * Font: Geist Sans, weight 400–500.
+   */
+  --text-compact-size: 0.875rem;      /* 14px */
+  --text-compact-line-height: 1.25rem; /* 20px */
+  --text-compact-weight: var(--font-weight-regular);
+  --text-compact-family: var(--font-sans);
+
+  /**
+   * Technical output — 13 px / 20 px
+   * Use: Expandable transcripts only.
+   * Font: Geist Mono, weight 400–500.
+   */
+  --text-technical-size: 0.8125rem;    /* 13px */
+  --text-technical-line-height: 1.25rem; /* 20px */
+  --text-technical-weight: var(--font-weight-regular);
+  --text-technical-family: var(--font-mono);
+
+
+  /* ── Type scale — mobile overrides ─────────────────────────────────────── */
+  /*
+   * Applied via the .mobile-type class or at ≤767 px via media query.
+   * Mobile sizes from UX Spec §4.1 table, mobile column.
+   * Card title is identical at both breakpoints (22/28) so has no override.
+   * Body and compact/technical are identical too.
+   */
+}
+
+/**
+ * Mobile type scale overrides (≤767 px).
+ * These custom properties shadow the desktop values within the media query,
+ * so any component reading the tokens picks up the correct size automatically.
+ */
+@media (max-width: 767px) {
+  :root {
+    /**
+     * Display — 36 px / 40 px (mobile)
+     */
+    --text-display-size: 2.25rem;        /* 36px */
+    --text-display-line-height: 2.5rem;  /* 40px */
+
+    /**
+     * Page title — 28 px / 34 px (mobile)
+     */
+    --text-page-title-size: 1.75rem;        /* 28px */
+    --text-page-title-line-height: 2.125rem; /* 34px */
+
+    /**
+     * Section title — 22 px / 28 px (mobile)
+     */
+    --text-section-title-size: 1.375rem;       /* 22px */
+    --text-section-title-line-height: 1.75rem; /* 28px */
+
+    /*
+     * Card title: spec says 22/28 at both breakpoints — no override needed.
+     * Body: 16/24 at both breakpoints — no override needed.
+     * Compact: 14/20 at both breakpoints — no override needed.
+     * Technical: 13/20 at both breakpoints — no override needed.
+     */
+  }
+}

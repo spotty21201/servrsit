@@ -1,0 +1,6 @@
+{
+  "name": "@servrsit/ai",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ServrSit Bedrock adapter, structured intent, and grounded summaries"
+}

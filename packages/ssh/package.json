@@ -1,0 +1,6 @@
+{
+  "name": "@servrsit/ssh",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ServrSit SSH transport, host identity, collectors, and bounded parsing"
+}

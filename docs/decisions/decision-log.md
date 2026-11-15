@@ -139,3 +139,42 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 | D-TAILSCALE-01 | Tailscale enrollment for dedicated controller | T-016 |
 | D-DOMAIN-01 | Product domain purchase and DNS | Before any public deployment |
 | D-COMMERCIAL-01 | Charge vs. personal tool decision | After Stage B |
+
+---
+
+## ADR-008 — Pinned runtime versions: Node.js 24.22.3 and PostgreSQL 17.12
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-15 |
+| **Owner** | Coder |
+| **Status** | [AGENT DECISION] — Adopted |
+| **Requirements** | Technical Spec §3.1 "pin the current supported security patch"; "recheck selected branches at repository initialization" |
+
+**Decision:** Pin Node.js to **24.22.3** and PostgreSQL to **17.12** as the confirmed current patch releases at M0 kickoff.
+
+**Verification method:** Versions confirmed via official release listings.
+- Node.js 24.22.3: `https://nodejs.org/dist/latest-v24.x/` — confirmed 2026-11-15, released 2026-11-11.
+- PostgreSQL 17.12: `https://www.postgresql.org/ftp/source/` — confirmed 2026-11-15, released 2026-11-09.
+- Support lifecycle data sourced from `https://endoflife.date/api/nodejs.json` and `https://endoflife.date/api/postgresql.json`.
+
+**Support lifecycle:**
+
+| Component | Current version | Active support ends | End of life |
+|---|---|---|---|
+| Node.js 24 LTS | 24.22.3 | 2026-10-20 | **2028-04-30** |
+| PostgreSQL 17 | 17.12 | — (rolling security patches) | **2029-11-08** |
+
+**Planned upgrade actions:**
+
+- **Node.js 24 LTS** active support ended 2026-10-20 (security-only maintenance period). Upgrade path to Node.js 26 LTS (expected October 2027 LTS status) must be planned and executed before **2028-04-30**. Create a tracking task before 2027-10-01.
+- **PostgreSQL 17** receives security/bug patches until 2029-11-08. Monitor the PostgreSQL release calendar quarterly and apply patch updates at each deployment. No major-version migration is required during Stages A–B.
+
+**Package manager:**
+- pnpm **12.21.0** installed alongside Node.js 24.22.3. Pin this version in root `package.json` `engines` field. Update pnpm when security advisories are published.
+
+**Consequences:**
+- `.node-version` file at repo root contains `24.22.3` for tooling compatibility.
+- Root `package.json` `engines` field specifies `"node": ">=24.22.3"`.
+- PostgreSQL version pinned in infrastructure manifests (CDK/deployment config) at T-010+.
+- All team members and CI environments use Node.js 24.22.3 exactly. Never infer version compatibility from this document alone — recheck against official release pages before upgrades.
