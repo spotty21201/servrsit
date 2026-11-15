@@ -1,0 +1,6 @@
+{
+  "name": "@servrsit/ui",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ServrSit design tokens and accessible presentation components"
+}

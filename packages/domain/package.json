@@ -1,0 +1,6 @@
+{
+  "name": "@servrsit/domain",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ServrSit deterministic policy, plan validation, and finding rules"
+}

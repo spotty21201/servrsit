@@ -1,0 +1,6 @@
+{
+  "name": "@servrsit/worker",
+  "private": true,
+  "version": "0.0.0",
+  "description": "ServrSit worker and executor — Node.js TypeScript"
+}

@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets
+.env
+.env.*
+*.local
+*.pem
+*.key
+known_hosts.prod
+
+# Build output
+dist/
+build/
+
+# Database
+database_dumps/
+
+# Test coverage
+coverage/
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/settings.json
+*.swp
+*.swo
+
+# pnpm
+.pnpm-store/
