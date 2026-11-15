@@ -1,0 +1,180 @@
+/**
+ * ServrSit — Spacing, shape, and motion tokens
+ * Source: UX Spec §4.3 (shape, spacing, depth) and §4.5 (motion)
+ *
+ * Spacing rhythm: 8 px base unit. All spacing tokens are multiples of 8 px
+ * (or 4 px for small internal relationships). Do not introduce arbitrary values.
+ */
+
+:root {
+  /* ── Spacing scale ───────────────────────────────────────────────────────── */
+  /*
+   * Base unit: 8 px.
+   * Tokens named --space-{n} where n is the multiplier.
+   * --space-1 = 8px, --space-2 = 16px, etc.
+   * --space-half = 4px for tight internal relationships.
+   */
+
+  /** 4 px — tight internal spacing (labels within a component, icon-to-text gap) */
+  --space-half: 0.25rem;  /* 4px */
+
+  /** 8 px — base unit; fine-grained internal spacing */
+  --space-1: 0.5rem;      /* 8px */
+
+  /** 12 px — small component padding (e.g. compact badge) */
+  --space-1-half: 0.75rem; /* 12px */
+
+  /** 16 px — standard component padding; side padding on mobile */
+  --space-2: 1rem;         /* 16px */
+
+  /** 24 px — card internal padding; mobile section spacing minimum */
+  --space-3: 1.5rem;       /* 24px */
+
+  /** 32 px — section spacing minimum (desktop and mobile) */
+  --space-4: 2rem;         /* 32px */
+
+  /** 40 px — desktop content margins */
+  --space-5: 2.5rem;       /* 40px */
+
+  /** 48 px — section spacing maximum on desktop */
+  --space-6: 3rem;         /* 48px */
+
+  /** 64 px — large vertical rhythm for page-level spacing */
+  --space-8: 4rem;         /* 64px */
+
+
+  /* ── Section spacing shorthands ─────────────────────────────────────────── */
+  /*
+   * Spec: "Main section spacing is 32–48 px on desktop and 24–32 px on mobile."
+   * These tokens capture the two ends of those ranges for consistent use.
+   */
+
+  /** Desktop section spacing: 32 px minimum */
+  --section-spacing-desktop-min: var(--space-4);  /* 32px */
+
+  /** Desktop section spacing: 48 px maximum */
+  --section-spacing-desktop-max: var(--space-6);  /* 48px */
+
+  /** Mobile section spacing: 24 px minimum */
+  --section-spacing-mobile-min: var(--space-3);   /* 24px */
+
+  /** Mobile section spacing: 32 px maximum */
+  --section-spacing-mobile-max: var(--space-4);   /* 32px */
+
+
+  /* ── Corner radii ────────────────────────────────────────────────────────── */
+  /*
+   * Spec §4.3:
+   *   Server cards:          ~20 px corners
+   *   Forms and panels:      16 px
+   *   Inputs and buttons:    10–12 px
+   *   Pills (status/tags):   fully rounded
+   */
+
+  /** Server identity cards */
+  --radius-card: 1.25rem;    /* 20px */
+
+  /** Forms, action panels, drawers */
+  --radius-panel: 1rem;      /* 16px */
+
+  /** Inputs and buttons */
+  --radius-input: 0.625rem;  /* 10px */
+
+  /** Buttons (slightly larger than inputs per spec 10–12 px range) */
+  --radius-button: 0.75rem;  /* 12px */
+
+  /** Pills: status badges, compact selections */
+  --radius-pill: 9999px;
+
+  /** Small elements (e.g. inline chips, tight badges) */
+  --radius-small: 0.375rem;  /* 6px */
+
+
+  /* ── Grid and content width ─────────────────────────────────────────────── */
+  /*
+   * Spec §5.2: "content maximum around 1320 px; ~40 px content margins;
+   * 12-column grid with 24 px gutters."
+   * Navigation rail: 88 px wide.
+   */
+
+  /** Maximum content width */
+  --content-max-width: 82.5rem;   /* 1320px */
+
+  /** Desktop content margin */
+  --content-margin-desktop: var(--space-5);  /* 40px */
+
+  /** Mobile side padding */
+  --content-padding-mobile: var(--space-2);  /* 16px */
+
+  /** Navigation rail width (desktop) */
+  --nav-rail-width: 5.5rem;       /* 88px */
+
+  /** Grid column count */
+  --grid-columns: 12;
+
+  /** Grid gutter */
+  --grid-gutter: 1.5rem;          /* 24px */
+
+  /** Server card minimum width (spec §5.2: "minimum width of 280 px") */
+  --server-card-min-width: 17.5rem; /* 280px */
+
+  /** Minimum touch / click target size (spec §16: 44×44 CSS px) */
+  --touch-target-min: 2.75rem;    /* 44px */
+
+
+  /* ── Motion durations ───────────────────────────────────────────────────── */
+  /*
+   * Spec §4.5 motion table.
+   *
+   * Rules:
+   *   - Respect prefers-reduced-motion: replace animated transitions with
+   *     instant display for decorative movement.
+   *   - Never animate a status to success before authoritative verification.
+   *   - Do not reorder a fleet card while the user is interacting with it.
+   */
+
+  /** Hover / focus / pressed response: immediate to 120 ms */
+  --duration-interaction: 120ms;
+
+  /** Disclosure or panel opening: 160–220 ms */
+  --duration-panel-open: 200ms;
+
+  /** State change (position preserved): 150–200 ms */
+  --duration-state-change: 175ms;
+
+  /** Easing for panel open and state change */
+  --easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /** Easing for instant hover/focus response */
+  --easing-snap: cubic-bezier(0, 0, 0.2, 1);
+
+
+  /* ── Elevation ───────────────────────────────────────────────────────────── */
+  /*
+   * Spec §4.3: "Use one subtle elevation treatment for overlays."
+   * "Avoid large shadows on every card."
+   * Cards use border + surface difference for structure, not shadows.
+   */
+
+  /** Overlay/modal drop shadow — the one permitted elevation treatment */
+  --shadow-overlay: 0 8px 32px rgba(29, 37, 50, 0.12),
+                    0 2px 8px rgba(29, 37, 50, 0.08);
+
+  /** Subtle card lift for active/hover card states only — use sparingly */
+  --shadow-card-hover: 0 2px 12px rgba(29, 37, 50, 0.08);
+}
+
+
+/* ── Reduced-motion override ───────────────────────────────────────────────── */
+/*
+ * When the OS signals prefers-reduced-motion, collapse all durations to
+ * near-zero. Components still transition through the correct states; they
+ * just do so without animation.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-interaction: 1ms;
+    --duration-panel-open: 1ms;
+    --duration-state-change: 1ms;
+  }
+}

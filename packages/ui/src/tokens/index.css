@@ -1,0 +1,21 @@
+/**
+ * ServrSit — Design tokens entry point
+ *
+ * Import this single file to load the complete ServrSit token system.
+ * Order matters: colors → typography → spacing.
+ *
+ * Usage in a consuming app:
+ *
+ *   import "@servrsit/ui/tokens/index.css";
+ *
+ * Or in CSS:
+ *
+ *   @import "@servrsit/ui/tokens/index.css";
+ *
+ * Fonts are NOT loaded here. See packages/ui/src/fonts/README.md for
+ * instructions on obtaining and serving the font files.
+ */
+
+@import "./colors.css";
+@import "./typography.css";
+@import "./spacing.css";

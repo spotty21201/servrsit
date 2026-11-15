@@ -1,0 +1,110 @@
+/**
+ * ServrSit — Color tokens
+ * Source: UX Spec §4.2
+ *
+ * Base palette tokens and semantic state pairs. All values are exact from the
+ * specification. Do not modify these values without a spec change and a logged
+ * decision in docs/decisions/decision-log.md.
+ *
+ * Usage rules (from spec):
+ *   - Tangerine (#FF7648) is paired with Ink (#1D2532) text — NEVER white.
+ *   - Lilac and Citron are brand/identity accents only — not health status colors.
+ *   - Stage A is light theme only. Do not add OS dark-mode auto-inversion.
+ *   - ~75% of a normal overview should remain neutral (Canvas/Surface/Ink);
+ *     accents must feel intentional, not painted across every component.
+ */
+
+:root {
+  /* ── Base palette ───────────────────────────────────────────────────────── */
+
+  /** Warm main background */
+  --color-canvas: #F6F4EE;
+
+  /** Forms, working cards, menus */
+  --color-surface: #FFFFFF;
+
+  /** Primary text and dark surfaces (e.g. transcript background) */
+  --color-ink: #1D2532;
+
+  /** Secondary readable text */
+  --color-muted-ink: #56606C;
+
+  /**
+   * Primary routine action fill.
+   * MUST be paired with --color-ink text. Never use white text on this color.
+   */
+  --color-tangerine: #FF7648;
+
+  /** Identity accents and quiet feature emphasis. Not a health status color. */
+  --color-lilac: #C9B8FF;
+
+  /** Small brand accents and editorial highlights. Not a health status color. */
+  --color-citron: #D7EF52;
+
+  /** Non-essential separators only */
+  --color-soft-line: #DDDCD6;
+
+  /** Input boundaries and essential control distinctions */
+  --color-control-boundary: #7B8490;
+
+  /** Visible keyboard focus indicator */
+  --color-focus: #5141C6;
+
+
+  /* ── Semantic states ────────────────────────────────────────────────────── */
+  /*
+   * Each semantic state has a foreground (text/icon) and background pair.
+   * Calculated contrast ratios: approximately 5.9:1–6.9:1 for the opaque pairs.
+   * Designer and Tester must verify rendered controls, focus, overlays, and
+   * every interactive state independently.
+   *
+   * Semantic colors are exclusively for health/operation states. Do not use
+   * Lilac or Citron as stand-ins for any of these states.
+   */
+
+  /**
+   * Checked / passed state
+   * Icon: check-circle + precise result text
+   */
+  --color-state-passed-fg: #185C44;
+  --color-state-passed-bg: #DDF5E7;
+
+  /**
+   * Needs attention state
+   * Icon: triangle + specific issue text
+   */
+  --color-state-attention-fg: #794A00;
+  --color-state-attention-bg: #FFF0CE;
+
+  /**
+   * Failed / critical state
+   * Icon: octagon or X-circle + failure text
+   */
+  --color-state-failed-fg: #A32F2B;
+  --color-state-failed-bg: #FDE7E5;
+
+  /**
+   * Unknown / stale / unavailable state
+   * Icon: question-circle or clock + explicit state text
+   */
+  --color-state-unknown-fg: #4D5663;
+  --color-state-unknown-bg: #E7EBF0;
+
+  /**
+   * In progress / informational state
+   * Icon: activity or information icon + step text
+   */
+  --color-state-progress-fg: #344FA3;
+  --color-state-progress-bg: #E7ECFF;
+
+
+  /* ── Contrast reference (do not use as tokens — for documentation only) ── */
+  /*
+   * Ink on Canvas:        ~14.0:1  (passes AAA)
+   * Muted ink on Canvas:  ~5.8:1   (passes AA)
+   * Ink on Tangerine:     ~5.8:1   (passes AA)
+   *
+   * These are spec calculations for the opaque pairs listed. The full
+   * application must be checked at every rendered state by Tester (T-024).
+   */
+}
