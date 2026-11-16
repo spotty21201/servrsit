@@ -28,3 +28,9 @@ Subject: Overview screen v1 (fixture data), viewed in browser. Device/viewport: 
 - Which background direction felt closest: cool light, dark, or colored?
 - Dark theme is now plausible. Is it wanted? (UX Spec deferred it.)
 - Mobile: viewed or not?
+
+## Round 2 answers (same day)
+
+- Viewed on desktop and mobile (Xiaomi 14T). **Defect:** on mobile the UI is not anchored to the screen and moves around (drags/shifts). Likely causes to check: horizontal overflow, missing/incorrect viewport meta, `100vw`/`100vh` sizing against the mobile browser bar, fixed-position elements.
+- Creative latitude granted ("surprise me"). Direction: **white background**; **pixelated font and pixel icons for servers**.
+- Supersedes the three-variant request: default is now white. Pixel-font scope decided by Orchestrator: pixel font for titles and server names only; body, controls, and data stay in a readable sans/mono (legibility and WCAG). Thin weight is not available in pixel fonts, so "thin/minimal" is satisfied by the pixel face at regular weight and small, restrained sizes.

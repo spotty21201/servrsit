@@ -25,11 +25,13 @@
   /* ── Font family stacks ─────────────────────────────────────────────────── */
 
   /**
-   * Brand and display headings (Bricolage Grotesque, weight 650–700).
-   * Falls back to a wide geometric sans then to system-ui so text is never
-   * invisible while the custom font loads.
+   * Brand and display headings (Bricolage Grotesque).
+   * ADR-011: titles use a light weight (300 minimum, never hairline).
+   * Fallback is a regular system sans so the light weight is honoured while the
+   * font files are absent (the previous "Arial Black" fallback rendered heavy).
    */
-  --font-display: "Bricolage Grotesque", "Arial Black", system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
   /**
    * Interface, body, forms, buttons (Geist Sans, weight 400–600).
@@ -47,6 +49,9 @@
 
 
   /* ── Font weight constants ───────────────────────────────────────────────── */
+
+  /** Titles and server names (ADR-011). Floor — never use a lighter weight. */
+  --font-weight-light: 300;
 
   /** Body prose weight (Geist Sans) */
   --font-weight-regular: 400;
@@ -74,21 +79,21 @@
   /**
    * Display — 52 px / 56 px
    * Use: Fleet briefing headline; maximum two short lines.
-   * Font: Bricolage Grotesque, weight 650–700.
+   * Font: Bricolage Grotesque, weight 300 (ADR-011; was 650–700).
    */
   --text-display-size: 3.25rem;        /* 52px */
   --text-display-line-height: 3.5rem;  /* 56px */
-  --text-display-weight: var(--font-weight-bold);
+  --text-display-weight: var(--font-weight-light);
   --text-display-family: var(--font-display);
 
   /**
    * Page title — 36 px / 42 px
    * Use: Server name, activity header, settings.
-   * Font: Bricolage Grotesque, weight 650–700.
+   * Font: Bricolage Grotesque, weight 300 (ADR-011; was 650–700).
    */
   --text-page-title-size: 2.25rem;        /* 36px */
   --text-page-title-line-height: 2.625rem; /* 42px */
-  --text-page-title-weight: var(--font-weight-bold);
+  --text-page-title-weight: var(--font-weight-light);
   --text-page-title-family: var(--font-display);
 
   /**
@@ -103,13 +108,13 @@
 
   /**
    * Card title — 22 px / 28 px
-   * Use: Server identity cards.
-   * Font: Geist Sans, weight 600.
+   * Use: Server identity cards (server name display text).
+   * Font: Bricolage Grotesque, weight 300 (ADR-011; was Geist Sans 600).
    */
   --text-card-title-size: 1.375rem;       /* 22px */
   --text-card-title-line-height: 1.75rem; /* 28px */
-  --text-card-title-weight: var(--font-weight-semibold);
-  --text-card-title-family: var(--font-sans);
+  --text-card-title-weight: var(--font-weight-light);
+  --text-card-title-family: var(--font-display);
 
   /**
    * Body — 16 px / 24 px

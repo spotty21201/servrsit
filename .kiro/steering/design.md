@@ -95,3 +95,4 @@ Both fonts are open-licensed. Serve pinned assets through the application's own 
 - Server emblem is a pixel-art server icon (identity color only, never health).
 - Overview order: server cards first, attention list, then a short, narrow chat bar at the bottom.
 - Unknown/stale/failed states must still be visible and never shown as healthy.
+- (Round 2) Background is white. Titles and server names use an open-licensed pixel font (self-hosted, license committed); body, controls, data stay in a readable sans/mono. Pixel icons for servers. Mobile must be anchored: no horizontal scroll or drift.
