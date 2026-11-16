@@ -158,6 +158,23 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 
 ---
 
+## ADR-011 — Founder UX direction v1 overrides UX Spec v0.1 on six points
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-15 |
+| **Owner** | Orchestrator |
+| **Status** | [FOUNDER DECISION] — Recorded |
+| **Source** | docs/team/ux-feedback-001.md |
+
+**Decision:** (1) Remove the large briefing headline. (2) Replace the warm Canvas background. (3) Lighten the display/title weight (floor 300). (4) Pixel-art server icon replaces the geometric emblem. (5) Server cards first, chat bar bottom, shorter and narrower. (6) Keep server card design.
+
+**Rationale:** Founder is the product decision-maker (PRD §18). UX Spec v0.1 was proposed for founder review.
+
+**Consequences:** UX Spec signature 1 (typographic briefing) is retired. PRD FR-06 still requires that unknown/stale/failed states are visible and never shown as healthy; that is met by per-card status badges and the attention list, not a headline. Orchestrator will reflect these changes in the UX Spec after the founder approves the second mockup. Contrast checks (WCAG 2.2 AA) still apply to any new palette.
+
+---
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |

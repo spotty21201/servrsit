@@ -86,3 +86,12 @@ Both fonts are open-licensed. Serve pinned assets through the application's own 
 - Do not change shared domain contracts in `packages/contracts/` or `packages/domain/` independently.
 - Agree API/state adapter boundary with Coder before touching shared interfaces.
 - Design changes that affect operations, approval scope, or permission model return to the Orchestrator.
+
+## Founder overrides (ADR-011, 2026-11-15) — these supersede conflicting text above
+
+- No large briefing headline on the Overview. Retired signature 1.
+- Canvas is no longer `#F6F4EE`. Background is under redesign; follow the latest approved mockup.
+- Display/title weight is light (300 minimum). Do not use hairline weights.
+- Server emblem is a pixel-art server icon (identity color only, never health).
+- Overview order: server cards first, attention list, then a short, narrow chat bar at the bottom.
+- Unknown/stale/failed states must still be visible and never shown as healthy.
