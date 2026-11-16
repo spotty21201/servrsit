@@ -97,7 +97,7 @@ Last updated: 2026-11-15 | Milestone: M0 — Establish the project
 | **Owner** | Coder (schema); Designer (fixture data content) |
 | **Requirements** | Technical Spec §21 M2; UX Spec §18 |
 | **Dependencies** | T-007 |
-| **Acceptance criteria** | `tests/fixtures/` contains typed synthetic server snapshots for: 1-server fresh, 3-server mixed state, stale/partial/unreachable, running operation, outcome-unknown, malicious-output cases. All fixtures carry `[FIXTURE DATA]` marker in their metadata. |
+| **Acceptance criteria** | `tests/fixtures/` contains typed synthetic server snapshots for: 1-server fresh, 3-server mixed state, stale/partial/unreachable, running operation, outcome-unknown, malicious-output cases. All fixtures carry `[FIXTURE DATA]` marker in their metadata. Must include the adversarial fixture packages required by acceptance-matrix tests FI-020 and SA-013b (prompt-injection text in hostnames, package descriptions, log lines, filenames). |
 | **Status** | 🔲 todo |
 | **Evidence** | — |
 

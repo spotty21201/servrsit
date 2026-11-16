@@ -1,0 +1,379 @@
+/**
+ * OverviewScreen layout
+ *
+ * UX Spec §5.2:
+ *   Desktop (≥1200 px): 88 px navigation rail + content column, max 1320 px
+ *   Tablet (768–1199):  compact top nav + single main column
+ *   Mobile (≤767):      single column, 16 px padding
+ *
+ * No hardcoded colors — all via CSS custom properties from token system.
+ */
+
+/* ── App shell ────────────────────────────────────────────────────────────── */
+
+.appShell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--color-canvas);
+}
+
+/* ── Navigation rail (desktop) ───────────────────────────────────────────── */
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--nav-rail-width); /* 88px */
+  background-color: var(--color-surface);
+  border-right: 1px solid var(--color-soft-line);
+  padding: var(--space-3) 0;
+  z-index: 10;
+  gap: var(--space-2);
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: var(--space-1) 0 var(--space-3);
+  border-bottom: 1px solid var(--color-soft-line);
+}
+
+.wordmarkText {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+  letter-spacing: 0.02em;
+}
+
+.navList {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  width: 100%;
+}
+
+.navItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-half);
+  width: 100%;
+  padding: var(--space-1) 0;
+  text-decoration: none;
+  color: var(--color-muted-ink);
+  transition: color var(--duration-interaction) var(--easing-snap),
+              background-color var(--duration-interaction) var(--easing-snap);
+  border-radius: 0;
+}
+
+.navItem:hover {
+  color: var(--color-ink);
+  text-decoration: none;
+  background-color: color-mix(in srgb, var(--color-canvas) 60%, transparent);
+}
+
+.navItem:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.navItemActive {
+  color: var(--color-ink);
+  position: relative;
+}
+
+.navItemActive::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 24px;
+  background-color: var(--color-tangerine);
+  border-radius: 2px 0 0 2px;
+}
+
+.navLabel {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.navAccount {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-soft-line);
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding-bottom: var(--space-1);
+}
+
+.accountButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-lilac);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-semibold);
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  transition: opacity var(--duration-interaction) var(--easing-snap);
+}
+
+.accountButton:hover {
+  opacity: 0.85;
+}
+
+.accountButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.accountAvatar {
+  display: block;
+  line-height: 1;
+}
+
+/* ── Main content ─────────────────────────────────────────────────────────── */
+
+.main {
+  flex: 1;
+  margin-left: var(--nav-rail-width); /* offset for fixed rail */
+  min-width: 0;
+}
+
+.contentWrapper {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--space-5) var(--content-margin-desktop);
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-spacing-desktop-min);
+}
+
+/* Skip nav — visually hidden, shown on focus */
+.skipNav {
+  position: absolute;
+  left: calc(var(--nav-rail-width) + var(--space-2));
+  top: var(--space-2);
+  z-index: 999;
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-button);
+  font-family: var(--font-sans);
+  font-size: var(--text-compact-size);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  border: 2px solid var(--color-focus);
+}
+
+/* ── Compact top line ─────────────────────────────────────────────────────── */
+
+.topLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.workspaceName {
+  font-family: var(--font-sans);
+  font-size: var(--text-compact-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-ink);
+}
+
+.serviceIndicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-half);
+  font-family: var(--font-sans);
+  font-size: var(--text-compact-size);
+  color: var(--color-state-passed-fg);
+}
+
+.serviceIndicatorDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-state-passed-fg);
+}
+
+/* ── Roster heading ───────────────────────────────────────────────────────── */
+
+.rosterHeading {
+  font-family: var(--font-sans);
+  font-size: var(--text-section-title-size);
+  line-height: var(--text-section-title-line-height);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-ink);
+  margin: 0 0 var(--space-3) 0;
+}
+
+/* ── Working area: 8+4 col grid ───────────────────────────────────────────── */
+
+.workingArea {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.roster {
+  min-width: 0;
+}
+
+/* ── Roster grid: 2 cards per row at desktop ──────────────────────────────── */
+
+.rosterGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(var(--server-card-min-width), 1fr));
+  gap: var(--space-3);
+}
+
+/* ── Responsive: tablet (768–1199 px) ────────────────────────────────────── */
+
+@media (max-width: 1199px) {
+  .nav {
+    /* Switch from rail to top bar */
+    flex-direction: row;
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    width: 100%;
+    height: 56px;
+    border-right: none;
+    border-bottom: 1px solid var(--color-soft-line);
+    padding: 0 var(--space-3);
+    z-index: 10;
+  }
+
+  .wordmark {
+    padding: 0 var(--space-3) 0 0;
+    border-bottom: none;
+    border-right: 1px solid var(--color-soft-line);
+    width: auto;
+  }
+
+  .wordmarkText {
+    font-size: 13px;
+  }
+
+  .navList {
+    flex-direction: row;
+    padding: 0 var(--space-2);
+    gap: 0;
+    flex: 1;
+    justify-content: flex-start;
+    align-items: center;
+  }
+
+  .navItem {
+    flex-direction: row;
+    padding: 0 var(--space-2);
+    height: 56px;
+    gap: var(--space-1);
+    width: auto;
+  }
+
+  .navItemActive::after {
+    right: auto;
+    bottom: 0;
+    top: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 3px;
+    border-radius: 2px 2px 0 0;
+  }
+
+  .navLabel {
+    font-size: 13px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .navAccount {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+    border-left: 1px solid var(--color-soft-line);
+    padding: 0 0 0 var(--space-3);
+    width: auto;
+  }
+
+  .main {
+    margin-left: 0;
+  }
+
+  .contentWrapper {
+    padding: var(--space-4) var(--space-4);
+    gap: var(--section-spacing-mobile-max);
+  }
+
+  /* Attention above roster on tablet */
+  .workingArea {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+
+  /* Show attention column before roster on tablet */
+  .workingArea > aside {
+    order: -1;
+  }
+}
+
+/* ── Responsive: mobile (≤767 px) ────────────────────────────────────────── */
+
+@media (max-width: 767px) {
+  .nav {
+    padding: 0 var(--content-padding-mobile);
+    height: 52px;
+  }
+
+  .contentWrapper {
+    padding: var(--space-3) var(--content-padding-mobile);
+    gap: var(--section-spacing-mobile-min);
+  }
+
+  .rosterGrid {
+    /* Single column on mobile */
+    grid-template-columns: 1fr;
+  }
+
+  .workingArea {
+    gap: var(--space-3);
+  }
+
+  .topLine {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-half);
+  }
+}

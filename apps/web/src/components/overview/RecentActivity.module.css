@@ -1,0 +1,141 @@
+/**
+ * RecentActivity styles
+ * Compact list — not a wall of metrics.
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.heading {
+  font-family: var(--font-sans);
+  font-size: var(--text-section-title-size);
+  line-height: var(--text-section-title-line-height);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-ink);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-soft-line);
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+/* ── State icon colors ───────────────────────────────────────────────────── */
+
+.stateIcon {
+  flex-shrink: 0;
+  display: flex;
+  margin-top: 2px;
+}
+
+.stateIcon.succeeded { color: var(--color-state-passed-fg); }
+.stateIcon.failed    { color: var(--color-state-failed-fg); }
+.stateIcon.partial   { color: var(--color-state-attention-fg); }
+.stateIcon.unknown   { color: var(--color-state-unknown-fg); }
+.stateIcon.progress  { color: var(--color-state-progress-fg); }
+
+/* ── Content ─────────────────────────────────────────────────────────────── */
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+  min-width: 0;
+  flex: 1;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.title {
+  font-family: var(--font-sans);
+  font-size: var(--text-compact-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink);
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title:hover {
+  text-decoration: underline;
+}
+
+.time {
+  font-family: var(--font-mono);
+  font-size: var(--text-compact-size);
+  color: var(--color-muted-ink);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.summary {
+  font-family: var(--font-mono);
+  font-size: var(--text-technical-size);
+  line-height: var(--text-technical-line-height);
+  color: var(--color-muted-ink);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── View all link ───────────────────────────────────────────────────────── */
+
+.viewAll {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-half);
+  margin-top: var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-compact-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-muted-ink);
+  text-decoration: none;
+  transition: color var(--duration-interaction) var(--easing-snap);
+}
+
+.viewAll:hover {
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.viewAll:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-small);
+}
+
+/* ── Empty ─────────────────────────────────────────────────────────────── */
+
+.empty {
+  font-family: var(--font-sans);
+  font-size: var(--text-compact-size);
+  color: var(--color-muted-ink);
+  margin: 0;
+}

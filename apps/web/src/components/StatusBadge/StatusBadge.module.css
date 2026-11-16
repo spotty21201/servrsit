@@ -1,0 +1,43 @@
+/**
+ * StatusBadge styles
+ * Uses semantic state tokens exclusively.
+ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-half);
+  padding: 3px var(--space-1);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-sans);
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+/* Semantic state variants */
+.passed {
+  color: var(--color-state-passed-fg);
+  background-color: var(--color-state-passed-bg);
+}
+
+.attention {
+  color: var(--color-state-attention-fg);
+  background-color: var(--color-state-attention-bg);
+}
+
+.failed {
+  color: var(--color-state-failed-fg);
+  background-color: var(--color-state-failed-bg);
+}
+
+.unknown {
+  color: var(--color-state-unknown-fg);
+  background-color: var(--color-state-unknown-bg);
+}
+
+.progress {
+  color: var(--color-state-progress-fg);
+  background-color: var(--color-state-progress-bg);
+}

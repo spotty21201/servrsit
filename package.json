@@ -2,7 +2,7 @@
   "name": "servrsit",
   "private": true,
   "version": "0.0.0",
-  "description": "ServrSit — Your servers have a sitter.",
+  "description": "ServrSit \u2014 Your servers have a sitter.",
   "engines": {
     "node": ">=24.22.3",
     "pnpm": ">=12.21.0"

@@ -1,0 +1,44 @@
+/**
+ * FixtureBanner styles
+ *
+ * Uses the in-progress semantic state (blue) to make the fixture label
+ * clearly visible and distinct from both passed (green) and error (red).
+ * Never use a health status color here — this is an informational label.
+ */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background-color: var(--color-state-progress-bg);
+  border-bottom: 1px solid var(--color-state-progress-fg);
+  color: var(--color-state-progress-fg);
+  font-family: var(--font-mono);
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+  font-weight: var(--font-weight-medium);
+  /* Ensure it stays in the stacking context above content */
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.label {
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.description {
+  color: var(--color-state-progress-fg);
+  opacity: 0.85;
+}
+
+@media (max-width: 767px) {
+  .banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-half);
+  }
+}

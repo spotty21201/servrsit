@@ -9,3 +9,6 @@ packages:
   - "packages/ai"
   - "target-helper"
   - "infra"
+
+allowBuilds:
+  esbuild: true

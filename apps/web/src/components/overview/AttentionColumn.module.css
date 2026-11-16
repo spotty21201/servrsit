@@ -1,0 +1,129 @@
+/**
+ * AttentionColumn styles
+ * Open rows and separators — intentionally lighter than server cards.
+ */
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-sans);
+  font-size: var(--text-section-title-size);
+  line-height: var(--text-section-title-line-height);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-ink);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--space-half);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-state-attention-bg);
+  color: var(--color-state-attention-fg);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Finding row ─────────────────────────────────────────────────────────── */
+
+.finding {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-soft-line);
+}
+
+.finding:last-child {
+  border-bottom: none;
+}
+
+/* Icon color driven by severity via CSS variable on the icon's parent */
+.finding.attention .findingIcon {
+  color: var(--color-state-attention-fg);
+}
+
+.finding.failed .findingIcon {
+  color: var(--color-state-failed-fg);
+}
+
+.findingIcon {
+  flex-shrink: 0;
+  margin-top: 2px; /* optical alignment with first line of text */
+  display: flex;
+}
+
+.findingContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+  min-width: 0;
+}
+
+.findingHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.serverName {
+  font-family: var(--font-sans);
+  font-size: var(--text-compact-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+.findingTime {
+  font-family: var(--font-mono);
+  font-size: var(--text-compact-size);
+  color: var(--color-muted-ink);
+  white-space: nowrap;
+}
+
+.findingTitle {
+  font-family: var(--font-sans);
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink);
+  margin: 0;
+}
+
+.findingDetail {
+  font-family: var(--font-sans);
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+  color: var(--color-muted-ink);
+  margin: 0;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.empty {
+  font-family: var(--font-sans);
+  font-size: var(--text-compact-size);
+  color: var(--color-muted-ink);
+  margin: 0;
+}

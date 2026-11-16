@@ -130,6 +130,34 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 
 ---
 
+## ADR-009 — Disposable Ubuntu target: founder-provisioned
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-15 |
+| **Owner** | Orchestrator |
+| **Status** | [FOUNDER DECISION] — Recorded |
+
+**Decision:** Spotty will provision the disposable Ubuntu 24.04 target when ready. Coder documents the exact requirements (spec, SSH access, teardown) in T-010 so the machine can be set up quickly when available.
+
+**Consequences:** T-010 through T-014 (SSH mechanics, helper bootstrap, APT locking, disconnect/retry proof) are blocked until the VM is provided. T-015 AWS worksheet, T-017–T-022 visual screens, and T-023 API scaffold are all unaffected and proceed now.
+
+---
+
+## ADR-010 — AWS cost worksheet: public pricing estimate, no account access
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-15 |
+| **Owner** | Orchestrator |
+| **Status** | [FOUNDER DECISION] — Recorded |
+
+**Decision:** No AWS account exists. T-015 produces a cost worksheet using AWS public pricing pages only. No resources are created or accessed.
+
+**Consequences:** The worksheet will be estimates from published pricing, not measured actuals. It remains valid as a decision input — the purpose is to determine whether the dedicated-per-owner architecture fits the US$7.25 direct cost envelope before Spotty decides to open an AWS account. If costs are clearly infeasible, the architecture decision (ADR-004) is revisited before any account is created.
+
+---
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
