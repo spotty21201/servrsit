@@ -1,5 +1,8 @@
 export {
   CHECK_NAMES,
+  CLOCK_SKEW_TOLERANCE_SECONDS,
+  clockSkewed,
+  describeClockSkew,
   InspectionObservationSchema,
   LIMITS,
   OBSERVATION_SCHEMA_VERSION,
@@ -8,6 +11,7 @@ export {
 } from "./schema.js";
 export type {
   CheckName,
+  Clock,
   FailedUnit,
   Field,
   FilesystemEntry,

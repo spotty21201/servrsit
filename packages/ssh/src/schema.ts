@@ -13,6 +13,10 @@ import { OBSERVATION_LIMITS, type Field } from "@servrsit/contracts";
 
 export {
   CHECK_NAMES,
+  CLOCK_SKEW_TOLERANCE_SECONDS,
+  ClockSchema,
+  clockSkewed,
+  describeClockSkew,
   FailedUnitSchema,
   FilesystemEntrySchema,
   InodeEntrySchema,
@@ -22,6 +26,7 @@ export {
 } from "@servrsit/contracts";
 export type {
   CheckName,
+  Clock,
   FailedUnit,
   Field,
   FilesystemEntry,

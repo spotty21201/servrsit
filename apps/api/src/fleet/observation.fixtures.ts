@@ -14,6 +14,8 @@ export interface ObservationOptions {
   pending?: number;
   rebootRequired?: boolean;
   unavailableChecks?: boolean;
+  /** T-061: target clock minus ServrSit's, in seconds. null = the clock could not be read. Default 0. */
+  clockSkewSeconds?: number | null;
 }
 
 export function makeObservation(o: ObservationOptions = {}): InspectionObservation {
@@ -50,6 +52,14 @@ export function makeObservation(o: ObservationOptions = {}): InspectionObservati
         ],
         skippedLineCount: 0,
       }),
+      clock:
+        o.clockSkewSeconds === null
+          ? unavailable("target time not in expected format")
+          : ok({
+              targetEpochSeconds: Math.floor(Date.parse(o.collectedAt ?? "2026-11-17T08:00:00.000Z") / 1000) + (o.clockSkewSeconds ?? 0),
+              skewSeconds: o.clockSkewSeconds ?? 0,
+              uncertaintySeconds: 1,
+            }),
     },
     services: {
       collector: "inspect.services.v1",
@@ -64,6 +74,8 @@ export function makeObservation(o: ObservationOptions = {}): InspectionObservati
       heldBackCount: ok(0),
       metadataUpdatedAt: ok("2026-11-16T02:00:00.000Z"),
       rebootRequired: ok(o.rebootRequired ?? false),
+      metadataClock:
+        o.clockSkewSeconds === null ? "unverified" : Math.abs(o.clockSkewSeconds ?? 0) - 1 > 120 ? "corrected" : "in-sync",
     },
   };
 }

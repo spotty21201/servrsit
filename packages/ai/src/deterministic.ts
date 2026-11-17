@@ -8,13 +8,22 @@
  * states how old it is and that the host refreshed it, not ServrSit (DEF-L2).
  */
 
-import { sanitizeText } from "@servrsit/ssh";
-import { buildAiInput, type ExplainableServer } from "./input.js";
+import { describeClockSkew, sanitizeText } from "@servrsit/ssh";
+import { buildAiInput, type AiServerInput, type ExplainableServer } from "./input.js";
 import type { LocalTime, TimeContext } from "./time.js";
 
 export const NOT_REFRESHED_BY_SERVRSIT = "ServrSit does not refresh package lists.";
 
 const when = (t: LocalTime): string => `${t.at} (${t.age})`;
+
+/** T-061: say how the package time relates to the host's clock, when that matters. */
+function clockNote(m: NonNullable<AiServerInput["metrics"]>): string {
+  if (m.packageListsClock === "unverified") return " The host's clock could not be checked, so this time may be wrong.";
+  if (m.packageListsClock === "corrected" && m.clock !== null) {
+    return ` The host's clock is ${describeClockSkew(m.clock)}; this time is corrected for that.`;
+  }
+  return "";
+}
 
 export function deterministicExplanation(server: ExplainableServer, ctx: TimeContext): string {
   const input = buildAiInput(server, ctx);
@@ -49,7 +58,7 @@ export function deterministicExplanation(server: ExplainableServer, ctx: TimeCon
     if (m.rebootRequired !== null) parts.push(m.rebootRequired ? "reboot required" : "no reboot required");
     if (parts.length > 0) lines.push(`${parts.join("; ")}.`);
     if (m.packageLists !== null) {
-      lines.push(`Package information was last refreshed by the host at ${when(m.packageLists)}. ${NOT_REFRESHED_BY_SERVRSIT}`);
+      lines.push(`Package information was last refreshed by the host at ${when(m.packageLists)}. ${NOT_REFRESHED_BY_SERVRSIT}${clockNote(m)}`);
     } else if (m.pendingUpdates !== null) {
       lines.push(`The age of the package information is unknown. ${NOT_REFRESHED_BY_SERVRSIT}`);
     }

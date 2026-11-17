@@ -79,6 +79,8 @@ Conf openssl (3.0.13-0ubuntu3.5 Ubuntu:24.04/noble-updates [amd64])
   },
   aptstamp: { rc: 0, body: "1794894260" },
   rebootreq: { rc: 1, body: "" },
+  /** 2026-11-17T07:59:59Z: in sync with the fixture collection that ends at 08:00:00Z. */
+  clock: { rc: 0, body: "1794902399" },
 };
 
 /** Capabilities missing: no systemd, no apt, no MemAvailable, no stamp file. */

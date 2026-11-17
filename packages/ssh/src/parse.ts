@@ -10,6 +10,8 @@ import {
   ok,
   unavailable,
   LIMITS,
+  clockSkewed,
+  type Clock,
   type Field,
   type FailedUnit,
   type FilesystemEntry,
@@ -360,6 +362,43 @@ export function parseAptSimulation(lines: string[]): Field<AptSimulation> {
   const added = Number(summary[2]);
   if (upgraded + added !== inst) return unavailable("apt output inconsistent with its summary");
   return ok({ pendingCount: inst, heldBackCount: Number(summary[4]) });
+}
+
+/**
+ * `date +%s` on the target, read during a collection that ServrSit timed from
+ * `started` to `finished` (T-061). The target read its clock somewhere in that
+ * window, so the skew is measured against the window's midpoint and the
+ * uncertainty is half the window plus the one-second resolution.
+ */
+export function parseClock(lines: string[], started: Date, finished: Date): Field<Clock> {
+  const first = nonEmpty(lines)[0]?.trim();
+  if (first === undefined || !/^\d{1,12}$/.test(first)) return unavailable("target time not in expected format");
+  const targetEpochSeconds = Number(first);
+  if (targetEpochSeconds <= 0) return unavailable("target time not in expected format");
+  const windowMs = Math.max(0, finished.getTime() - started.getTime());
+  const midpointMs = started.getTime() + windowMs / 2;
+  return ok({
+    targetEpochSeconds,
+    // `|| 0` turns a rounded -0 into 0.
+    skewSeconds: Math.round((targetEpochSeconds * 1000 - midpointMs) / 1000) || 0,
+    uncertaintySeconds: Math.ceil(windowMs / 2000) + 1,
+  });
+}
+
+/**
+ * Put a time the TARGET's clock wrote into ServrSit's time (T-061). Corrected
+ * only when the measured skew is beyond the tolerance; unverified when the
+ * clock could not be read.
+ */
+export function correctTargetTime(
+  stamp: Field<string>,
+  clock: Field<Clock>,
+): { stamp: Field<string>; basis: "in-sync" | "corrected" | "unverified" } {
+  if (clock.status !== "ok") return { stamp, basis: "unverified" };
+  if (!clockSkewed(clock.value)) return { stamp, basis: "in-sync" };
+  if (stamp.status !== "ok") return { stamp, basis: "corrected" };
+  const corrected = new Date(Date.parse(stamp.value) - clock.value.skewSeconds * 1000);
+  return { stamp: ok(corrected.toISOString()), basis: "corrected" };
 }
 
 export function parseAptStamp(lines: string[], now: Date): Field<string> {

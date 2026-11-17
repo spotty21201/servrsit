@@ -60,6 +60,33 @@ export const InodeEntrySchema = z.object({
   usedPercent: z.number().int().min(0).max(100),
 });
 
+/** Larger skew than this (beyond the measurement uncertainty) is a time-sync finding (T-061, Tech Spec §8.2). */
+export const CLOCK_SKEW_TOLERANCE_SECONDS = 120;
+
+export const ClockSchema = z.object({
+  targetEpochSeconds: z.number().int().nonnegative(),
+  skewSeconds: z.number().int(),
+  uncertaintySeconds: z.number().int().nonnegative(),
+});
+export type Clock = z.infer<typeof ClockSchema>;
+
+/** True when the skew is beyond tolerance even at the most favourable end of the uncertainty. */
+export function clockSkewed(clock: Clock): boolean {
+  return Math.abs(clock.skewSeconds) - clock.uncertaintySeconds > CLOCK_SKEW_TOLERANCE_SECONDS;
+}
+
+/** "about 7 h behind ServrSit's clock", "about 10 min ahead of ServrSit's clock": plain text for findings and summaries. */
+export function describeClockSkew(clock: Pick<Clock, "skewSeconds">): string {
+  const abs = Math.abs(clock.skewSeconds);
+  const span =
+    abs >= 3600
+      ? `${Math.round(abs / 3600)} h`
+      : abs >= 60
+        ? `${Math.round(abs / 60)} min`
+        : `${abs} s`;
+  return `about ${span} ${clock.skewSeconds < 0 ? "behind" : "ahead of"} ServrSit's clock`;
+}
+
 export const FailedUnitSchema = z.object({
   unit: z.string().max(256),
   /** True only when `unit` is a well-formed systemd unit name. */
@@ -112,6 +139,13 @@ export const InspectionObservationSchema = z.object({
         skippedLineCount: z.number().int().nonnegative(),
       }),
     ),
+    /**
+     * T-061: the target's clock against ServrSit's, read once per collection
+     * (`date +%s`, read-only). Positive skew means the target is ahead.
+     * `uncertaintySeconds` covers the collection window and the one-second
+     * resolution: the true skew is within skew +- uncertainty.
+     */
+    clock: fieldSchema(ClockSchema),
   }),
   services: z.object({
     collector: z.literal("inspect.services.v1"),
@@ -127,8 +161,19 @@ export const InspectionObservationSchema = z.object({
     /** From a read-only simulation against the existing APT state. No refresh. */
     pendingCount: fieldSchema(z.number().int().nonnegative()),
     heldBackCount: fieldSchema(z.number().int().nonnegative()),
-    /** When APT metadata was last refreshed on the target (not by us). */
+    /**
+     * When APT metadata was last refreshed on the target (not by us), in
+     * ServrSit's time. The target writes this stamp with its own clock, so it is
+     * corrected for a measured skew beyond the tolerance (T-061).
+     */
     metadataUpdatedAt: fieldSchema(z.string().datetime()),
+    /**
+     * How metadataUpdatedAt relates to the target's clock:
+     *  - "in-sync": the clock was measured within tolerance; the stamp is used as is.
+     *  - "corrected": the clock was off by more than the tolerance; the stamp was shifted by the measured skew.
+     *  - "unverified": the clock could not be read, so the stamp may be wrong by any amount.
+     */
+    metadataClock: z.enum(["in-sync", "corrected", "unverified"]),
     rebootRequired: fieldSchema(z.boolean()),
   }),
 });
@@ -151,6 +196,7 @@ export const CHECK_NAMES = [
   "memory",
   "filesystems",
   "inodes",
+  "clock",
   "failedUnits",
   "pendingPackages",
   "heldBackPackages",

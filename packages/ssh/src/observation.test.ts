@@ -11,7 +11,7 @@ const at = new Date("2026-11-17T08:00:00.000Z");
 const build = (sections = NORMAL, extra: { outputTruncated?: boolean } = {}) =>
   buildObservation({
     stdout: renderOutput(sections), nonce: NONCE, source: "ssh",
-    collectedAt: at, durationMs: 1234, outputTruncated: extra.outputTruncated ?? false,
+    startedAt: new Date(at.getTime() - 1234), collectedAt: at, durationMs: 1234, outputTruncated: extra.outputTruncated ?? false,
   });
 
 test("a normal snapshot parses into structured, versioned JSON", () => {
@@ -64,7 +64,7 @@ test("sections the run never finished are unavailable, not defaulted", () => {
   const partial = renderOutput({ hostname: NORMAL["hostname"]!, os: NORMAL["os"]! }, NONCE);
   const o = buildObservation({
     stdout: partial + `@@BEGIN ${NONCE} df@@\n/dev/sda5 1 1 1 1% /`, nonce: NONCE, source: "ssh",
-    collectedAt: at, durationMs: 5, outputTruncated: true,
+    startedAt: new Date(at.getTime() - 5), collectedAt: at, durationMs: 5, outputTruncated: true,
   });
   assert.equal(o.truncated, true);
   assert.deepEqual(o.host.filesystems, { status: "unavailable", reason: "collector output incomplete" });
@@ -139,4 +139,51 @@ test("failed-unit list is capped and overflow counted", () => {
 
 test("serialised observation stays under the payload cap", () => {
   assert.ok(Buffer.byteLength(JSON.stringify(build(MALICIOUS))) < LIMITS.maxObservationBytes);
+});
+
+// ---- T-061: target clock ------------------------------------------------------------
+
+const SEVEN_HOURS = 7 * 3600;
+const withClock = (body: string, rc = 0) => build({ ...NORMAL, clock: { rc, body } });
+
+test("T-061: the clock is measured against the collection window; in sync leaves the package stamp alone", () => {
+  const o = build();
+  assert.deepEqual(o.host.clock, { status: "ok", value: { targetEpochSeconds: 1794902399, skewSeconds: 0, uncertaintySeconds: 2 } });
+  assert.equal(o.packages.metadataClock, "in-sync");
+  assert.equal(o.packages.metadataUpdatedAt.status === "ok" && o.packages.metadataUpdatedAt.value, "2026-11-17T05:44:20.000Z");
+});
+
+test("T-061: Sentani's case, a target clock 7 hours slow, is measured and the package stamp is corrected by 7 hours", () => {
+  const o = withClock(String(1794902399 - SEVEN_HOURS));
+  assert.equal(o.host.clock.status === "ok" && o.host.clock.value.skewSeconds, -SEVEN_HOURS);
+  assert.equal(o.packages.metadataClock, "corrected");
+  // The target wrote 05:44:20 by its own clock, which is 7 h behind: the real time was 12:44:20.
+  assert.equal(o.packages.metadataUpdatedAt.status === "ok" && o.packages.metadataUpdatedAt.value, "2026-11-17T12:44:20.000Z");
+});
+
+test("T-061: a clock ahead by 10 minutes is corrected the other way; 90 seconds is within tolerance", () => {
+  const ahead = withClock(String(1794902399 + 600));
+  assert.equal(ahead.packages.metadataClock, "corrected");
+  assert.equal(ahead.packages.metadataUpdatedAt.status === "ok" && ahead.packages.metadataUpdatedAt.value, "2026-11-17T05:34:20.000Z");
+  const near = withClock(String(1794902399 + 90));
+  assert.equal(near.packages.metadataClock, "in-sync");
+});
+
+test("T-061: an unreadable clock is unavailable, never zero skew, and the package age is marked unverified", () => {
+  for (const [body, rc] of [["", 127], ["not a number", 0], ["0", 0], ["$(date)", 0]] as const) {
+    const o = withClock(body, rc);
+    assert.equal(o.host.clock.status, "unavailable", JSON.stringify(body));
+    assert.equal(o.packages.metadataClock, "unverified");
+    assert.equal(o.packages.metadataUpdatedAt.status === "ok" && o.packages.metadataUpdatedAt.value, "2026-11-17T05:44:20.000Z", "kept as reported, but marked unverified");
+  }
+});
+
+test("T-061: a long collection window widens the uncertainty, so a borderline skew is not called skewed", async () => {
+  const { buildObservation: b } = await import("./collect.js");
+  const o = b({
+    stdout: renderOutput({ ...NORMAL, clock: { rc: 0, body: String(1794902400 - 130) } }), nonce: NONCE, source: "ssh",
+    startedAt: new Date(at.getTime() - 30_000), collectedAt: at, durationMs: 30_000, outputTruncated: false,
+  });
+  assert.equal(o.host.clock.status === "ok" && o.host.clock.value.uncertaintySeconds, 16);
+  assert.equal(o.packages.metadataClock, "in-sync", "115 s skew +- 16 s is not beyond 120 s for certain");
 });

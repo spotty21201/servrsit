@@ -19,6 +19,7 @@
 
 import {
   CHECK_NAMES,
+  clockSkewed,
   isSafeMountPath,
   isSafeUnitName,
   type InspectionObservation,
@@ -119,6 +120,15 @@ export const AiServerInputSchema = z
          * pendingUpdates is only as current as this. ServrSit never refreshes them.
          */
         packageLists: LocalTimeSchema.nullable(),
+        /**
+         * T-061: how packageLists relates to the host's clock. "corrected": the host's clock was off by more
+         * than 2 minutes and the time was corrected; "unverified": the clock could not be checked.
+         */
+        packageListsClock: z.enum(["in-sync", "corrected", "unverified"]),
+        /** T-061: host clock minus ServrSit's. Null when it could not be read. */
+        clock: z
+          .object({ skewSeconds: z.number().int(), uncertaintySeconds: z.number().int().nonnegative(), beyondTolerance: z.boolean() })
+          .nullable(),
         rebootRequired: z.boolean().nullable(),
         failedUnits: z
           .object({ names: z.array(text(100)).max(10), unrecognisedCount: z.number().int().nonnegative() })
@@ -189,6 +199,11 @@ function metricsFrom(
     pendingUpdates: o.packages.pendingCount.status === "ok" ? o.packages.pendingCount.value : null,
     packageLists:
       o.packages.metadataUpdatedAt.status === "ok" ? localTime(o.packages.metadataUpdatedAt.value, ctx) : null,
+    packageListsClock: o.packages.metadataClock,
+    clock:
+      h.clock.status === "ok"
+        ? { skewSeconds: h.clock.value.skewSeconds, uncertaintySeconds: h.clock.value.uncertaintySeconds, beyondTolerance: clockSkewed(h.clock.value) }
+        : null,
     rebootRequired: o.packages.rebootRequired.status === "ok" ? o.packages.rebootRequired.value : null,
     failedUnits,
     importantServicesFailed:

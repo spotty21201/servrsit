@@ -10,13 +10,17 @@
  *   reverifies the key out of band. No confirmation window applies.
  * - CPU and memory produce no finding: the spec requires a documented
  *   sampling method and sustained-sample rule first.
+ * - Target clock skew beyond 2 minutes (after the measurement's uncertainty)
+ *   is a time-sync warning on the first observation (T-061, Tech Spec §8.2):
+ *   one reading is a measurement, not a sample, and every target-written time
+ *   is affected from that moment.
  * - Unavailable checks are not findings (and never resolve one).
  *
  * Names that came from a server are only echoed into text when they pass the
  * well-formedness check. Findings are built from our own templates.
  */
 
-import { isSafeMountPath, isSafeUnitName, type InspectionObservation } from "@servrsit/ssh";
+import { clockSkewed, describeClockSkew, isSafeMountPath, isSafeUnitName, type InspectionObservation } from "@servrsit/ssh";
 import type { Finding } from "./schema.js";
 
 const WARNING = 85;
@@ -118,6 +122,12 @@ export function evaluateFindings(input: FindingsInput): Finding[] {
   }
 
   if (current !== null) {
+    if (current.host.clock.status === "ok" && clockSkewed(current.host.clock.value)) {
+      findings.push({
+        id: "clock-skew", rule: "time.skew.v1", severity: "warning",
+        summary: `This server's clock is ${describeClockSkew(current.host.clock.value)}. Times the server writes itself, such as when it last refreshed package lists, are corrected for this. Check time synchronisation on the server.`,
+      });
+    }
     findings.push(...usageFindings("disk", filesystemUsage(current), filesystemUsage(previous)));
     findings.push(...usageFindings("inode", inodeUsage(current), inodeUsage(previous)));
 
