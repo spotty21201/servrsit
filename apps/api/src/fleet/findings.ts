@@ -5,6 +5,9 @@
  *   threshold is met in two successive successful observations. A first
  *   observation over the line is an advisory, never a warning.
  * - Two consecutive failed scheduled connections create an unreachable finding.
+ * - A changed host key is a critical finding on the FIRST occurrence (O2). It
+ *   is a security event: inspection and changes stay blocked until the owner
+ *   reverifies the key out of band. No confirmation window applies.
  * - CPU and memory produce no finding: the spec requires a documented
  *   sampling method and sustained-sample rule first.
  * - Unavailable checks are not findings (and never resolve one).
@@ -95,6 +98,14 @@ export interface FindingsInput {
 export function evaluateFindings(input: FindingsInput): Finding[] {
   const findings: Finding[] = [];
   const { current, previous } = input;
+
+  if (input.latestFailureCode === "HOST_KEY_CHANGED") {
+    findings.push({
+      id: "host-key-changed", rule: "host.key-changed.v1", severity: "critical",
+      summary:
+        "The host key no longer matches the pinned key. Inspection is blocked. Verify the new fingerprint independently (for example from the provider console) before trusting this host again.",
+    });
+  }
 
   if (
     input.consecutiveFailures >= 2 &&

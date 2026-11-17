@@ -78,3 +78,24 @@ test("findings are sorted most severe first", () => {
     makeObservation({ diskPercent: 96 }));
   assert.deepEqual(f.map((x) => x.severity), ["critical", "warning", "advisory"]);
 });
+
+test("O2: a changed host key is a critical finding on the first occurrence", () => {
+  const f = evaluateFindings({ current: null, previous: null, consecutiveFailures: 1, latestFailureCode: "HOST_KEY_CHANGED" });
+  assert.equal(f.length, 1);
+  assert.deepEqual([f[0]?.id, f[0]?.rule, f[0]?.severity], ["host-key-changed", "host.key-changed.v1", "critical"]);
+  assert.match(f[0]?.summary ?? "", /Verify the new fingerprint independently/);
+});
+
+test("O2: the host-key finding sits above older data findings and is not 'unreachable'", () => {
+  const f = evaluateFindings({ current: makeObservation({ pending: 2 }), previous: null, consecutiveFailures: 3, latestFailureCode: "HOST_KEY_CHANGED" });
+  assert.equal(f[0]?.id, "host-key-changed");
+  assert.equal(f.some((x) => x.id === "unreachable"), false);
+  assert.ok(f.some((x) => x.id === "updates-pending"), "older findings from the last success stay visible");
+});
+
+test("O2: other failures do not raise the host-key finding", () => {
+  for (const code of ["AUTH_FAILED", "ROUTE_UNAVAILABLE", "TIMEOUT", "HOST_UNTRUSTED", null]) {
+    const f = evaluateFindings({ current: null, previous: null, consecutiveFailures: 1, latestFailureCode: code });
+    assert.equal(f.some((x) => x.id === "host-key-changed"), false, String(code));
+  }
+});

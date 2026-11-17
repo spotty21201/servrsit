@@ -120,6 +120,8 @@ test("a changed host key blocks the host until restart", async () => {
   await service.refreshAll();
   assert.equal(calls.filter((c) => c === "Alpha").length, 1);
   assert.equal(server("Alpha").status, "host-key-changed");
+  assert.equal(server("Alpha").findings[0]?.id, "host-key-changed", "O2: raised as a finding, and it persists");
+  assert.equal(server("Alpha").findings[0]?.severity, "critical");
 });
 
 test("a recovered host clears its failure count", async () => {
