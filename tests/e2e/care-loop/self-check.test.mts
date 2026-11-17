@@ -62,11 +62,11 @@ const EXPECT: Record<Fault, string[]> = {
   reconcileRedispatches: ["CL-06e"],
   stopKills: ["CL-07a"],
   stopCancelsQueuedWithoutQuery: ["CL-07c"],
-  writesGateMissing: ["CL-08b", "CL-08c", "CL-08e"],
+  writesGateMissing: ["CL-08b", "CL-08c", "CL-08e", "CL-08i"],
   writesGateApproveOnly: ["CL-08e"],
   clientOverride: ["CL-08c"],
   assistantApproves: ["CL-08d"],
-  defaultWritesTrue: ["CL-08b", "CL-08e"],
+  defaultWritesTrue: ["CL-08b", "CL-08e", "CL-08i"],
 };
 
 test('the correct model also passes when planning itself refuses write-disabled servers (second legal design)', async () => {

@@ -28,9 +28,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { FastifyInstance } from "fastify";
 import { CSRF_HEADER, CsrfGuard } from "../../../apps/api/src/csrf.ts";
 import { buildServer } from "../../../apps/api/src/server.ts";
+
+type App = Awaited<ReturnType<typeof buildServer>>;
 import { Dispatcher, SimulatedTarget, TransportError, type WriteTarget } from "../../../apps/worker/src/index.ts";
 import { createSigner, PRODUCTION_ACK } from "../../../packages/domain/src/index.ts";
 import { MemoryIntentStore, SqliteCareStore, type OperationEvent, type StoredOperation } from "../../../packages/store/src/index.ts";
@@ -158,7 +159,7 @@ export class InProcessHarness implements Harness {
   private readonly csrf = new CsrfGuard();
   private readonly servers = new Map<string, Entry>();
   private readonly targets = new Map<string, WriteTarget>();
-  private app: FastifyInstance | null = null;
+  private app: App | null = null;
   private dirty = true;
   private paused = false;
   private workerSeq = 0;
@@ -180,7 +181,7 @@ export class InProcessHarness implements Harness {
     });
   }
 
-  private async appInstance(): Promise<FastifyInstance> {
+  private async appInstance(): Promise<App> {
     if (this.app !== null && !this.dirty) return this.app;
     if (this.app !== null) await this.app.close();
     this.app = await buildServer({

@@ -21,7 +21,6 @@ import { syncBuiltinESMExports } from "node:module";
 import test, { after, before } from "node:test";
 import tls from "node:tls";
 import { DatabaseSync } from "node:sqlite";
-import type { FastifyInstance } from "fastify";
 import { CSRF_HEADER, CsrfGuard } from "../../../apps/api/src/csrf.ts";
 import { FleetConfigSchema, loadFleetConfig } from "../../../apps/api/src/fleet/config.ts";
 import { buildServer } from "../../../apps/api/src/server.ts";
@@ -53,7 +52,8 @@ function guard<T extends object>(obj: T, names: string[], label: string): void {
 
 const csrf = new CsrfGuard();
 const store = new SqliteCareStore({ path: dbPath });
-let app: FastifyInstance;
+type App = Awaited<ReturnType<typeof buildServer>>;
+let app: App;
 let readDb: DatabaseSync;
 let hosts: { id: string; name: string; production: boolean }[] = [];
 
@@ -120,13 +120,14 @@ test("ZT-01: a revised plan for a real host is still blocked, and a client canno
   const plan = (await post("/api/plans", { operation: "apply.packages.v1", serverId: h.id })).body;
   const rev = await post(`/api/plans/${plan["id"]}/revisions`);
   assert.equal(rev.status, 201);
-  assert.ok((rev.body["blockers"] as { code: string }[]).some((b) => b.code === "WRITES_DISABLED"));
+  assert.ok((rev.body["blockers"] as { code: string }[]).some((b: { code: string }) => b.code === "WRITES_DISABLED"));
   const baseBody = { planVersion: rev.body["version"], planDigest: rev.body["digest"], idempotencyKey: "zt01-override-attempt-0001", acknowledgements: [PRODUCTION_ACK] };
   for (const extra of [{ writesEnabled: true }, { writes_enabled: true }, { force: true }, { override: { writesEnabled: true } }]) {
     const r = await post(`/api/plans/${plan["id"]}/approvals`, { ...baseBody, ...extra }, withCsrf);
     assert.ok(r.status >= 400 && r.status < 500, `override ${JSON.stringify(extra)}: ${r.status}`);
   }
-  for (const headers of [{ "x-writes-enabled": "true" }, { "x-servrsit-force": "1" }]) {
+  const headerSets: Record<string, string>[] = [{ "x-writes-enabled": "true" }, { "x-servrsit-force": "1" }];
+  for (const headers of headerSets) {
     const r = await post(`/api/plans/${plan["id"]}/approvals`, baseBody, { ...withCsrf, ...headers });
     assert.ok(r.status >= 400 && r.status < 500, `header override ${JSON.stringify(headers)}: ${r.status}`);
   }
@@ -152,7 +153,7 @@ test("ZT-01: no route can change a server's write setting (PATCH/PUT/POST/DELETE
     }
   }
   const plan = (await post("/api/plans", { operation: "apply.packages.v1", serverId: hosts[0]!.id })).body;
-  assert.ok((plan["blockers"] as { code: string }[]).some((b) => b.code === "WRITES_DISABLED"), "still gated after those attempts");
+  assert.ok((plan["blockers"] as { code: string }[]).some((b: { code: string }) => b.code === "WRITES_DISABLED"), "still gated after those attempts");
 });
 
 test("ZT-01: route inventory. Every mutating route is known and reviewed (a new one fails this test on purpose)", () => {

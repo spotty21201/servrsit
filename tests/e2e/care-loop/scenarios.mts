@@ -833,6 +833,21 @@ const writesOff: Scenario[] = [
     },
   },
   {
+    id: "CL-08i",
+    title: "writes switched off between planning and approval: the approval is refused",
+    traces: ["ZT-01", "invariant 12", "Tech §9.2"],
+    spec: ["Tech §9.2: the approval endpoint checks current policy", "ADR-014: the flag is the gate, read when it is used"],
+    async run(h) {
+      for (const flag of FLAGS) {
+        const { serverId, plan } = await setup(h, { production: true });
+        await h.setWritesEnabled(serverId, flag);
+        assertRefused(await h.approve(approvalFor(plan, { production: true })), `writes ${label(flag)} before approval`);
+        await h.settle();
+        await assertNoWork(h, serverId, `writes ${label(flag)} before approval`);
+      }
+    },
+  },
+  {
     id: "CL-08f",
     title: "schedules, time and reconcile never write on a write-disabled server",
     traces: ["ZT-01", "FR-19", "Tech §14"],

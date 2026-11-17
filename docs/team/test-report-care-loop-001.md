@@ -1,144 +1,203 @@
-# Test Report — Care loop acceptance tests, written ahead of T-048
+# Test Report: care loop (T-048), AWS skeleton (T-049), live cards (T-046) on integration/live-v1
 
 **Tester:** Kiro Tester  
 **Date:** 2026-11-17 (UTC)  
-**Branch / worktree:** `feat/tester/live-check` at `/projects/servrsit-tester`  
-**Spec reviewed:** PRD FR-10..FR-17; Technical Spec §8.2, §9, §10.2, §11, §13; execution-security invariants 1-14; ADR-014. Coder's code was **not** read to write these tests.  
-**Implementation reviewed:** none. T-048 has not landed (evidence below).
+**Branch:** `feat/tester/care-loop` (integration/live-v1 plus my tests)  
+**Code tested:** integration/live-v1 at `6bc72cc`. Integration has since advanced to `e9dd899`; I checked, and nothing but docs, `.gitignore` and an agent file changed, so the product code is identical.  
+**Spec reviewed:** PRD FR-10..FR-17; Technical Spec §8.2, §9, §10.2, §11, §13; execution-security invariants 1-14; ADR-014; Coder's T-047..T-049 handoff.
 
 ## Result: PARTIAL
 
-| Part | Status |
+The write gate holds on every real-host path I could find or build. The core care-loop behaviours I tested pass. Six scenarios fail and one could not run, and every one of the seven is a gap in what has been built, not a safety failure. Nothing wrote to a real server.
+
+| Area | Result |
 |---|---|
-| Tests written from the spec (39 scenarios, 7 requested areas) | **Done** |
-| Tests proven able to pass and able to fail (self-check on a reference model) | **Done, 27/27** |
-| Static ZT-01 check on the shipped host config | **Done, 3/3 pass** |
-| Tests run against Coder's care loop (T-048) | **NOT RUN.** It does not exist yet. All 39 real-system scenarios are skipped as PENDING. |
-
-Nothing in this report is a verdict on Coder's implementation. A green self-check says the tests are sound, not that the product is.
-
-**T-048 status, checked rather than assumed:** the ID appears in no doc in either checkout (`grep -rln T-048` → nothing). `apps/api/src` in Coder's worktree (HEAD `5c61936`, "T-047 … still disabled") and the integration branch (`2a2e768`) contain no plan or operation routes and no `writesEnabled` anywhere in source.
-
-## Verbatim results
+| **ZT-01: `writesEnabled=false` blocks every real-host write path** | **CONFIRMED** (§2). 12/12 on the real four-host wiring, 11 of 13 faults I injected into the real code caught, the other two explained. |
+| Care-loop scenarios against T-048 | 42 scenarios: **35 pass, 6 fail, 1 not run** (§3) |
+| Real-host ZT-01 suite | 12/12 pass |
+| Static host-config check | 3/3 pass |
+| Self-check of the tests themselves | 28/28 pass |
+| Live fleet re-check, all four servers | **PASS**: `source=live`, `fresh`, 15/15 each (§6) |
+| Repo's own suite (regression) | **362 pass, 0 fail**, same as Coder reported (353 plus infra 9) |
+| Strict `tsc` on all my test files | exit 0 |
 
 ```
 $ pnpm exec tsx --test ../../tests/e2e/care-loop/*.test.mts
-ℹ tests 69   ℹ pass 30   ℹ fail 0   ℹ cancelled 0   ℹ skipped 39   ℹ todo 0
-
-self-check.test.mts      ℹ tests 27  ℹ pass 27  ℹ fail 0  ℹ skipped 0
-static-config.test.mts   ℹ tests 3   ℹ pass 3   ℹ fail 0  ℹ skipped 0
-care-loop.test.mts       ℹ tests 39  ℹ pass 0   ℹ fail 0  ℹ skipped 39   (PENDING T-048)
-tsc --noEmit (strict) over all new files: exit 0
+ℹ tests 85   ℹ pass 78   ℹ fail 6   ℹ cancelled 0   ℹ skipped 1
+  care-loop.test.mts        42 tests: 35 pass, 6 fail, 1 skipped (NOT RUN)
+  zt01-real-hosts.test.mts  12 tests: 12 pass
+  self-check.test.mts       28 tests: 28 pass
+  static-config.test.mts     3 tests:  3 pass
 ```
 
-Skipped tests are **not passes**. The "30 pass" are the self-check and the static config check only.
+## Safety record
 
-No server was contacted. The test code contains no process spawn, network call or SSH (grep: one hit, a comment). The static check only reads the text of `hosts.json`.
-
-## How the tests are built, and why
-
-The spec fixes behaviour, endpoints and error codes. It does **not** fix request/response JSON. So:
-
-- **Scenarios assert on an abstract `Harness`** (`support/contract.mts`). Every shape assumption is isolated in `http-binding.mts`, which is deliberately unbound. When T-048 lands I map shapes there without touching any assertion.
-- **The managed server is the oracle.** Effects are read from a simulated target's own ledger, mutation log and interaction log, not from the API's account of itself. "Double approval gives one operation" is proved by counting mutations the target actually applied.
-- **Tests were validated before use.** A small spec-derived reference model passes every scenario, and 24 deliberately broken variants ("faults") are each caught by the scenarios I named. This guards against tests that cannot fail.
-- **Hard safety guards in the binding:** refuses any non-loopback URL, refuses to run without `CARELOOP_SIMULATED=1`, never reads an address, key or host from the environment. These tests drive mutation paths and must never reach Sentani, Nabire, Timika or Merauke.
-
-## Coverage of the seven requested areas
-
-| # | Requested | Scenarios | Key assertions (spec source) |
-|---|---|---|---|
-| 1 | Plan expiry and digest mismatch | CL-01a–e, CL-02a–f | Approvable at 14m59s, refused `PLAN_EXPIRED` at 15m01s with zero ops and zero requests reaching the target (FR-11). Refresh gives a new digest and acknowledgements don't transfer (UX §10.3). **Accepted work is not expired or killed** (Tech §8.2). **Queued-unsent work is never sent after expiry** (Tech §9.3). Tampered digest, other plan's digest, wrong version, missing digest are all refused (`PLAN_CHANGED`). Both production acknowledgements required. Session and CSRF required (Tech §9.2). |
-| 2 | Double approval returns one operation | CL-03a–f | Same key twice, and **10 concurrent**, give one operation id and one mutation on the target. Different key can never create a second. Two different plans at once: exactly one wins, loser gets `TARGET_BUSY` (FR-14). **Alias display name can't bypass the lock** (FR-02). Replay after completion changes nothing. |
-| 3 | Changed transaction invalidates approval | CL-04a–d | Transaction changes after approval: **no commit**, a reason is given (Tech §10.2 step 5). Old approval can't be reused. A new plan has a new digest and applies exactly once. Change before approval is `PLAN_CHANGED`. Removals are blocked in A (FR-12). |
-| 4 | Retry after lost ack queries same op ID | CL-05a–c | Ack lost after acceptance, request lost before acceptance, and controller restart. In each: the target only ever sees **one** operation id, the retry **queries first**, the mutation request is sent **once**, one mutation applied (invariant 7). |
-| 5 | `outcome_unknown` blocks conflicting writes | CL-06a–e | Conflicting approval refused (`TARGET_BUSY` or `OUTCOME_UNKNOWN`) **even after the target is reachable again**, because reachability is not evidence. 1 h and 24 h later: still refused (lease expiry never authorizes, Tech §9.4). Other servers are unaffected. `reconcile` only reads and never guesses. Resolution **appends** events and keeps the earlier `outcome_unknown` record (Tech §11). |
-| 6 | Stop request is not cancellation | CL-07a–c | Running op: request recorded, **state stays `running`**, **0 kill signals** to the target, work completes and is verified, no event claims rollback (FR-16, Tech §10.2). Never-sent op: `cancelled_before_start`, nothing ever sent. Possibly-already-sent op: **must query first, never called cancelled** (Tech §11). |
-| 7 | `writesEnabled=false` blocks every write path (ZT-01) | CL-08a–g, CL-08h (static) | Control: all four kinds do work when enabled. With the flag **false and absent**: all four kinds refused, no op, nothing reaches the target. Client override via body or header ignored. Chat "yes / do it / approve" creates nothing, with writes on or off. **Gate re-checked at dispatch** (flag turned off or removed after approval). Scheduler, 30 hours of time and `reconcile` never send a mutation. Read-only inspection still works. Static: no host in `hosts.json` has `writesEnabled: true`. |
-
-## Does each scenario actually detect its bug? (self-check)
-
-24 faults, each introduced on its own, each caught. Examples (full list in `self-check.test.mts`):
-
-| Fault introduced in the model | Caught by |
+| Rule | What happened |
 |---|---|
-| expiry not enforced | CL-01b, CL-01e |
-| expiry kills an already-accepted op | CL-01d |
-| digest ignored / version ignored | CL-02a, 02b / CL-02c |
-| no idempotency; duplicate ops | CL-03a, 03b, 03f / CL-03a, 03b, 03c |
-| same-server lock missing | CL-03d, 03e, 06a |
-| helper doesn't recheck the transaction | CL-04a, 04c |
-| retry doesn't query first / regenerates the id | CL-05a–c / CL-05b |
-| unknown outcome doesn't block / time unblocks it | CL-06a, 06b / CL-06b |
-| reconcile re-dispatches | CL-06e |
-| stop request kills the transaction | CL-07a |
-| stop cancels a possibly-sent op without querying | CL-07c |
-| writes gate missing / approve-only (not re-checked at dispatch) | CL-08b, 08c, 08e / CL-08e |
-| client override honoured | CL-08c |
-| chat approves | CL-08d |
-| absent flag treated as enabled | CL-08b, 08e |
+| Read-only, no writes on any real host | No write was sent anywhere. The care-loop scenarios run only against simulated targets inside the test process. The real-host suite runs with a guard that throws on and counts any process spawn, socket, TLS or DNS call. The count was **0**. |
+| No sudo | None used. |
+| No SSH from me | I never ran `ssh`. The only contact with real hosts was my one API instance's read-only collector pass (§6): **4 checks, one per host, 0 failures**. I did not read any key file. |
+| No production source edited | `git status` shows only `tests/` and this report. Mutation testing was done in a throwaway detached worktree under `/tmp`, which I removed. |
+| Founder's running instance (port 3001) | Untouched. I read its cached `/api/fleet` once (no new contact) and it was still up when I finished. |
+| My process and pane | Instance on port 3002 stopped by SIGTERM (exited in 0.1 s) after confirming its PID's working directory was my worktree. Pane closed. |
 
-The correct model also passes under a second legal design (planning itself refuses write-disabled servers), so the tests don't force one implementation choice.
+## 1. How the tests run against T-048
 
-### Two flaws the self-check found in my own work (both fixed)
+T-048 has **no HTTP test mode**: simulated servers can only be injected in code (`buildServer({ care: { simulated } })`). So the binding (`tests/e2e/care-loop/binding.mts`) runs the real Fastify routes, real SQLite store and real `Dispatcher` in-process through `fastify.inject()`, against the real `SimulatedTarget`. A recording proxy around the target logs what it saw, in order. That log, the target's claims, and a second read-only database connection are the oracle, so no scenario trusts the API's own account of itself. No socket is opened.
 
-1. **CL-01d and CL-07a failed on the correct model.** After completing a held transaction they called `settle()` with no time advance, so they demanded instant completion detection. The spec gives no poll interval, so a correct controller could fail them. Fixed by advancing one poll interval first.
-2. **The "client override" fault was not caught.** My model's planning step already blocked write-disabled servers, so the override was masked by `PLAN_BLOCKED`. FR-10 doesn't require planning to block (a plan can be inspected without changing a machine), so a real system may rely on the approval gate alone. Fixed by making the model's default match that, with the other design kept as a second variant.
+The scenarios were written before T-048 existed and assert only on an abstract harness. The binding holds all shape assumptions and no assertions. Its mappings are listed in the README because they affect what a pass means.
 
-## ZT-01 static finding (runs today)
+## 2. ZT-01: writes disabled on real hosts
+
+The shipped config covers Sentani, Nabire, Timika and Merauke. Evidence for each layer:
+
+| Layer | Evidence | Result |
+|---|---|---|
+| Config cannot enable writes | `FleetConfigSchema` rejects `writesEnabled` of `true`, `"true"`, `1`, `null`, `"false"`; absent parses to `false` | PASS |
+| No route changes the flag | PATCH, PUT, POST, DELETE on `/api/servers/:id`, `/api/servers/:id/writes`, `/api/config` all 4xx: all four hosts in the test suite, and the first host on my live instance | PASS |
+| Route inventory | The only mutating routes are `POST /api/plans`, `/api/plans/:id/revisions`, `/api/plans/:id/approvals`, `/api/assistant/messages`. A new one fails the test on purpose. | PASS |
+| Planning gate | All four real hosts: plan `201`, blocker `WRITES_DISABLED`, `approvable:false`, `previewDigest:"none"` (no preview taken from a real server) | PASS |
+| Approval gate | All four: refused `409 PLAN_BLOCKED`, **0 operation rows** (counted in the database). Override fields in the body (`writesEnabled`, `writes_enabled`, `force`, nested) get 4xx, and header overrides are ignored. | PASS |
+| Store gate (route bypassed) | `store.approve` with a lying `writesEnabled:true` for an `ssh` target is rejected | PASS |
+| Dispatcher gate | Switching writes off after approval cancels an unsent operation with `WRITES_DISABLED`, nothing sent (CL-08e) | PASS |
+| Approval-time recheck | Switching writes off between plan and approval is refused (CL-08i, added after a fault in the store's gate survived) | PASS |
+| Real SSH target | `submit` rejects `WRITES_DISABLED`; `query` and `inspectInstalled` throw `WritesDisabledError`; `previewPackages` is `null`. Its source imports only `./target.js` and `@servrsit/domain`: no process, network or dynamic-import capability. | PASS |
+| Chat | "yes", "do it", "approve the plan", "go ahead and update the packages now" for every real host: 0 operations | PASS |
+| No I/O | Process spawn, socket, TLS and DNS guard recorded **0 attempts** across all of the above | PASS |
+| Running server | Same plan and approval checks against my live instance on port 3002 for all four hosts: plans blocked, approvals `409 PLAN_BLOCKED` | PASS |
+
+**Limits of this confirmation, so it isn't read as more than it is:**
+
+- It covers every write path that **exists**. No route runs the dispatcher and no worker process exists, so the dispatcher's real-host behaviour is exercised only in tests. When a worker or a new route is added, the route-inventory test fails on purpose and must be reviewed.
+- The gate is four layers deep. Faults I injected into one layer at a time were caught where a layer is observable (§5). The one layer I cannot attack from outside is the database's unique index (needs a second process).
+- This says nothing about the future real SSH write target. When that replaces `SshWriteTarget`, the target tests here will (correctly) fail and need rewriting against the disposable-server gates.
+
+## 3. Care-loop scenarios (42)
+
+| Area | Scenarios | Result |
+|---|---|---|
+| Plan expiry (FR-11) | CL-01a–e: approvable at 14m59s; `PLAN_EXPIRED` at 15m01s with 0 ops and nothing sent; refreshed plan has a new digest and acknowledgements don't carry; **accepted work is not killed by expiry**; queued-unsent work is never sent after expiry | **5/5 PASS** |
+| Digest and approval envelope | CL-02a–f: tampered digest, another plan's digest, wrong version, missing digest, partial or missing production acknowledgement, missing or wrong CSRF token. All refused and the plan stays approvable afterwards. | **6/6 PASS** |
+| No session | CL-02g: approval with no signed-in owner is refused | **FAIL** (F1) |
+| Double approval (FR-11, FR-14) | CL-03a–d, f: same key twice, **ten concurrent** with one key, different key, two plans at once (`TARGET_BUSY` for the loser), replay after completion. One operation, one claim on the target. | **5/5 PASS** |
+| Alias display name cannot bypass the lock | CL-03e | **NOT RUN** (F5) |
+| Changed transaction (FR-11, FR-12) | CL-04a: changes after approval → nothing claimed, reason `PRECONDITION_CHANGED`. CL-04b: old approval unusable, new plan has a new digest and applies once. CL-04d: removals blocked. | **3/3 PASS** |
+| Target changed before approval | CL-04c | **FAIL** (F2) |
+| Retry after lost ack (invariant 7) | CL-05a–c: ack lost after acceptance, request lost before acceptance, restart with the route down. The target only ever sees **one** operation id, one claim, queries on the same id, one mutation. | **3/3 PASS** |
+| `outcome_unknown` blocks conflicting writes (invariant 8) | CL-06a–e: conflicting approval refused even when the target is reachable again; time (10 min, 1 h, 24 h) with failed reconciles never unblocks; other servers unaffected; reconcile reads only; resolution **appends** events, keeps the earlier `outcome_unknown`, and lifts the block | **5/5 PASS** |
+| Stop request is not cancellation | CL-07a–c | **FAIL** (F3, no route) |
+| `writesEnabled` gate (ZT-01) | CL-08a–g, i | **8/8 PASS** (two are weaker than they look, see below) |
+| Stage A scope | CL-09a: packages, restart, reboot, directories all exist | **FAIL** (F4) |
+
+**Passes that prove less than their title** (so no one leans on them):
+
+- **CL-08f** (schedules never write): the care loop has no scheduler path, so `schedulerTick` is a no-op here. It shows time and reconcile never send, not that a scheduler can't.
+- **CL-08g** (inspection still works with writes off): the care loop has no inspection route for simulated servers, so the harness reads the target directly. The real read path is covered by the live fleet re-check (§6).
+- **CL-02e** (both acknowledgements): the system has **one** acknowledgement, so "one of two" cannot be distinguished from "none". See O1.
+- **CL-06a/b** pass through plan-level blocking (`PLAN_BLOCKED` carrying `OUTCOME_UNKNOWN`). The approval-level backstop is covered by CL-03d (fault R5).
+
+## 4. Failures and the one not-run
+
+| # | Scenarios | Finding | Severity | Safety effect |
+|---|---|---|---|---|
+| **F1** | CL-02g | An approval request with no session is accepted (`201`). Auth is still the stub (D3). | **High before any real write is enabled** | None today: real hosts are gated and the stub is loopback. **Blocks enabling writes.** |
+| **F2** | CL-04c | Approving a plan after the target's package state changed is accepted. The spec says the approval endpoint checks target state (§9.2). Traced: the operation then fails `PRECONDITION_CHANGED` at the target, `remote_rejected`, **0 claims, 0 mutations**. | Low–Medium | None: the target's own check stops it. The user sees a failed operation instead of a refused approval. |
+| **F3** | CL-07a–c | No `stop-request` route (real 404). The store has a `stop_requested` column and event type, but nothing sets them and `WriteTarget` has no way to stop or kill a run. FR-16 and FR-17 are priority A. | Medium (known gap) | None. |
+| **F4** | CL-09a | Only `apply.packages.v1` exists. Service restart, reboot and directory preparation return 400. FR-13 and FR-15 are priority A. Handoff states this ("restart and reboot cannot be planned"). | Medium (scope) | None. |
+| **F5** | CL-03e (NOT RUN) | No canonical-identity model: a second record for one machine gets its own server id and its own lock (the database index is on `server_id`). FR-02's duplicate-identity acceptance is not built. The remote helper's server-wide lock would still stop concurrent mutations once a real helper exists. | Medium | Not exercised. |
+| **F6** | `POST /api/operations/:id/reconcile` | Route missing (real 404). Reconciliation happens only through the dispatcher's own passes. CL-06d/e pass using that fallback, which the binding records. | Low–Medium | None. |
+
+## 5. Can the tests catch real bugs in the real code? (mutation checks)
+
+I broke Coder's actual code one rule at a time in a throwaway detached worktree and ran the care-loop and real-host suites. Baseline failures were the six above. A fault is **caught** when it adds a failure.
+
+| # | Fault injected in the real code | Result | Caught by |
+|---|---|---|---|
+| R1 | Dispatcher: drop the write-gate recheck | caught | CL-08e |
+| R2 | Store: ignore the plan digest | caught | CL-02a, 02b, 01c |
+| R3 | Store: ignore plan expiry | caught | CL-01b, 01c |
+| R4 | Store: no idempotent replay | caught | CL-03a, 03b, 03f |
+| R5 | Store: don't block on an unresolved operation | caught | CL-03d |
+| R6 | Store: approval ignores the writes gate | **survived, then caught** | new **CL-08i** (a real gap in my scenarios, now closed) |
+| R7 | Dispatcher: ignore plan expiry before first send | caught | CL-01e |
+| R8 | Route: skip CSRF check on approval | caught | CL-02f |
+| R9 | Dispatcher: transport loss marks the op `failed`, not unknown | caught | CL-05c, CL-06a–e |
+| R10 | Dispatcher: after a lost ack, do not query immediately | **survived** | *Equivalent*: the next pass still queries the same id, so there is no second claim. Same behaviour, different timing. |
+| R11 | Store: remove the unique-index backstop | **survived** | The application-level check still blocks, so only a second process racing it would show the difference. Coder's own tests cover that layer. I did not verify it independently. |
+| R12 | Route: planning treats real hosts as writable (layer 1 off) | caught | three real-host ZT-01 tests |
+| R13 | `SshWriteTarget.submit` pretends to accept | caught | real-target ZT-01 test |
+
+## 6. Live fleet re-check (all four servers)
+
+First, the founder's already-running instance (port 3001, cached read, **0 new contacts**, 20:53:33Z): all four `source=live`, `status=fresh`, 15/15.
+
+Then my own instance on **port 3002 via the real `index.ts` entry point** (Coder's `PORT` override works), one collector pass, started 20:53:58Z:
+
+| Server | access | source | status | age at read | window | checks | hostname | OS | boot id | pending / held | reboot |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Timika | ssh | live | fresh | 46.9 s | 30 min | 15/15 | timika | Ubuntu 24.04.5 | `d7c54a08` | 0 / 1 | no |
+| Nabire | ssh | live | fresh | 45.2 s | 30 min | 15/15 | nabire | Ubuntu 24.04.5 | `3918acfd` | 1 / 0 | no |
+| Sentani | ssh | live | fresh | 40.0 s | 30 min | 15/15 | sentani | Ubuntu 24.04.5 | `ecc8b4a3` | 6 / 0 | no |
+| Merauke | local | live | fresh | 39.3 s | 30 min | 15/15 | merauke | Ubuntu 24.04.5 | `fdd6f28c` | 0 / 1 | no |
+
+- **Identity:** four distinct hostnames and four distinct boot ids, and **each boot id is identical to the one the founder's independent instance reported**, so no key answered for another machine.
+- **Merauke checked independently** from the machine itself: hostname, boot id `fdd6f28c`, `apt-get -s` "0 upgraded … 1 not upgraded", no reboot-required. All match.
+- **Findings** (advisory only): Nabire 1 pending update, Sentani 6 pending updates, both worded "from the host's existing package information (not refreshed by ServrSit)". Nothing critical or warning.
+- **Leaks:** my scanner now has real key paths to look for. Fleet body, headers and server log: **CLEAN** (`PRIVATE KEY`, `id_ed25519`, `/.ssh/`, `.ssh`, `identityFile`, `/home/spotty`, `BEGIN OPENSSH`, AWS-key shape all 0).
+- **Contacts:** 4 `check finished`, 0 `check failed`. Process stopped well before its 15-minute timer; shutdown took 0.1 s.
+- **Caveat:** this shows the read path works, not that the dedicated Sentani/Timika keys follow least privilege. I did not and must not read them.
+
+## 7. Other observations
+
+- **O1 (Low):** the system has one production acknowledgement (`production-impact`), while UX §10.2 and Tech §9.2 describe two (recovery route, interruption risk). The API takes an array, so the UI could send both; it just isn't enforced as two.
+- **O2 (Low):** plan creation against an unreachable simulated target returns an untyped `500` (verified), though §13 has `ROUTE_UNAVAILABLE`. Real hosts are unaffected because no preview is taken from them.
+- **O3 (Low–Medium, design):** the dispatcher has no delay between passes. Each pass against an unreachable target appends a `transport_error` event, and my settle loop produced dozens. Whoever builds the worker loop needs backoff or de-duplication, or an outage grows the append-only event table.
+- **O4 (closed):** my earlier recommendation to write `"writesEnabled": false` explicitly is no longer needed. The schema is `z.literal(false).default(false)`, so absent means false and `true` cannot load.
+- **O5 (info):** `/projects/servrsit-coder` is now on `feat/coder/ai-context`; I made no use of it.
+
+## 8. Mistakes I made while testing, and fixed
+
+For transparency, because each looked like a product failure first:
+
+1. My binding mapped approval blockers as objects; the approval response uses plain strings. Product was correct.
+2. CL-06e planned a second update after the first operation had applied everything, so the new plan was legitimately `NO_CHANGES`. Scenario fixed.
+3. CL-06b let time pass with the target reachable, but the dispatcher legitimately reconciles on contact. Redesigned so reconcile keeps failing while time passes.
+4. CL-05b asserted an intermediate state the dispatcher passes through instantly (it retries with no delay). Replaced with an order assertion that fails if the drop didn't happen.
+5. A fake-ack scenario needed `thenPartition`, because here a lost ack is resolved by an immediate query unless the connection is also down.
+6. My route-inventory parser read Fastify's nested tree wrongly. Fixed to rebuild full paths.
+7. Three strict-typecheck errors in my files. Fixed, `tsc` exit 0.
+8. Mutant R6 survived because of a real gap in my scenarios (policy change between plan and approval). Added CL-08i.
+
+## 9. Not covered
+
+- Invariant 5: a package-update approval cannot authorize a restart or reboot. Nothing to test until those exist (F4).
+- ZT-03 (success reported only after independent verification): the dispatcher's verification is covered by Coder's tests (exit 0 with an unchanged package gives `partially_succeeded`). I did not write scenarios for it.
+- Serial batches and cancelling a batch (FR-14, FR-17): no batch API.
+- The database unique-index layer and multi-process races.
+- Anything involving a real helper, APT locking, transient-job survival or reboot: these need the disposable server (T-010..T-014). A simulated target cannot prove them (ADR-014).
+- Auth, MFA and session handling (F1).
+- The AWS skeleton (T-049) and Designer's live cards (T-046): outside this request. I did not test them beyond confirming the integrated suite still passes (362/0) and the fleet read path works.
+
+## 10. Recommendations for Orchestrator
+
+1. **Do not enable writes on any real host until** authentication replaces the stub (F1) and the disposable-server gates pass (ADR-014). The gate is sound today, but its protection against a *person on the network* is the loopback bind, not auth.
+2. **Add tasks for F3, F4, F6** (stop-request and reconcile routes with a real stop path; restart, reboot, directories) and a decision on F2 (should approval re-check target state?) and F5 (canonical identity), so the Stage A scope is tracked.
+3. **Ask Coder** to add worker-loop backoff before any worker exists (O3) and typed `ROUTE_UNAVAILABLE` on planning (O2).
+4. **Decide O1:** one acknowledgement, or two as UX §10.2 describes.
+5. **Keep the route-inventory and real-target tests as a standing gate.** Any new mutating route or a replacement of `SshWriteTarget` should fail them and force review.
+
+## 11. Files
 
 ```
-hosts.json                         Timika / Nabire / Sentani / Merauke
-this worktree                      writesEnabled = <absent> on all four
-/projects/servrsit-coder (5c61936) writesEnabled = <absent> on all four
-/projects/servrsit (integration)   writesEnabled = <absent> on all four
-static-config.test.mts → 3 pass on each
+tests/e2e/care-loop/binding.mts             in-process binding to the integrated system (no assertions)
+tests/e2e/care-loop/care-loop.test.mts      42 scenarios against it
+tests/e2e/care-loop/zt01-real-hosts.test.mts 12 tests, real four-host wiring, I/O guard
+tests/e2e/care-loop/scenarios.mts           42 scenarios (CL-01a … CL-09a), CL-02g, CL-08i, CL-09a new
+tests/e2e/care-loop/reference-model.mts     spec-derived model, 25 faults
+tests/e2e/care-loop/self-check.test.mts     28 tests of the tests
+tests/e2e/care-loop/static-config.test.mts  3 tests
+tests/e2e/care-loop/README.md               how to run, what the binding maps
+docs/team/test-report-care-loop-001.md      this report (replaces the earlier "pending" version)
 ```
 
-The check passes, but **the flag ADR-014 relies on does not exist yet**: no host config sets it and no source reads it. Today real hosts are safe only because no write code exists. Once T-048 lands, safety depends on "absent means false" (CL-08b covers the absent case, CL-08e the removed case).
-
-## Defects
-
-None found, because there is nothing to test yet. Observations:
-
-- **O1 (Medium, process).** ADR-014's gate is specified but unimplemented, and the shipped config doesn't state it. Recommend `"writesEnabled": false` written explicitly on each real host, so the state is visible and reviewable rather than inferred from a missing key. My static check accepts both forms.
-- **O2 (Low).** `T-048` is referenced in the request but is not on any task board I can find. I couldn't read its acceptance criteria. Please add it, so the tests can be traced to it.
-
-## What is not covered (so no one assumes it is)
-
-- **Invariant 5:** that package-update approval cannot authorize a service restart or reboot, and the reboot return window (FR-13, FI-016).
-- **ZT-03:** command success followed by failed verification must not read as success (FR-16). Next candidate.
-- **Serial batches** and "cancelling a batch" (FR-14/FR-17): the batch API is unspecified.
-- **Helper-side checks** (signature, replay, same-id-different-digest, APT lock, low disk, held packages). These need the disposable VM (T-010–T-014) and cannot be proven with a simulated target (ADR-014).
-- **Unknown routes.** CL-08 covers every write path I can name. Once T-048 lands I will also list its non-GET routes from its OpenAPI document and require each to map to a CL-08 case or be provably read-only.
-- **Alias server with a different flag than its canonical machine:** undefined by ADR-014, so not tested.
-
-## What I need
-
-**From Coder (T-048)**, full detail in `tests/e2e/care-loop/README.md`: a loopback-only, flag-enabled simulated-target mode that refuses to start with any real host configured; a test oracle (mutation, interaction and ledger logs) and fault controls (partition, drop-ack, change-transaction, hold-open); an injectable clock; a manual-drive worker (`settle`, pause, restart); a server-side `writesEnabled` toggle; test sessions with CSRF; and operation views with ordered events and the §13 error codes.
-
-**From Orchestrator:** a decision on the alias/flag question; confirmation that "READ_ONLY_ACCESS or any typed 4xx" is acceptable for the writes gate; and the T-048 task entry.
-
-## Next steps when T-048 lands
-
-1. Write the HTTP mapping in `http-binding.mts` from the API's OpenAPI document (no assertion changes), set `MAPPED = true`.
-2. Run against the simulated mode only. Report each scenario PASS/FAIL with the target's logs as evidence.
-3. Add the route-inventory check and the invariant-5 and ZT-03 scenarios.
-4. Update this file with the real-system results. Until then, treat every care-loop requirement as **unverified**.
-
-## Files (all new, none production)
-
-```
-tests/e2e/care-loop/README.md
-tests/e2e/care-loop/scenarios.mts            39 scenarios
-tests/e2e/care-loop/support/contract.mts     Harness interface and vocabulary
-tests/e2e/care-loop/support/helpers.mts
-tests/e2e/care-loop/care-loop.test.mts       real-system run (39 PENDING)
-tests/e2e/care-loop/http-binding.mts         UNBOUND, with safety guards
-tests/e2e/care-loop/reference-model.mts      spec-derived model + 24 faults
-tests/e2e/care-loop/self-check.test.mts      27 tests
-tests/e2e/care-loop/static-config.test.mts   3 tests
-docs/team/test-report-care-loop-001.md       this report
-```
-
-No production source was modified.
+No production source was modified. Raw `/api/fleet` captures from real hosts are not committed.
