@@ -17,6 +17,8 @@ import { createHash } from "node:crypto";
 import { sanitizeText, stripEscapeSequences } from "@servrsit/ssh";
 import { deterministicExplanation } from "./deterministic.js";
 import { buildAiInput, type AiServerInput, type ExplainableServer } from "./input.js";
+import { buildPrompt } from "./prompt.js";
+import { DEFAULT_TIME_ZONE, timesAreQuoted, type TimeContext } from "./time.js";
 
 export const CALL_TIMEOUT_MS = 20_000;
 export const MIN_CALL_INTERVAL_MS = 10 * 60_000;
@@ -39,7 +41,8 @@ export type AiUnavailableReason =
   | "malformed_response"
   | "not_configured"
   | "provider_disabled"
-  | "not_supported";
+  | "not_supported"
+  | "unverified_time";
 
 export interface ExplainMeta {
   readonly provider: ProviderId | "none";
@@ -76,7 +79,7 @@ export interface CompletionRequest {
 export interface ModelProvider {
   readonly id: ProviderId;
   readonly requestedModel: string | null;
-  call(input: AiServerInput): Promise<ProviderOutcome>;
+  call(input: AiServerInput, ctx: TimeContext): Promise<ProviderOutcome>;
   /** Optional. Providers that cannot take a custom system prompt (Kiro) omit it. */
   complete?(request: CompletionRequest): Promise<ProviderOutcome>;
 }
@@ -90,6 +93,8 @@ export interface Explainer {
 
 export interface GuardOptions {
   readonly now?: (() => Date) | undefined;
+  /** Owner time zone for every time the model sees or the owner reads. Default Asia/Jakarta. */
+  readonly timeZone?: string | undefined;
   readonly minCallIntervalMs?: number | undefined;
   readonly cacheTtlMs?: number | undefined;
 }
@@ -109,6 +114,7 @@ interface CacheEntry {
 
 export class GuardedExplainer implements Explainer {
   private readonly now: () => Date;
+  private readonly timeZone: string;
   private readonly minIntervalMs: number;
   private readonly cacheTtlMs: number;
   private readonly lastCallAt = new Map<string, number>();
@@ -120,6 +126,7 @@ export class GuardedExplainer implements Explainer {
     options: GuardOptions = {},
   ) {
     this.now = options.now ?? (() => new Date());
+    this.timeZone = options.timeZone ?? DEFAULT_TIME_ZONE;
     this.minIntervalMs = options.minCallIntervalMs ?? MIN_CALL_INTERVAL_MS;
     this.cacheTtlMs = options.cacheTtlMs ?? CACHE_TTL_MS;
   }
@@ -133,8 +140,9 @@ export class GuardedExplainer implements Explainer {
   }
 
   async explain(serverId: string, server: ExplainableServer): Promise<ExplainResult> {
-    const input = buildAiInput(server);
-    const nowMs = this.now().getTime();
+    const ctx: TimeContext = { timeZone: this.timeZone, now: this.now() };
+    const input = buildAiInput(server, ctx);
+    const nowMs = ctx.now.getTime();
     const hash = hashInput(input);
 
     const cached = this.cache.get(serverId);
@@ -144,21 +152,24 @@ export class GuardedExplainer implements Explainer {
 
     const last = this.lastCallAt.get(serverId);
     if (last !== undefined && nowMs - last < this.minIntervalMs) {
-      return this.fallback(server, "rate_limited", null, null);
+      return this.fallback(server, ctx, "rate_limited", null, null);
     }
 
     this.lastCallAt.set(serverId, nowMs);
     this.callCount += 1;
     const started = performance.now();
-    const outcome = await this.provider.call(input);
+    const outcome = await this.provider.call(input, ctx);
     const latencyMs = Math.round(performance.now() - started);
 
-    if (!outcome.ok) return this.fallback(server, outcome.reason, outcome.httpStatus, latencyMs);
+    if (!outcome.ok) return this.fallback(server, ctx, outcome.reason, outcome.httpStatus, latencyMs);
 
     const text = sanitizeText(stripEscapeSequences(outcome.text), MAX_TEXT_CHARS).trim();
-    if (text.length === 0) return this.fallback(server, "empty_output", outcome.httpStatus, latencyMs, outcome.returnedModel);
+    if (text.length === 0) return this.fallback(server, ctx, "empty_output", outcome.httpStatus, latencyMs, outcome.returnedModel);
     if (UNSAFE_OUTPUT.test(outcome.text)) {
-      return this.fallback(server, "unsafe_output", outcome.httpStatus, latencyMs, outcome.returnedModel);
+      return this.fallback(server, ctx, "unsafe_output", outcome.httpStatus, latencyMs, outcome.returnedModel);
+    }
+    if (!timesAreQuoted(outcome.text, buildPrompt(input, ctx)).ok) {
+      return this.fallback(server, ctx, "unverified_time", outcome.httpStatus, latencyMs, outcome.returnedModel);
     }
 
     const result: ExplainResult = {
@@ -187,6 +198,7 @@ export class GuardedExplainer implements Explainer {
 
   private fallback(
     server: ExplainableServer,
+    ctx: TimeContext,
     reason: AiUnavailableReason,
     httpStatus: number | null,
     latencyMs: number | null,
@@ -194,7 +206,7 @@ export class GuardedExplainer implements Explainer {
   ): ExplainResult {
     return {
       status: "ai_unavailable",
-      text: deterministicExplanation(server),
+      text: deterministicExplanation(server, ctx),
       source: "deterministic",
       reason,
       cached: false,
@@ -213,12 +225,13 @@ export class DisabledExplainer implements Explainer {
   constructor(
     private readonly reason: "not_configured" | "provider_disabled",
     private readonly now: () => Date = () => new Date(),
+    private readonly timeZone: string = DEFAULT_TIME_ZONE,
   ) {}
 
   async explain(_serverId: string, server: ExplainableServer): Promise<ExplainResult> {
     return {
       status: "ai_unavailable",
-      text: deterministicExplanation(server),
+      text: deterministicExplanation(server, { timeZone: this.timeZone, now: this.now() }),
       source: "deterministic",
       reason: this.reason,
       cached: false,

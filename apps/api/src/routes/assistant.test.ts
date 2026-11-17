@@ -421,3 +421,64 @@ test("fixture mode: evidence matches the fixture servers that have observations 
     await app.close();
   }
 });
+
+// ---- DEF-L1 / DEF-L2 through the route ---------------------------------------
+
+async function startAt(ai: Mock, nowIso: string) {
+  const service = new FleetService({
+    config, knownHostsFile: "/x/known_hosts",
+    pinChecker: async () => "pinned",
+    collector: async () => ({ ok: true, observation: makeObservation({ collectedAt: "2026-11-17T17:10:03.658Z" }) }),
+  });
+  await service.refreshAll();
+  const assistant = new AssistantResponder(
+    createOpenAiProvider({ baseUrl: ai.baseUrl, apiKey: FAKE_KEY, model: "deepseek-v4.1-flash", timeoutMs: 1500 }),
+    "not_configured",
+  );
+  const app = await buildServer({ config, fleetService: service, startChecks: false, logger: false, assistant, now: () => new Date(nowIso) });
+  return app;
+}
+
+test("DEF-L1 via the route: the model gets Asia/Jakarta local times and no raw UTC; a '17:10' reply is withheld", async () => {
+  const ai = await mockAi(() => reply("Alpha's last check succeeded at 17:10."));
+  const app = await startAt(ai, "2026-11-17T17:22:00.000Z");
+  try {
+    const r = await app.inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "When was Alpha checked?", scope: ALPHA }) });
+    const body = AssistantResponseSchema.parse(r.json());
+    const user = (JSON.parse(ai.bodies[0]!) as { messages: Array<{ content: string }> }).messages[1]!.content;
+    assert.equal(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(user), false, "no ISO timestamp in what the model saw");
+    assert.ok(user.includes('"timeZone":"Asia/Jakarta"'));
+    assert.ok(user.includes("18 Nov 2026, 00:10 GMT+7"));
+    assert.equal(body.source, "deterministic");
+    assert.match(body.notice ?? "", /stated a time that was not in the data/);
+    assert.match(body.answer, /Last successful check: 18 Nov 2026, 00:10 GMT\+7 \(11 min ago\)/);
+    assert.deepEqual(body.evidence, [{ serverId: ALPHA, observedAt: "2026-11-17T17:10:03.658Z" }], "evidence stays machine-readable ISO; the UI formats it with ownerTimeZone");
+  } finally {
+    await app.close();
+    await ai.close();
+  }
+});
+
+test("DEF-L1 via the route: a reply quoting the local time is shown", async () => {
+  const ai = await mockAi(() => reply("Alpha was last checked at 00:10 (11 min ago)."));
+  const app = await startAt(ai, "2026-11-17T17:22:00.000Z");
+  try {
+    const r = await app.inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "When was Alpha checked?", scope: ALPHA }) });
+    const body = AssistantResponseSchema.parse(r.json());
+    assert.equal(body.source, "ai");
+    assert.equal(body.answer, "Alpha was last checked at 00:10 (11 min ago).");
+  } finally {
+    await app.close();
+    await ai.close();
+  }
+});
+
+test("DEF-L1: /api/fleet tells the UI which zone the answers use", async () => {
+  const { app } = await start();
+  try {
+    const fleet = (await app.inject({ method: "GET", url: "/api/fleet" })).json() as { ownerTimeZone: string };
+    assert.equal(fleet.ownerTimeZone, "Asia/Jakarta");
+  } finally {
+    await app.close();
+  }
+});

@@ -35,6 +35,10 @@ export interface AssistantRouteOptions {
   /** Current fleet view. Never contacts a server. */
   readonly fleet: () => { readonly servers: readonly FleetServer[] };
   readonly limiter?: SlidingWindowLimiter | undefined;
+  /** Owner's IANA time zone for every time in the answer (DEF-L1). */
+  readonly timeZone: string;
+  /** For tests. */
+  readonly now?: (() => Date) | undefined;
 }
 
 export const SECRET_NOTICE =
@@ -53,6 +57,7 @@ const UNAVAILABLE_NOTICES: Readonly<Partial<Record<AiUnavailableReason, string>>
   timeout: "The AI did not answer in time, so this is a summary of the latest checks instead.",
   quota_or_auth: "The AI refused the request (access or quota), so this is a summary of the latest checks instead.",
   unsafe_output: "The AI's reply was withheld because it looked like a command, so this is a summary of the latest checks instead.",
+  unverified_time: "The AI's reply was withheld because it stated a time that was not in the data, so this is a summary of the latest checks instead.",
 };
 const DEFAULT_UNAVAILABLE_NOTICE = "The AI is unavailable right now, so this is a summary of the latest checks instead.";
 
@@ -114,7 +119,10 @@ export async function assistantRoutes(fastify: FastifyInstance, options: Assista
         return reply.code(429).header("retry-after", String(retry)).send({ error: "RATE_LIMITED" });
       }
 
-      const result = await options.assistant.respond(message, scoped);
+      const result = await options.assistant.respond(message, scoped, {
+        timeZone: options.timeZone,
+        now: (options.now ?? (() => new Date()))(),
+      });
       const usedObservations = result.kind === "question";
       const evidence = usedObservations ? evidenceFor(scoped) : [];
 

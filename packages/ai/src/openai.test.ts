@@ -5,7 +5,7 @@ import { createOpenAiProvider } from "./openai.js";
 import { buildAiInput } from "./input.js";
 import { buildPrompt, SYSTEM_PROMPT } from "./prompt.js";
 import type { OpenAiConfig } from "./config.js";
-import { FAKE_API_KEY, hostileServer, INJECTION, server } from "./ai.fixtures.js";
+import { FAKE_API_KEY, hostileServer, INJECTION, server, CTX } from "./ai.fixtures.js";
 import { completion, json, startMock, type Handler } from "./mock-server.fixtures.js";
 
 class Clock {
@@ -52,13 +52,17 @@ test("the body has exactly the allowed fields: no tools, functions, tool_choice,
 });
 
 test("messages are the fixed system prompt plus the sanitized, fenced input", async () => {
-  const { mock, explainer } = await setup(ok());
-  await explainer.explain("s1", server());
-  const body = JSON.parse(mock.requests[0]!.body) as { messages: Array<{ role: string; content: string }> };
-  assert.equal(body.messages.length, 2);
-  assert.deepEqual(body.messages[0], { role: "system", content: SYSTEM_PROMPT });
-  assert.deepEqual(body.messages[1], { role: "user", content: buildPrompt(buildAiInput(server())) });
-  await mock.close();
+  const { mock, explainer, clock } = await setup(ok());
+  try {
+    await explainer.explain("s1", server());
+    const ctx = { timeZone: "Asia/Jakarta", now: clock.now() };
+    const body = JSON.parse(mock.requests[0]!.body) as { messages: Array<{ role: string; content: string }> };
+    assert.equal(body.messages.length, 2);
+    assert.deepEqual(body.messages[0], { role: "system", content: SYSTEM_PROMPT });
+    assert.deepEqual(body.messages[1], { role: "user", content: buildPrompt(buildAiInput(server(), ctx), ctx) });
+  } finally {
+    await mock.close();
+  }
 });
 
 // ---- result metadata -----------------------------------------------------
@@ -243,14 +247,30 @@ test("prompt injection: hostile text never reaches the request; an obedient repl
 // ---- metering guards -----------------------------------------------------
 
 test("identical input is served from cache: one HTTP request", async () => {
+  const { mock, explainer } = await setup(ok());
+  try {
+    await explainer.explain("s1", server());
+    const again = await explainer.explain("s1", server());
+    assert.equal(mock.requests.length, 1);
+    assert.equal(again.cached, true);
+    assert.equal(again.meta.returnedModel, "cb/deepseek-v4.1-flash");
+  } finally {
+    await mock.close();
+  }
+});
+
+test("a cached answer is not replayed once its ages are out of date (DEF-L1), and no extra call is made", async () => {
   const { mock, explainer, clock } = await setup(ok());
-  await explainer.explain("s1", server());
-  clock.advance(5 * 60_000);
-  const again = await explainer.explain("s1", server());
-  assert.equal(mock.requests.length, 1);
-  assert.equal(again.cached, true);
-  assert.equal(again.meta.returnedModel, "cb/deepseek-v4.1-flash");
-  await mock.close();
+  try {
+    await explainer.explain("s1", server());
+    clock.advance(5 * 60_000);
+    const later = await explainer.explain("s1", server());
+    assert.equal(later.cached, false, "the old text would quote stale ages");
+    assert.equal(later.reason, "rate_limited", "the 10-minute guard still caps spend");
+    assert.equal(mock.requests.length, 1);
+  } finally {
+    await mock.close();
+  }
 });
 
 test("max one call per server per 10 minutes; a failed call uses up the window", async () => {

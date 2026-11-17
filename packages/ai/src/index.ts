@@ -46,3 +46,16 @@ export {
 export type { AssistantReply, MessageKind } from "./assistant.js";
 export { UNSAFE_OUTPUT } from "./explainer.js";
 export type { CompletionRequest } from "./explainer.js";
+export {
+  clockTimes,
+  DEFAULT_TIME_ZONE,
+  formatAge,
+  formatLocal,
+  isValidTimeZone,
+  localTime,
+  LocalTimeSchema,
+  timesAreQuoted,
+} from "./time.js";
+export type { LocalTime, TimeCheck, TimeContext } from "./time.js";
+export { NOT_REFRESHED_BY_SERVRSIT } from "./deterministic.js";
+export { TIME_AND_PACKAGE_RULES } from "./prompt.js";

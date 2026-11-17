@@ -53,12 +53,27 @@ export const OperationStateSchema = z.enum([
   OperationState.OUTCOME_UNKNOWN,
 ]);
 
-/** Terminal operation states — records in these states cannot be edited into success. */
-export const TERMINAL_OPERATION_STATES: ReadonlySet<OperationState> = new Set([
+/**
+ * Final operation states. Their records cannot be edited: later evidence is
+ * appended as an event, never written over the state.
+ */
+export const FINAL_OPERATION_STATES: ReadonlySet<OperationState> = new Set([
   OperationState.SUCCEEDED,
   OperationState.PARTIALLY_SUCCEEDED,
   OperationState.FAILED,
   OperationState.CANCELLED_BEFORE_START,
+]);
+
+/**
+ * Unresolved operation states. At most one unresolved operation may exist per
+ * server, and it blocks conflicting writes. `outcome_unknown` is unresolved,
+ * not final (Technical Spec §11): it is resolved only by reconciliation
+ * against the remote ledger. (T-007 wrongly listed it as terminal.)
+ */
+export const UNRESOLVED_OPERATION_STATES: ReadonlySet<OperationState> = new Set([
+  OperationState.QUEUED,
+  OperationState.RUNNING,
+  OperationState.VERIFYING,
   OperationState.OUTCOME_UNKNOWN,
 ]);
 
@@ -335,3 +350,5 @@ export * from "./observation.js";
 export * from "./fleet.js";
 
 export * from "./assistant.js";
+
+export * from "./care.js";

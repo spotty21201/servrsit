@@ -4,6 +4,7 @@
  */
 
 import { readFile } from "node:fs/promises";
+import { DEFAULT_TIME_ZONE, isValidTimeZone } from "@servrsit/ai";
 import { z } from "zod";
 
 const HostBase = z.object({
@@ -13,6 +14,11 @@ const HostBase = z.object({
   production: z.boolean(),
   collect: z.boolean(),
   collectDisabledReason: z.string().max(200).optional(),
+  /**
+   * HARD GATE (ADR-014): writes to real servers are disabled. Configuration
+   * can only ever say false; true fails to load. There is no API to change it.
+   */
+  writesEnabled: z.literal(false, { errorMap: () => ({ message: "writesEnabled must be false for real servers (ADR-014)" }) }).default(false),
 });
 
 const SshHost = HostBase.extend({
@@ -30,6 +36,11 @@ export const HostConfigSchema = z.discriminatedUnion("access", [SshHost, LocalHo
 export const FleetConfigSchema = z
   .object({
     healthIntervalMinutes: z.number().int().min(1).max(1440),
+    /** The owner's IANA time zone. Every time in assistant answers is given in it (DEF-L1). */
+    ownerTimeZone: z
+      .string()
+      .default(DEFAULT_TIME_ZONE)
+      .refine(isValidTimeZone, { message: "ownerTimeZone is not a valid IANA time zone" }),
     hosts: z.array(HostConfigSchema).min(1).max(20),
   })
   .superRefine((config, ctx) => {
