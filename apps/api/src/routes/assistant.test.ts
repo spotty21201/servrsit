@@ -400,3 +400,24 @@ test("other routes keep Fastify's normal error handling (the assistant handler i
   assert.notDeepEqual(r.json(), { error: "INVALID_INPUT" });
   await app.close();
 });
+
+test("fixture mode: evidence matches the fixture servers that have observations (T-044 / D5 consistency)", async () => {
+  const app = await buildServer({ mode: "fixture", startChecks: false, logger: false });
+  try {
+    const r = await app.inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "How is the fleet?", scope: "all" }) });
+    const body = AssistantResponseSchema.parse(r.json());
+    const fleet = (await app.inject({ method: "GET", url: "/api/fleet" })).json() as { servers: Array<{ id: string; observedAt: string | null; observation: unknown }> };
+    // Fixture timestamps are relative to "now" for each request, so the two
+    // requests differ by milliseconds. Compare servers, and times loosely.
+    const expected = fleet.servers.filter((s) => s.observation !== null);
+    assert.equal(expected.length, 3, "three of the four fixture servers have observations");
+    assert.deepEqual(body.evidence.map((e) => e.serverId), expected.map((s) => s.id));
+    body.evidence.forEach((e, i) => {
+      const drift = Math.abs(Date.parse(e.observedAt) - Date.parse(expected[i]!.observedAt ?? ""));
+      assert.ok(drift < 1000, `observedAt for ${e.serverId} is consistent (drift ${drift} ms)`);
+    });
+    assert.equal((body.notice ?? "").includes("no observations to rely on"), false);
+  } finally {
+    await app.close();
+  }
+});
