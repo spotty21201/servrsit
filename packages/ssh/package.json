@@ -2,5 +2,27 @@
   "name": "@servrsit/ssh",
   "private": true,
   "version": "0.0.0",
-  "description": "ServrSit SSH transport, host identity, collectors, and bounded parsing"
+  "description": "ServrSit SSH transport, host identity, collectors, and bounded parsing",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
 }
