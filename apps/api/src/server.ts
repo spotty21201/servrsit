@@ -20,6 +20,7 @@ import { createAssistant, createScrubber, resolveAiConfig, type AssistantRespond
 import assistantRoutes from "./routes/assistant.js";
 import careRoutes, { type CareServer } from "./routes/care.js";
 import { CsrfGuard } from "./csrf.js";
+import { DEFAULT_OWNER_CONTEXT_PATH, OwnerContextFile } from "./owner-context-file.js";
 import { SqliteCareStore, type CareStore } from "@servrsit/store";
 import { SshWriteTarget, type WriteTarget } from "@servrsit/worker";
 import { buildFixtureFleet } from "./fleet/fixture.js";
@@ -48,6 +49,11 @@ export interface BuildServerOptions {
   readonly now?: (() => Date) | undefined;
   /** Care loop wiring. Defaults to an in-memory store and real servers only (all writes disabled). */
   readonly care?: CareOptions | undefined;
+  /**
+   * Owner-context file for the assistant (T-050). Default: apps/api/config/assistant-context.md.
+   * null disables it (tests).
+   */
+  readonly ownerContextPath?: string | null | undefined;
 }
 
 /** A simulated server, injectable only in code (tests and local demos), never via config or API. */
@@ -65,6 +71,15 @@ export interface CareOptions {
 
 /** Simulated servers use obviously fake ids and can never shadow a real server. */
 const SIMULATED_ID = /^00000000-0000-4000-8000-[0-9a-f]{12}$/;
+
+function ownerContextSource(
+  options: BuildServerOptions,
+  log: { info(o: object, m: string): void; warn(o: object, m: string): void },
+): (() => string | null) | undefined {
+  if (options.ownerContextPath === null) return undefined;
+  const file = new OwnerContextFile(options.ownerContextPath ?? DEFAULT_OWNER_CONTEXT_PATH, options.redactSecrets ?? [], log);
+  return () => file.get();
+}
 
 function careWiring(config: FleetConfig, care: CareOptions | undefined) {
   const real: CareServer[] = config.hosts.map((h) => ({
@@ -190,6 +205,7 @@ export async function buildServer(options: BuildServerOptions = {}) {
     fleet: () => (mode === "fixture" ? buildFixtureFleet(config, new Date()) : service.snapshot()),
     timeZone: config.ownerTimeZone,
     now: options.now,
+    ownerContext: ownerContextSource(options, fastify.log),
   });
   const care = careWiring(config, options.care);
   const careStore = options.care?.store ?? new SqliteCareStore({ path: ":memory:" });

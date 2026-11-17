@@ -482,3 +482,36 @@ test("DEF-L1: /api/fleet tells the UI which zone the answers use", async () => {
     await app.close();
   }
 });
+
+// ---- T-050: owner context reaches the model after the fixed rules ----------------
+
+test("T-050 via the route: the model gets the fixed rules, then the owner context; a secret-bearing file gives fixed rules only", async () => {
+  const { ASSISTANT_SYSTEM_PROMPT } = await import("@servrsit/ai");
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "servrsit-oc-route-"));
+  const good = join(dir, "good.md");
+  const bad = join(dir, "bad.md");
+  writeFileSync(good, "## Voice\nPlain English.\n");
+  writeFileSync(bad, "## Voice\nPlain.\ntoken: abcdef0123456789\n");
+
+  for (const [path, expectOwner] of [[good, true], [bad, false]] as const) {
+    const ai = await mockAi(() => reply("Alpha looks fine."));
+    const service = new FleetService({ config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }) });
+    await service.refreshAll();
+    const assistant = new AssistantResponder(createOpenAiProvider({ baseUrl: ai.baseUrl, apiKey: FAKE_KEY, model: "m", timeoutMs: 1500 }), "not_configured");
+    const app = await buildServer({ config, fleetService: service, startChecks: false, logger: false, assistant, ownerContextPath: path });
+    try {
+      await app.inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "How is Alpha?", scope: "all" }) });
+      const system = (JSON.parse(ai.bodies[0]!) as { messages: Array<{ content: string }> }).messages[0]!.content;
+      assert.ok(system.startsWith(ASSISTANT_SYSTEM_PROMPT), "fixed rules first");
+      assert.equal(system.includes("<owner_context>"), expectOwner, path);
+      if (expectOwner) assert.ok(system.includes("Plain English."));
+      assert.equal(system.includes("abcdef0123456789"), false);
+    } finally {
+      await app.close();
+      await ai.close();
+    }
+  }
+});

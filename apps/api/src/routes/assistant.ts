@@ -39,6 +39,8 @@ export interface AssistantRouteOptions {
   readonly timeZone: string;
   /** For tests. */
   readonly now?: (() => Date) | undefined;
+  /** The prepared owner-context layer (T-050), or null for none. Read per request. */
+  readonly ownerContext?: (() => string | null) | undefined;
 }
 
 export const SECRET_NOTICE =
@@ -119,10 +121,12 @@ export async function assistantRoutes(fastify: FastifyInstance, options: Assista
         return reply.code(429).header("retry-after", String(retry)).send({ error: "RATE_LIMITED" });
       }
 
-      const result = await options.assistant.respond(message, scoped, {
-        timeZone: options.timeZone,
-        now: (options.now ?? (() => new Date()))(),
-      });
+      const result = await options.assistant.respond(
+        message,
+        scoped,
+        { timeZone: options.timeZone, now: (options.now ?? (() => new Date()))() },
+        options.ownerContext?.() ?? null,
+      );
       const usedObservations = result.kind === "question";
       const evidence = usedObservations ? evidenceFor(scoped) : [];
 

@@ -12,6 +12,7 @@ export function fixtureServer(overrides: Partial<FleetServer> = {}): FleetServer
     name: "Fixture One",
     role: null,
     production: false,
+    importantServices: [],
     access: "ssh",
     source: "fixture",
     status: "fresh",

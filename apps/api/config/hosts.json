@@ -10,8 +10,9 @@
       "port": 22,
       "user": "spotty",
       "identityFile": "~/.ssh/servrsit/id_ed25519_timika",
-      "role": null,
+      "role": "Client-facing VPS (Europe)",
       "production": true,
+      "importantServices": [],
       "collect": true
     },
     {
@@ -22,8 +23,9 @@
       "port": 22,
       "user": "spotty",
       "identityFile": "~/.ssh/id_ed25519_nabire",
-      "role": null,
-      "production": true,
+      "role": "Development server",
+      "production": false,
+      "importantServices": [],
       "collect": true
     },
     {
@@ -34,16 +36,18 @@
       "port": 22,
       "user": "spotty",
       "identityFile": "~/.ssh/servrsit/id_ed25519_sentani",
-      "role": null,
-      "production": true,
+      "role": "Personal server (Hermes), limited resources",
+      "production": false,
+      "importantServices": [],
       "collect": true
     },
     {
       "id": "44444444-4444-4444-a444-444444444444",
       "name": "Merauke",
       "access": "local",
-      "role": "Dev host",
+      "role": "Development server (dev host)",
       "production": false,
+      "importantServices": [],
       "collect": true
     }
   ]

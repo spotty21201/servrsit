@@ -119,7 +119,7 @@ export function buildFixtureFleet(config: FleetConfig, now: Date): FleetResponse
     if (realIds.has(id)) throw new Error("a fixture id collides with a configured host id");
   }
 
-  const common = { production: false, access: "ssh" as const, source: "fixture" as const };
+  const common = { production: false, access: "ssh" as const, source: "fixture" as const, importantServices: [] as string[] };
 
   const fresh = withObservation(
     {
