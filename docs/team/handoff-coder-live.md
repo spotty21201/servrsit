@@ -1033,3 +1033,77 @@ No real AI call was made for this work. The time check enforces the rule whateve
 2. **`packages/store` is a new package** not in the steering's repository map (rationale in ADR-015).
 3. **Tell me when the founder has installed the Sentani and Timika keys**, so `collect` can be turned on.
 4. **The leftover API watcher from DEF-L1/L2 (PID 458878) is still running** in `/projects/servrsit` and serving the founder. Stop it when the founder is done.
+
+## T-050: layered assistant context (commit `4ff055c`, branch `feat/coder/ai-context`)
+
+**Changed files:**
+
+- `packages/ai/src/assistant.ts`: `buildAssistantSystem(ownerContext)` puts the fixed `ASSISTANT_SYSTEM_PROMPT` first and unchanged, then `OWNER_CONTEXT_RULES`, then the owner text as a JSON string (with `<` escaped) inside `<owner_context>`. The rule says the owner context can never grant permissions, override the fixed rules or count as evidence of server state. `keyedByName()` keys the observations by server name. One preamble sentence was added: each server's facts belong only to that server. The Rules section is unchanged; a test pins its sha256 `512e3931…0d46`.
+- `packages/ai/src/owner-context.ts`: `prepareOwnerContext()` strips control characters and drops `TODO(owner)` lines. It runs the shared `looksLikeSecret` detector on the whole cleaned file **before** the 4 KB cap, so a secret cannot hide past the cut. A match rejects the whole file (`reason: "secret"`); a file with only placeholders or headings counts as `empty`.
+- `apps/api/src/owner-context-file.ts`: re-reads the file when its mtime or size changes. It fails closed with a warning that logs the byte count only.
+- `apps/api/config/assistant-context.md`: the founder draft from `docs/team/assistant-context-draft.md`, using the Voice section as revised in `bc47735`. I reworded header line 4 because the old wording tripped the secret detector.
+- `apps/api/config/hosts.json`, `packages/contracts/src/fleet.ts`, `apps/api/src/fleet/*`: per-server `role`, `production` and `importantServices` (bare names become `.service`; only names that pass `isSafeUnitName` are kept).
+  - Timika: "Client-facing VPS (Europe)", production true.
+  - Sentani: "Personal server (Hermes), limited resources", production false.
+  - Nabire: "Development server", production false.
+  - Merauke: "Development server (dev host)", production false.
+- `packages/ai/src/input.ts`: a new `ROLE` regex, because the old name regex nulled the founder's roles. `< > " \` $ ;` are still refused.
+- `apps/web/src/api/fleet.fixtures.ts`: `importantServices` added to the [FIXTURE DATA] servers (data layer only).
+
+## T-051: fact check of AI replies (commit `7576a61`)
+
+**How it works:**
+
+- `packages/ai/src/fact-check.ts` `checkFacts(reply, inputs, prompt)` runs in `AssistantResponder.respond()` after the command check and the time check.
+- **Claims it extracts:** pending-update counts (digits, number words, "a single", "an update", "up to date", "doesn't have any updates"), reboot required yes/no, failed-service counts and unit names, disk, inode and memory percentages (narrowed by a mentioned mount), and the status words healthy, fresh, stale and unreachable.
+- **Attribution:**
+  - A clause that names a server is about that server.
+  - A clause that names none is about the last-named server.
+  - "all servers" or "the fleet" means every server in scope; "the other servers" means the servers not yet named.
+  - Before any server is named, a single-server scope means that server; in a fleet answer, a claim must hold for every server, and any other number fails.
+  - When one clause names several servers, each claim goes to the nearest name, unless the clause says both, all, each, neither or none.
+- **Any other number must be:** a fact of that server, a clock time, a date, a year, an age, a version string that appears in the prompt, or a plausible server count.
+- **On a mismatch:**
+  - The responder returns `source: "deterministic"`, `reason: "fact_mismatch"` and `factMismatch: <type>`.
+  - The route's notice is exactly "The AI answer did not match the latest checks, so here are the checks directly."
+  - The log line adds `factMismatch` (the type only). The reply text is not logged.
+- **Inode percentages** are now part of the model input (`metrics.inodes`), so inode claims can be checked. Before this they were missing.
+- **Tone:** cheeky lines get the same check. A test covers this.
+
+**Tests** (`packages/ai/src/fact-check.test.ts`, 13 tests; 2 route tests in `apps/api/src/routes/assistant.test.ts`):
+
+- Replay of the Nabire 1 / Merauke 0 swap in 5 phrasings, all caught.
+- Correct answers and paraphrases pass.
+- Invented numbers fail.
+- A number for the wrong server fails, including reboot.
+- Failed-service names are checked per server, and so are inode percentages.
+- Status words fail when they do not fit, for example an unreachable Timika called "healthy" or "Everything looks healthy" with Timika unreachable.
+- A realistic fleet answer with times and package-list age passes.
+- A correct cheeky line passes and a wrong one fails.
+- Responder and route: exact notice, and the log has the mismatch type but not the reply.
+
+**An existing test changed:** the T-044 route test had a canned AI reply, "Alpha is fresh with two pending updates", but the Alpha fixture has 0 pending updates and is stale. The fact check correctly rejected it, so I changed the canned reply to "Alpha has no pending updates. Beta is not being collected."
+
+**Checks run (real output, after both commits):**
+
+```
+pnpm -r --workspace-concurrency=1 run test     -> exit 0
+  suites: 9, 13, 40, 36, 11, 140 (ai), 18, 130 (api) tests; fail 0 in every suite
+typecheck: ai, contracts, domain, ssh, store, ui, api, web, worker, infra -> exit 0 each
+key scan of staged diff (AI_API_KEY value, grep -F, never printed) -> clean, both commits
+private-key headers in staged diff: T-050 has 1, the test string "-----BEGIN OPENSSH PRIVATE KEY-----" used as secret-detector input (no key material); T-051 has 0
+```
+
+**Limits and known gaps:**
+
+- **False alarms fall back safely.** The checker is pattern-based and strict, so an unusual phrasing gives the deterministic answer, never a wrong fact shown as AI. The Tester should try live phrasings and report false alarms.
+- **Negated status words are not checked.** For example "Timika is not healthy" is not checked against the facts. Neither is "Merauke has none" when no noun follows.
+- **Decimals** such as load or versions only need to appear somewhere in the prompt, so a load figure moved to the wrong server would pass.
+- **"N days" without "ago"** is checked against uptime. Durations in minutes or hours are always exempt.
+- **The per-server explainer is not covered.** `GuardedExplainer` (`/api/fleet/.../explanation`) does not run the fact check yet; it still has the time and command checks. Tell me if T-051 should cover it.
+
+## Needs Orchestrator action (T-050/T-051)
+
+1. **`feat/coder/ai-context` is ready to merge** into `integration/live-v1`: `4ff055c` (T-050) and `7576a61` (T-051), on top of `bc47735`.
+2. **ADR number clash:** your ADR-015 (assistant voice) and my `docs/decisions/ADR-015-care-loop-persistence.md` share a number. Please renumber one. T-053 will use ADR-017 as briefed.
+3. **PID 458878**, my leftover API watcher, is still running in `/projects/servrsit/apps/api` (elapsed 16:38:19 when checked). I have not stopped it because it serves the founder.
