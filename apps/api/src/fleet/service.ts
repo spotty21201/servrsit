@@ -157,6 +157,7 @@ export class FleetService {
       mode: "live",
       generatedAt: now.toISOString(),
       healthIntervalMinutes: this.options.config.healthIntervalMinutes,
+      ownerTimeZone: this.options.config.ownerTimeZone,
       nextCheckAt: next,
       servers,
     };

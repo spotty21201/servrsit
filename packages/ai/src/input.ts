@@ -7,6 +7,10 @@
  * Names that fail the check are replaced by a count. No free text of any kind
  * is passed: not status reasons, not finding summaries, not failure messages.
  *
+ * Times are never sent raw (DEF-L1). Each one is {at, age}: already formatted
+ * in the owner's time zone, with an age computed here, so the model has
+ * nothing to convert and no UTC to quote.
+ *
  * Passing the check does not make a name trustworthy: a well-formed name can
  * still be hostile ("ignore-previous-instructions.service"). The agent prompt
  * treats the whole object as data, the agent has no tools, and its output is
@@ -20,6 +24,7 @@ import {
   type InspectionObservation,
 } from "@servrsit/ssh";
 import { z } from "zod";
+import { LocalTimeSchema, localTime, type TimeContext } from "./time.js";
 
 /** Structural subset of the API's fleet server record. */
 export interface ExplainableServer {
@@ -76,11 +81,13 @@ export const AiServerInputSchema = z
       access: z.enum(["ssh", "local"]),
     }),
     status: z.enum(KNOWN_STATUSES),
-    observedAt: text(40).nullable(),
-    freshUntil: text(40).nullable(),
+    /** Last successful check, owner-local. */
+    observed: LocalTimeSchema.nullable(),
+    /** When that check stops counting as fresh, owner-local. */
+    freshUntil: LocalTimeSchema.nullable(),
     latestAttempt: z
       .object({
-        at: text(40),
+        at: LocalTimeSchema,
         succeeded: z.boolean(),
         failureCode: z.enum(KNOWN_FAILURE_CODES).nullable(),
         consecutiveFailures: z.number().int().nonnegative(),
@@ -102,6 +109,11 @@ export const AiServerInputSchema = z
         uptimeDays: z.number().int().nonnegative().nullable(),
         filesystems: z.array(z.object({ mount: text(64), usedPercent: z.number().int().min(0).max(100) })).max(8).nullable(),
         pendingUpdates: z.number().int().nonnegative().nullable(),
+        /**
+         * When the HOST last refreshed its package lists (DEF-L2), owner-local.
+         * pendingUpdates is only as current as this. ServrSit never refreshes them.
+         */
+        packageLists: LocalTimeSchema.nullable(),
         rebootRequired: z.boolean().nullable(),
         failedUnits: z
           .object({ names: z.array(text(100)).max(10), unrecognisedCount: z.number().int().nonnegative() })
@@ -121,7 +133,7 @@ const OS_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,63}$/;
 const KNOWN_CHECKS: ReadonlySet<string> = new Set(CHECK_NAMES);
 const UNRECOGNISED_MOUNT = "(unrecognised mount name)";
 
-function metricsFrom(o: InspectionObservation): NonNullable<AiServerInput["metrics"]> {
+function metricsFrom(o: InspectionObservation, ctx: TimeContext): NonNullable<AiServerInput["metrics"]> {
   const h = o.host;
   const mem = h.memory.status === "ok" ? h.memory.value : null;
   const memoryUsedPercent =
@@ -155,13 +167,16 @@ function metricsFrom(o: InspectionObservation): NonNullable<AiServerInput["metri
           }))
         : null,
     pendingUpdates: o.packages.pendingCount.status === "ok" ? o.packages.pendingCount.value : null,
+    packageLists:
+      o.packages.metadataUpdatedAt.status === "ok" ? localTime(o.packages.metadataUpdatedAt.value, ctx) : null,
     rebootRequired: o.packages.rebootRequired.status === "ok" ? o.packages.rebootRequired.value : null,
     failedUnits,
   };
 }
 
 /** Rebuild the model input from scratch. Nothing is copied wholesale. */
-export function buildAiInput(server: ExplainableServer): AiServerInput {
+export function buildAiInput(server: ExplainableServer, ctx: TimeContext): AiServerInput {
+  const attemptAt = server.latestAttempt === null ? null : localTime(server.latestAttempt.at, ctx);
   return AiServerInputSchema.parse({
     server: {
       name: SERVER_NAME.test(server.name) ? server.name : "(unnamed server)",
@@ -170,13 +185,13 @@ export function buildAiInput(server: ExplainableServer): AiServerInput {
       access: server.access,
     },
     status: oneOf(server.status, KNOWN_STATUSES, "unknown"),
-    observedAt: server.observedAt,
-    freshUntil: server.freshUntil,
+    observed: localTime(server.observedAt, ctx),
+    freshUntil: localTime(server.freshUntil, ctx),
     latestAttempt:
-      server.latestAttempt === null
+      server.latestAttempt === null || attemptAt === null
         ? null
         : {
-            at: server.latestAttempt.at,
+            at: attemptAt,
             succeeded: server.latestAttempt.succeeded,
             failureCode:
               server.latestAttempt.failure === null
@@ -192,7 +207,7 @@ export function buildAiInput(server: ExplainableServer): AiServerInput {
             total: server.coverage.total,
             unavailableChecks: server.coverage.unavailable.map((u) => u.check).filter((c) => KNOWN_CHECKS.has(c)),
           },
-    metrics: server.observation === null ? null : metricsFrom(server.observation),
+    metrics: server.observation === null ? null : metricsFrom(server.observation, ctx),
     findings: server.findings
       .slice(0, 20)
       .map((f) => ({ severity: f.severity, rule: RULE_ID.test(f.rule) ? f.rule : "unknown.v1" })),

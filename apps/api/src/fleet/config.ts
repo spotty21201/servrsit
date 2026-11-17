@@ -4,6 +4,7 @@
  */
 
 import { readFile } from "node:fs/promises";
+import { DEFAULT_TIME_ZONE, isValidTimeZone } from "@servrsit/ai";
 import { z } from "zod";
 
 const HostBase = z.object({
@@ -30,6 +31,11 @@ export const HostConfigSchema = z.discriminatedUnion("access", [SshHost, LocalHo
 export const FleetConfigSchema = z
   .object({
     healthIntervalMinutes: z.number().int().min(1).max(1440),
+    /** The owner's IANA time zone. Every time in assistant answers is given in it (DEF-L1). */
+    ownerTimeZone: z
+      .string()
+      .default(DEFAULT_TIME_ZONE)
+      .refine(isValidTimeZone, { message: "ownerTimeZone is not a valid IANA time zone" }),
     hosts: z.array(HostConfigSchema).min(1).max(20),
   })
   .superRefine((config, ctx) => {

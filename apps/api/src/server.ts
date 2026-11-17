@@ -40,6 +40,8 @@ export interface BuildServerOptions {
   readonly logStream?: LogStream | undefined;
   /** The assistant. Defaults to deterministic-only (no AI) when not given. */
   readonly assistant?: AssistantResponder | undefined;
+  /** For tests: the clock the assistant uses for local times and ages. */
+  readonly now?: (() => Date) | undefined;
 }
 
 export async function buildServer(options: BuildServerOptions = {}) {
@@ -138,6 +140,8 @@ export async function buildServer(options: BuildServerOptions = {}) {
   await fastify.register(assistantRoutes, {
     assistant: options.assistant ?? createAssistant(resolveAiConfig({ AI_PROVIDER: "none" })),
     fleet: () => (mode === "fixture" ? buildFixtureFleet(config, new Date()) : service.snapshot()),
+    timeZone: config.ownerTimeZone,
+    now: options.now,
   });
 
   // Fixture mode never contacts any server.

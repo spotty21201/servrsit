@@ -87,6 +87,12 @@ export const FleetResponseSchema = z.object({
   mode: z.enum(["live", "fixture"]),
   generatedAt: z.string().datetime(),
   healthIntervalMinutes: z.number().int().positive(),
+  /**
+   * The owner's IANA time zone (for example "Asia/Jakarta"). Assistant answers
+   * quote times in this zone, so the UI should format evidence and observation
+   * times in it too, not in the browser's zone (DEF-L1).
+   */
+  ownerTimeZone: z.string().min(1).max(64),
   nextCheckAt: z.string().datetime().nullable(),
   servers: z.array(FleetServerSchema),
 });

@@ -1,27 +1,37 @@
 /**
- * Deterministic text for when the model is unavailable (FR-08). No model is
+ * Deterministic text for when the model is not used (FR-08). No model is
  * involved. Numbers and validated names come from the sanitized input; the
  * status reason and finding summaries are this product's own display text and
  * are only shown to the owner, never sent to the model.
+ *
+ * Times are owner-local with an age (DEF-L1), and the package information
+ * states how old it is and that the host refreshed it, not ServrSit (DEF-L2).
  */
 
 import { sanitizeText } from "@servrsit/ssh";
 import { buildAiInput, type ExplainableServer } from "./input.js";
+import type { LocalTime, TimeContext } from "./time.js";
 
-export function deterministicExplanation(server: ExplainableServer): string {
-  const input = buildAiInput(server);
+export const NOT_REFRESHED_BY_SERVRSIT = "ServrSit does not refresh package lists.";
+
+const when = (t: LocalTime): string => `${t.at} (${t.age})`;
+
+export function deterministicExplanation(server: ExplainableServer, ctx: TimeContext): string {
+  const input = buildAiInput(server, ctx);
   const lines: string[] = [];
   const who = `${input.server.name}${input.server.role === null ? "" : ` (${input.server.role})`}`;
   lines.push(`${who}: ${input.status}. ${sanitizeText(server.statusReason, 300)}`);
 
-  if (input.observedAt !== null) {
-    lines.push(`Last successful check: ${input.observedAt}${input.freshUntil === null ? "" : `, fresh until ${input.freshUntil}`}.`);
+  if (input.observed !== null) {
+    lines.push(
+      `Last successful check: ${when(input.observed)}${input.freshUntil === null ? "" : `; counts as fresh until ${input.freshUntil.at}`}.`,
+    );
   } else {
     lines.push("No successful check has been recorded.");
   }
   if (input.latestAttempt !== null && !input.latestAttempt.succeeded) {
     lines.push(
-      `The latest attempt failed${input.latestAttempt.failureCode === null ? "" : ` (${input.latestAttempt.failureCode})`}; ${input.latestAttempt.consecutiveFailures} in a row.`,
+      `The latest attempt at ${input.latestAttempt.at.at} failed${input.latestAttempt.failureCode === null ? "" : ` (${input.latestAttempt.failureCode})`}; ${input.latestAttempt.consecutiveFailures} in a row.`,
     );
   }
   if (input.coverage !== null) {
@@ -35,9 +45,14 @@ export function deterministicExplanation(server: ExplainableServer): string {
     const parts: string[] = [];
     if (m.memoryUsedPercent !== null) parts.push(`memory ${m.memoryUsedPercent}% used`);
     if (m.load1 !== null) parts.push(`load ${m.load1}${m.cpuCount === null ? "" : ` on ${m.cpuCount} CPUs`}`);
-    if (m.pendingUpdates !== null) parts.push(`${m.pendingUpdates} pending updates`);
+    if (m.pendingUpdates !== null) parts.push(`${m.pendingUpdates} pending ${m.pendingUpdates === 1 ? "update" : "updates"}`);
     if (m.rebootRequired !== null) parts.push(m.rebootRequired ? "reboot required" : "no reboot required");
     if (parts.length > 0) lines.push(`${parts.join("; ")}.`);
+    if (m.packageLists !== null) {
+      lines.push(`Package information was last refreshed by the host at ${when(m.packageLists)}. ${NOT_REFRESHED_BY_SERVRSIT}`);
+    } else if (m.pendingUpdates !== null) {
+      lines.push(`The age of the package information is unknown. ${NOT_REFRESHED_BY_SERVRSIT}`);
+    }
     if (m.filesystems !== null && m.filesystems.length > 0) {
       lines.push(`Disk use: ${m.filesystems.map((f) => `${f.mount} ${f.usedPercent}%`).join(", ")}.`);
     }

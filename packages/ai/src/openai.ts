@@ -22,6 +22,7 @@ import type { OpenAiConfig } from "./config.js";
 import type { AiUnavailableReason, CompletionRequest, ModelProvider, ProviderOutcome } from "./explainer.js";
 import type { AiServerInput } from "./input.js";
 import { buildPrompt, SYSTEM_PROMPT } from "./prompt.js";
+import type { TimeContext } from "./time.js";
 
 /** Upper bound for a reply body. A 120-word explanation is far below this. */
 export const MAX_RESPONSE_BYTES = 256 * 1024;
@@ -91,8 +92,8 @@ export function createOpenAiProvider(config: OpenAiConfig, deps: OpenAiProviderD
   return {
     id: "openai_compatible",
     requestedModel: config.model,
-    call(input: AiServerInput): Promise<ProviderOutcome> {
-      return this.complete({ system: SYSTEM_PROMPT, user: buildPrompt(input) });
+    call(input: AiServerInput, ctx: TimeContext): Promise<ProviderOutcome> {
+      return this.complete({ system: SYSTEM_PROMPT, user: buildPrompt(input, ctx) });
     },
     async complete(request: CompletionRequest): Promise<ProviderOutcome> {
       const fail = (reason: AiUnavailableReason, httpStatus: number | null = null): ProviderOutcome => ({

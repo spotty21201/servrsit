@@ -22,7 +22,11 @@ export function createExplainer(config: AiConfig, options: CreateExplainerOption
   if (config.provider === "kiro") {
     return new GuardedExplainer(createKiroProvider(options.kiro), options);
   }
-  return new DisabledExplainer(config.problems.length > 0 ? "not_configured" : "provider_disabled", options.now);
+  return new DisabledExplainer(
+    config.problems.length > 0 ? "not_configured" : "provider_disabled",
+    options.now,
+    options.timeZone,
+  );
 }
 
 /**

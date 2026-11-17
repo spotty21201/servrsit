@@ -31,6 +31,7 @@ export function fixtureFleet(overrides: Partial<FleetResponse> = {}): FleetRespo
     mode: "fixture",
     generatedAt: "2026-11-17T08:05:00.000Z",
     healthIntervalMinutes: 15,
+    ownerTimeZone: "Asia/Jakarta",
     nextCheckAt: null,
     servers: [
       fixtureServer(),

@@ -166,6 +166,7 @@ export function buildFixtureFleet(config: FleetConfig, now: Date): FleetResponse
     mode: "fixture",
     generatedAt: now.toISOString(),
     healthIntervalMinutes: config.healthIntervalMinutes,
+    ownerTimeZone: config.ownerTimeZone,
     nextCheckAt: null,
     servers: [fresh, partial, unreachable, noData],
   };

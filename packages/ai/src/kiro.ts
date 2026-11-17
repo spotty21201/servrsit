@@ -22,6 +22,7 @@ import {
 } from "./explainer.js";
 import type { AiServerInput } from "./input.js";
 import { buildPrompt } from "./prompt.js";
+import type { TimeContext } from "./time.js";
 import { spawnKiro, type KiroRunner } from "./runner.js";
 
 export { buildPrompt } from "./prompt.js";
@@ -56,10 +57,10 @@ export function createKiroProvider(options: KiroProviderOptions = {}): ModelProv
   return {
     id: "kiro",
     requestedModel: null,
-    async call(input: AiServerInput): Promise<ProviderOutcome> {
+    async call(input: AiServerInput, ctx: TimeContext): Promise<ProviderOutcome> {
       const run = await runner({
         file: binary,
-        args: buildKiroArgs(buildPrompt(input)),
+        args: buildKiroArgs(buildPrompt(input, ctx)),
         cwd: workspace,
         timeoutMs,
         maxStdoutBytes: MAX_OUTPUT_BYTES,
