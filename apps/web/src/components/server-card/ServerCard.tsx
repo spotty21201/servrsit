@@ -88,7 +88,7 @@ export function ServerCard({ server }: ServerCardProps) {
         <PixelServerIcon variant={emblemVariant} className={styles.icon} />
         <div className={styles.identity}>
           <h2 id={headingId} className={`${styles.name} pixel-text`}>
-            <a href={`/servers/${id}`} className={styles.nameLink}>
+            <a href={`/servers/${id}`} className={styles.nameLink} title={name}>
               {name}
             </a>
           </h2>

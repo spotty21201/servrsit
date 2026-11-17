@@ -191,8 +191,8 @@
 }
 
 /* ── Server roster (top, full content width) ────────────────────────────── */
-/* Round 5: 3 cards per row ≥1024px, 2 per row 768–1023px, 1 per row ≤767px.
- * minmax(0, 1fr) tracks: a long child can never widen the grid. */
+/* Round 5/6: 1 per row ≤767px, 2 per row 768–1023px, 3 per row 1024–1299px,
+ * 4 per row ≥1300px. minmax(0, 1fr) tracks: a long child can never widen the grid. */
 
 .roster {
   min-width: 0;
@@ -230,12 +230,24 @@
 
 @media (min-width: 1024px) {
   .rosterGrid {
-    /* at 1024px each card is ~309px; at 1440px ~398px */
+    /* 1024–1299: 3 per row (~306px at 1024, ~352px at 1280) */
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .lowerGrid {
     gap: var(--space-4);
+  }
+}
+
+/* Round 6 (experiment): 4 per row from 1300px.
+ * Brief asked for 1280px, but at 1280 a card would be ~258px
+ * (1280 − 88 rail − 80 padding − 8 shadow room − 3×24 gaps = 1032 / 4),
+ * under the 260px floor. At 1300px it is ~263px; at 1440px ~290px.
+ * Fixed 4 tracks (not auto-fit): 3 fixture cards stay left-aligned at
+ * normal card width with an empty 4th slot, instead of stretching. */
+@media (min-width: 1300px) {
+  .rosterGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

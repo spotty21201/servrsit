@@ -187,3 +187,77 @@ herdr pane read w1:p5 --source recent-unwrapped --lines 60
 git add -A apps/web docs/team/handoff-designer-m2c.md   # -A records the deleted ScrollRegion files
 git commit -m "feat(web): overview round 5 — revert three-column fit; 3-up server cards, lists below, chat at bottom"
 ```
+
+---
+
+# Round 6 addendum — 4-column server grid (experiment)
+
+**Status: code written in apps/web only. NOT built, NOT run, NOT committed.** I still have no shell or network tool. I couldn't run `pnpm run build`, read pane w1:p5, or commit with the message `T-018 round 6: 4-column server grid (experiment)`. The founder-approved state stays safe at tag `founder-approved-overview-v3`. I didn't and can't touch git.
+
+## Breakpoints (one deviation from the brief)
+
+| Viewport | Cards per row | Card width (calculated) |
+|---|---|---|
+| ≤767 px | 1 | unchanged |
+| 768–1023 px | 2 | ~348–488 px |
+| 1024–1299 px | 3 | ~306 px at 1024, ~352 px at 1280 |
+| **≥1300 px** | **4** | ~263 px at 1300, ~290 px at 1440 |
+
+**Deviation:** the brief asked for 4 columns from 1280 px, with the rule "if 4 columns at 1280 forces under 260, use 3 until wider". At 1280 px the arithmetic is 1280 − 88 rail − 80 padding − 8 shadow room − 3 × 24 gaps = 1032 px, which gives **~258 px per card, under 260**. So 4 columns start at 1300 px (~263 px). I kept the gap at 24 px rather than shrinking it to squeeze 4 columns in at 1280. The brief said to change only the columns.
+
+Note that 263–290 px is below the UX Spec's 280 px minimum until about 1360 px.
+
+## Changed files (round 6)
+
+| Path | Change |
+|---|---|
+| `components/overview/OverviewScreen.module.css` | New `@media (min-width: 1300px)` with `repeat(4, minmax(0, 1fr))`. The 1024 px block is unchanged (3 columns) apart from its comment. **Fixed 4 tracks, not `auto-fit`:** 3 fixture cards stay left-aligned at normal card width with an empty 4th slot. They don't stretch to fill the row. |
+| `components/server-card/ServerCard.tsx` | Name link gets `title={name}`. |
+| `components/server-card/ServerCard.module.css` | **Name:** wraps, at most 2 lines, then ellipsis (`line-clamp: 2`). The full name stays in the DOM, so screen readers read it all, and in `title`. **Name focus:** the clamp clips overflow, which would cut an outside outline, so focus shows as a Citron highlight (Ink on Citron 12.0:1) plus a 3 px Focus-colored underline. **Action button:** `max-width: 100%`, may wrap inside instead of clipping, `min-height` still 44 px. The longest fixture label, "Check connection", is ~170 px with padding and fits on one line at 263 px. The status badge already wraps (round 2). |
+
+Untouched: chat console, Needs attention / Recent activity, mobile rules, nav, density tokens. A grep shows no `100vw`, and the only `100vh` is the existing `100dvh` fallback.
+
+## Fit at 1440×900 (calculated, not measured)
+
+The page scrolls normally (round 5 layout), so "fits" means everything is visible without scrolling. Top to bottom:
+
+| Part | Height |
+|---|---|
+| Banner | 36 |
+| Band | 10 |
+| Top padding | 24 |
+| Servers header | ~42 |
+| Card row | ~257 (at 290 px wide, Nabire's finding wraps to 2 lines) |
+| Shadow room | 8 |
+| Gap | 32 |
+| Attention (2 rows) | ~222, the taller of the two side-by-side lists |
+| Gap | 32 |
+| Chat label + console | ~158 |
+| Bottom padding | 32 |
+| **Total** | **≈ 853 px**, under 900 |
+
+The margin is about 47 px. Real font metrics or browser chrome could change it, so this needs a browser check.
+
+## Not verified (no browser)
+
+- Build and Vite pane output.
+- That the page fits 1440×900 with no scroll; the ~853 px figure is arithmetic.
+- How 3 left-aligned cards in a 4-slot row look (intentional vs. unfinished). This is a judgement call for the founder.
+- Readability of 263–290 px cards: pixel names wrapping or clamping, badge wrapping, and two-line findings.
+- The name-link focus style (Citron highlight) on keyboard focus.
+- That `line-clamp` with `-webkit-box` behaves on the `<h2>` that holds the link (Chrome and Safari support it; Firefox supports `-webkit-line-clamp`).
+- The 1280–1299 px band stays at 3 columns as intended.
+- Mobile unchanged: recheck `scrollWidth === innerWidth` at 390 and 320 px.
+
+## To close (round 6)
+
+```bash
+git switch feat/designer/overview-v3
+git tag --list founder-approved-overview-v3     # confirm the safe point exists
+pnpm -F @servrsit/web run build 2>&1 | tail -20
+herdr pane read w1:p5 --source recent-unwrapped --lines 60
+git add apps/web docs/team/handoff-designer-m2c.md
+git commit -m "T-018 round 6: 4-column server grid (experiment)"
+```
+
+To abandon the experiment: `git switch -c <name> founder-approved-overview-v3`, or revert this one commit.

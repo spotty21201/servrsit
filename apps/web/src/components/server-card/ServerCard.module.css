@@ -60,8 +60,15 @@
   font-size: var(--text-card-title-size);     /* 24px — 8px multiple */
   line-height: var(--text-card-title-line-height);
   color: var(--color-ink);
-  /* long names wrap instead of widening the card */
+  /* Long names: wrap (breaking inside a word only if it has to), at most
+     2 lines, then ellipsis. The full name stays in the DOM (accessible name)
+     and in the link's title attribute for pointer users. */
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .nameLink {
@@ -164,7 +171,13 @@
   font-size: var(--text-compact-size);
   font-weight: var(--font-weight-semibold);
   text-decoration: none;
-  white-space: nowrap;
+  /* At ~260px cards the label still fits on one line (longest fixture label,
+     "Check connection", is ~170px with padding). If a future label is longer,
+     it wraps inside the button instead of clipping; min-height keeps ≥44px. */
+  max-width: 100%;
+  padding-block: var(--space-half);
+  text-align: center;
+  white-space: normal;
 }
 
 .primaryAction:hover {
@@ -172,10 +185,22 @@
   background-color: var(--color-citron);
 }
 
-.primaryAction:focus-visible,
-.nameLink:focus-visible {
+.primaryAction:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+/* The name heading clips overflow (line clamp), which would cut an outside
+   outline. Focus is shown inside the text box instead: Citron highlight
+   (Ink on Citron 12.0:1) plus a thick Focus-colored underline. */
+.nameLink:focus-visible {
+  outline: none;
+  background-color: var(--color-citron);
+  text-decoration: underline;
+  text-decoration-color: var(--color-focus);
+  text-decoration-thickness: 3px;
+  text-underline-offset: 3px;
+  border-radius: 0;
 }
 
 /* ── Mobile (≤767px): smaller, tighter cards (round 3) ──────────────────────
