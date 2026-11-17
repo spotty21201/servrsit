@@ -24,8 +24,10 @@ export * from "./fixtures.js";
 
 /** Base palette — hex values exactly as specified. */
 export const colors = {
-  /** Warm main background */
+  /** Warm background. Retired as page background (ADR-011 round 2). */
   canvas: "#F6F4EE",
+  /** Page background (ADR-011 round 2) */
+  page: "#FFFFFF",
   /** Forms, working cards, menus */
   surface: "#FFFFFF",
   /** Primary text and dark surfaces (e.g. transcript background) */
@@ -41,6 +43,8 @@ export const colors = {
   lilac: "#C9B8FF",
   /** Small brand accents and editorial highlights. Not a health status. */
   citron: "#D7EF52",
+  /** 4th server identity color (T-040). Identity only, never a health status. */
+  bubblegum: "#FFA3D7",
   /** Non-essential separators only */
   softLine: "#DDDCD6",
   /** Input boundaries and essential control distinctions */
@@ -54,12 +58,14 @@ export type ColorToken = keyof typeof colors;
 /** CSS custom property names for base palette tokens. */
 export const colorCssVars = {
   canvas: "--color-canvas",
+  page: "--color-page",
   surface: "--color-surface",
   ink: "--color-ink",
   mutedInk: "--color-muted-ink",
   tangerine: "--color-tangerine",
   lilac: "--color-lilac",
   citron: "--color-citron",
+  bubblegum: "--color-bubblegum",
   softLine: "--color-soft-line",
   controlBoundary: "--color-control-boundary",
   focus: "--color-focus",
@@ -122,8 +128,10 @@ export type StateColorKey = keyof typeof stateColors;
 // Source: src/tokens/typography.css — UX Spec §4.1
 
 export const fontFamilies = {
-  /** Bricolage Grotesque — brand/display (weight 650–700) */
-  display: '"Bricolage Grotesque", "Arial Black", system-ui, sans-serif',
+  /** Bricolage Grotesque — brand/display (retired on Overview, ADR-011) */
+  display: '"Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  /** Silkscreen — page titles and server names only; sizes in multiples of 8 px */
+  pixel: '"Silkscreen", ui-monospace, "Cascadia Code", Menlo, Consolas, "Courier New", monospace',
   /** Geist Sans — interface/body/forms (weight 400–600) */
   sans: '"Geist", "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   /** Geist Mono — addresses/versions/timestamps/transcripts (weight 400–500) */
@@ -152,10 +160,10 @@ export const typeScaleDesktop = {
     cssVarLineHeight: "--text-display-line-height",
   },
   pageTitle: {
-    sizePx: 36,
-    lineHeightPx: 42,
-    weight: fontWeights.bold,
-    family: fontFamilies.display,
+    sizePx: 32,
+    lineHeightPx: 40,
+    weight: fontWeights.regular,
+    family: fontFamilies.pixel,
     cssVarSize: "--text-page-title-size",
     cssVarLineHeight: "--text-page-title-line-height",
   },
@@ -168,10 +176,10 @@ export const typeScaleDesktop = {
     cssVarLineHeight: "--text-section-title-line-height",
   },
   cardTitle: {
-    sizePx: 22,
-    lineHeightPx: 28,
-    weight: fontWeights.semibold,
-    family: fontFamilies.sans,
+    sizePx: 24,
+    lineHeightPx: 32,
+    weight: fontWeights.regular,
+    family: fontFamilies.pixel,
     cssVarSize: "--text-card-title-size",
     cssVarLineHeight: "--text-card-title-line-height",
   },
@@ -210,7 +218,7 @@ export type TypeScaleKey = keyof typeof typeScaleDesktop;
  */
 export const typeScaleMobile = {
   display: { sizePx: 36, lineHeightPx: 40 },
-  pageTitle: { sizePx: 28, lineHeightPx: 34 },
+  pageTitle: { sizePx: 24, lineHeightPx: 32 },
   sectionTitle: { sizePx: 22, lineHeightPx: 28 },
 } as const satisfies Partial<Record<TypeScaleKey, { sizePx: number; lineHeightPx: number }>>;
 

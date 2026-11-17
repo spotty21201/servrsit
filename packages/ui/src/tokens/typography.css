@@ -25,13 +25,22 @@
   /* ── Font family stacks ─────────────────────────────────────────────────── */
 
   /**
-   * Brand and display headings (Bricolage Grotesque).
-   * ADR-011: titles use a light weight (300 minimum, never hairline).
-   * Fallback is a regular system sans so the light weight is honoured while the
-   * font files are absent (the previous "Arial Black" fallback rendered heavy).
+   * Brand and display headings (Bricolage Grotesque). Not used on the Overview
+   * after ADR-011 round 2; titles there use --font-pixel.
+   * Fallback is a regular system sans (the old "Arial Black" fallback rendered heavy).
    */
   --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /**
+   * Pixel face — page titles and server names ONLY (ADR-011 round 2).
+   * Silkscreen (Jason Kottke, SIL OFL 1.1), self-hosted by the app.
+   * Designed on an 8 px grid: use sizes that are multiples of 8 px so glyph
+   * edges land on whole pixels. Never use for body, buttons, data, or timestamps.
+   * Fallback is monospace so layout stays close if the file is missing.
+   */
+  --font-pixel: "Silkscreen", ui-monospace, "Cascadia Code", Menlo, Consolas,
+    "Courier New", monospace;
 
   /**
    * Interface, body, forms, buttons (Geist Sans, weight 400–600).
@@ -49,9 +58,6 @@
 
 
   /* ── Font weight constants ───────────────────────────────────────────────── */
-
-  /** Titles and server names (ADR-011). Floor — never use a lighter weight. */
-  --font-weight-light: 300;
 
   /** Body prose weight (Geist Sans) */
   --font-weight-regular: 400;
@@ -79,22 +85,22 @@
   /**
    * Display — 52 px / 56 px
    * Use: Fleet briefing headline; maximum two short lines.
-   * Font: Bricolage Grotesque, weight 300 (ADR-011; was 650–700).
+   * Font: Bricolage Grotesque, weight 700. Retired on the Overview (ADR-011).
    */
   --text-display-size: 3.25rem;        /* 52px */
   --text-display-line-height: 3.5rem;  /* 56px */
-  --text-display-weight: var(--font-weight-light);
+  --text-display-weight: var(--font-weight-bold);
   --text-display-family: var(--font-display);
 
   /**
-   * Page title — 36 px / 42 px
-   * Use: Server name, activity header, settings.
-   * Font: Bricolage Grotesque, weight 300 (ADR-011; was 650–700).
+   * Page title — 32 px / 40 px (ADR-011 round 2; was 36/42)
+   * Use: page h1, e.g. "Your servers".
+   * Font: Silkscreen pixel face, weight 400. 32 = 4 × 8 px grid.
    */
-  --text-page-title-size: 2.25rem;        /* 36px */
-  --text-page-title-line-height: 2.625rem; /* 42px */
-  --text-page-title-weight: var(--font-weight-light);
-  --text-page-title-family: var(--font-display);
+  --text-page-title-size: 2rem;            /* 32px */
+  --text-page-title-line-height: 2.5rem;   /* 40px */
+  --text-page-title-weight: var(--font-weight-regular);
+  --text-page-title-family: var(--font-pixel);
 
   /**
    * Section title — 24 px / 30 px
@@ -107,14 +113,14 @@
   --text-section-title-family: var(--font-sans);
 
   /**
-   * Card title — 22 px / 28 px
-   * Use: Server identity cards (server name display text).
-   * Font: Bricolage Grotesque, weight 300 (ADR-011; was Geist Sans 600).
+   * Card title — 24 px / 32 px (ADR-011 round 2; was 22/28)
+   * Use: server names on cards.
+   * Font: Silkscreen pixel face, weight 400. 24 = 3 × 8 px grid.
    */
-  --text-card-title-size: 1.375rem;       /* 22px */
-  --text-card-title-line-height: 1.75rem; /* 28px */
-  --text-card-title-weight: var(--font-weight-light);
-  --text-card-title-family: var(--font-display);
+  --text-card-title-size: 1.5rem;         /* 24px */
+  --text-card-title-line-height: 2rem;    /* 32px */
+  --text-card-title-weight: var(--font-weight-regular);
+  --text-card-title-family: var(--font-pixel);
 
   /**
    * Body — 16 px / 24 px
@@ -170,10 +176,10 @@
     --text-display-line-height: 2.5rem;  /* 40px */
 
     /**
-     * Page title — 28 px / 34 px (mobile)
+     * Page title — 24 px / 32 px (mobile; pixel face, 3 × 8 px grid)
      */
-    --text-page-title-size: 1.75rem;        /* 28px */
-    --text-page-title-line-height: 2.125rem; /* 34px */
+    --text-page-title-size: 1.5rem;        /* 24px */
+    --text-page-title-line-height: 2rem;   /* 32px */
 
     /**
      * Section title — 22 px / 28 px (mobile)
@@ -182,7 +188,7 @@
     --text-section-title-line-height: 1.75rem; /* 28px */
 
     /*
-     * Card title: spec says 22/28 at both breakpoints — no override needed.
+     * Card title: 24/32 at both breakpoints (pixel face) — no override needed.
      * Body: 16/24 at both breakpoints — no override needed.
      * Compact: 14/20 at both breakpoints — no override needed.
      * Technical: 13/20 at both breakpoints — no override needed.

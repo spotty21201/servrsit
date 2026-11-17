@@ -17,8 +17,11 @@
 :root {
   /* ── Base palette ───────────────────────────────────────────────────────── */
 
-  /** Warm main background. RETIRED as page background by ADR-011; use --theme-page-bg (themes.css). */
+  /** Warm background. RETIRED as page background by ADR-011 round 2; use --color-page. */
   --color-canvas: #F6F4EE;
+
+  /** Page background (ADR-011 round 2: white). */
+  --color-page: #FFFFFF;
 
   /** Forms, working cards, menus */
   --color-surface: #FFFFFF;
@@ -40,6 +43,13 @@
 
   /** Small brand accents and editorial highlights. Not a health status color. */
   --color-citron: #D7EF52;
+
+  /**
+   * 4th server identity color (T-040). Identity only — never a health status.
+   * Ink on Bubblegum ≈ 8.42:1. Chosen because the other free hues (green,
+   * amber, red, blue, grey) are all taken by semantic states.
+   */
+  --color-bubblegum: #FFA3D7;
 
   /** Non-essential separators only */
   --color-soft-line: #DDDCD6;
