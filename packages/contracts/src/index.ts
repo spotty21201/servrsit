@@ -333,3 +333,5 @@ export type Operation = z.infer<typeof OperationSchema>;
 
 export * from "./observation.js";
 export * from "./fleet.js";
+
+export * from "./assistant.js";

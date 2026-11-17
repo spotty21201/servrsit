@@ -87,7 +87,9 @@ test("a returned model id with unexpected characters is not recorded", async () 
 // ---- failures ------------------------------------------------------------
 
 test("timeout: falls back to deterministic text marked ai_unavailable", async () => {
-  const { mock, explainer } = await setup(async (_q, res) => { await new Promise((r) => setTimeout(r, 800)); json(res, 200, completion("late")); }, { timeoutMs: 100 });
+  let mockRef: Awaited<ReturnType<typeof startMock>> | null = null;
+  const { mock, explainer } = await setup(async (_q, res) => { await mockRef?.delay(800); if (!res.writableEnded) json(res, 200, completion("late")); }, { timeoutMs: 100 });
+  mockRef = mock;
   const started = Date.now();
   const r = await explainer.explain("s1", server());
   assert.ok(Date.now() - started < 700, "gave up at the timeout, not when the server answered");

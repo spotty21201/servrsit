@@ -19,12 +19,16 @@ export interface Mock {
   readonly baseUrl: string;
   readonly requests: Recorded[];
   close(): Promise<void>;
+  /** A delay that is cancelled when the mock closes, so slow handlers cannot keep the test process alive. */
+  delay(ms: number): Promise<void>;
 }
 
 export type Handler = (req: IncomingMessage, res: ServerResponse, recorded: Recorded) => void | Promise<void>;
 
 export async function startMock(handler: Handler): Promise<Mock> {
   const requests: Recorded[] = [];
+  const timers = new Set<NodeJS.Timeout>();
+  let closed = false;
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on("data", (c: Buffer) => chunks.push(c));
@@ -41,8 +45,16 @@ export async function startMock(handler: Handler): Promise<Mock> {
     requests,
     close: () =>
       new Promise<void>((resolve) => {
+        closed = true;
+        for (const t of timers) clearTimeout(t);
         server.closeAllConnections();
         server.close(() => resolve());
+      }),
+    delay: (ms: number) =>
+      new Promise<void>((resolve) => {
+        if (closed) return resolve();
+        const t = setTimeout(resolve, ms);
+        timers.add(t);
       }),
   };
 }

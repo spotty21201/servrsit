@@ -3,6 +3,7 @@
  * can create it without listening on a port.
  */
 
+import { createAssistant } from "@servrsit/ai";
 import { loadAiRuntime } from "./ai-runtime.js";
 import { resolvePort } from "./port.js";
 import { buildServer } from "./server.js";
@@ -12,7 +13,7 @@ const HOST = "127.0.0.1";
 
 async function start(): Promise<void> {
   const ai = loadAiRuntime();
-  const fastify = await buildServer({ redactSecrets: ai.redactSecrets });
+  const fastify = await buildServer({ redactSecrets: ai.redactSecrets, assistant: createAssistant(ai.config) });
   for (const note of ai.notes) fastify.log[note.level](note.message);
 
   const shutdown = async (signal: string): Promise<void> => {

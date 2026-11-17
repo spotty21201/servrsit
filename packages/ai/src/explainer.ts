@@ -38,7 +38,8 @@ export type AiUnavailableReason =
   | "provider_error"
   | "malformed_response"
   | "not_configured"
-  | "provider_disabled";
+  | "provider_disabled"
+  | "not_supported";
 
 export interface ExplainMeta {
   readonly provider: ProviderId | "none";
@@ -66,10 +67,18 @@ export type ProviderOutcome =
   | { readonly ok: true; readonly text: string; readonly returnedModel: string | null; readonly httpStatus: number | null }
   | { readonly ok: false; readonly reason: AiUnavailableReason; readonly httpStatus: number | null };
 
+/** A free-form request: a fixed system prompt plus user text. No tools, no functions. */
+export interface CompletionRequest {
+  readonly system: string;
+  readonly user: string;
+}
+
 export interface ModelProvider {
   readonly id: ProviderId;
   readonly requestedModel: string | null;
   call(input: AiServerInput): Promise<ProviderOutcome>;
+  /** Optional. Providers that cannot take a custom system prompt (Kiro) omit it. */
+  complete?(request: CompletionRequest): Promise<ProviderOutcome>;
 }
 
 export interface Explainer {
@@ -86,7 +95,7 @@ export interface GuardOptions {
 }
 
 /** Output we refuse to show as explanation: code blocks or command-looking lines. */
-const UNSAFE_OUTPUT = /```|^\s*[$#]\s+\S|\bsudo\b|\brm\s+-rf\b|\bcurl\b[^\n]*\|\s*(ba)?sh/im;
+export const UNSAFE_OUTPUT = /```|^\s*[$#]\s+\S|\bsudo\b|\brm\s+-rf\b|\bcurl\b[^\n]*\|\s*(ba)?sh/im;
 
 function hashInput(input: AiServerInput): string {
   return createHash("sha256").update(JSON.stringify(input)).digest("hex");

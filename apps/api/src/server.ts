@@ -16,7 +16,9 @@ import healthPlugin from "./routes/health.js";
 import fleetPlugin from "./routes/fleet.js";
 import { FleetService } from "./fleet/service.js";
 import { knownHostsPath, loadFleetConfig, type FleetConfig } from "./fleet/config.js";
-import { createScrubber } from "@servrsit/ai";
+import { createAssistant, createScrubber, resolveAiConfig, type AssistantResponder } from "@servrsit/ai";
+import assistantRoutes from "./routes/assistant.js";
+import { buildFixtureFleet } from "./fleet/fixture.js";
 import { createLoggerOptions, installResponseRedaction, type LogStream } from "./redaction.js";
 
 const isDev = process.env["NODE_ENV"] !== "production";
@@ -36,6 +38,8 @@ export interface BuildServerOptions {
   readonly redactSecrets?: readonly string[] | undefined;
   /** For tests: capture log lines. */
   readonly logStream?: LogStream | undefined;
+  /** The assistant. Defaults to deterministic-only (no AI) when not given. */
+  readonly assistant?: AssistantResponder | undefined;
 }
 
 export async function buildServer(options: BuildServerOptions = {}) {
@@ -131,6 +135,10 @@ export async function buildServer(options: BuildServerOptions = {}) {
     options.fleetService ??
     new FleetService({ config, knownHostsFile: knownHostsPath(), log: fastify.log });
   await fastify.register(fleetPlugin, { mode, service, config });
+  await fastify.register(assistantRoutes, {
+    assistant: options.assistant ?? createAssistant(resolveAiConfig({ AI_PROVIDER: "none" })),
+    fleet: () => (mode === "fixture" ? buildFixtureFleet(config, new Date()) : service.snapshot()),
+  });
 
   // Fixture mode never contacts any server.
   if (mode === "live" && options.startChecks !== false) service.start();

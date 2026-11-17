@@ -26,9 +26,23 @@ export type { KiroExplainerOptions, KiroProviderOptions } from "./kiro.js";
 export { buildRequestBody, createOpenAiProvider, MAX_RESPONSE_BYTES } from "./openai.js";
 export { DEFAULT_AI_TIMEOUT_MS, describeAiConfig, loadAiEnv, resolveAiConfig } from "./config.js";
 export type { AiConfig, Env, LoadedAiEnv, OpenAiConfig, ProviderChoice } from "./config.js";
-export { createExplainer } from "./factory.js";
+export { createAssistant, createExplainer } from "./factory.js";
 export type { CreateExplainerOptions } from "./factory.js";
 export { createScrubber, REDACTED } from "./redact.js";
 export type { Scrub } from "./redact.js";
 export { spawnKiro } from "./runner.js";
 export type { KiroRunner, KiroRunRequest, KiroRunResult } from "./runner.js";
+export {
+  ASSISTANT_SYSTEM_PROMPT,
+  AssistantResponder,
+  buildAssistantPrompt,
+  CHANGE_REQUEST_ANSWER,
+  classifyMessage,
+  cleanUserMessage,
+  deterministicOverview,
+  MAX_ANSWER_CHARS,
+  SECRET_ANSWER,
+} from "./assistant.js";
+export type { AssistantReply, MessageKind } from "./assistant.js";
+export { UNSAFE_OUTPUT } from "./explainer.js";
+export type { CompletionRequest } from "./explainer.js";

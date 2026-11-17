@@ -699,3 +699,85 @@ Provider tests run against a real local HTTP server on loopback: success and exa
 - **Redaction is value- and shape-based.** It catches the configured key, its URL-encoded form and bearer-shaped strings. A transformed key (for example base64 or split across fields) would not be caught.
 - **Kiro latency note** from the previous handoff still applies if `AI_PROVIDER=kiro` is chosen.
 - `apps/api/.env` is read from `apps/api/.env` relative to the source file, not the working directory.
+
+---
+
+# T-044 — Assistant chat: `POST /api/assistant/messages` and `askAssistant()`
+
+**Branch:** `feat/coder/live-inspection` (worktree `/projects/servrsit-coder`), after T-042 and T-043. No component edited.
+
+## Contract (fixed, implemented as given; schemas in `@servrsit/contracts` `assistant.ts`)
+
+- **Request:** `{"message": 1..2000 chars, "scope": "all" | "<serverId>"}`. Unknown fields are rejected.
+- **200:** `{"answer", "source": "ai"|"deterministic", "model": string|null, "evidence": [{"serverId","observedAt"}], "notice": string|null}`.
+- **400** `{"error":"INVALID_INPUT"}`: bad shape, empty or whitespace-only message, more than 2000 chars, malformed JSON, non-JSON content type, a body over 16 KiB, or an unknown `serverId`.
+- **429** `{"error":"RATE_LIMITED"}` with `Retry-After`.
+- **AI failure is never an error status.** Timeout, 401, 5xx, unreachable, malformed and command-looking replies all return 200, `source: "deterministic"`, and a notice saying why.
+
+## For Designer: using the helper
+
+```ts
+import { askAssistant } from "@/api/assistant";
+const r = await askAssistant(text, "all" /* or a server id */, controller.signal);
+if (r.ok) { r.data.answer; r.data.source; r.data.notice; r.data.evidence; r.data.model }
+else { r.error.kind /* invalid-input | rate-limited | timeout | network | http | invalid-response | aborted */; r.error.message; r.error.retryAfterSeconds }
+```
+
+- Never throws. Messages are fixed text and never echo a response body. Client timeout is 30 s, above the server's 20 s AI timeout, so the server's deterministic fallback normally arrives first.
+- Render `answer` as **plain text only**, never as HTML. It keeps paragraph breaks (`\n\n`).
+- **Always show `notice` when it is not null.** It says when the answer is AI-generated, when the AI was unavailable, when a change was refused, and when a pasted secret was withheld.
+- Label `source: "ai"` answers as AI-generated. They are not evidence. `evidence` lists the servers and observation times the answer was based on; it is empty when nothing was observed, and the notice then says so.
+
+## Behaviour
+
+| Message | What happens | AI called? |
+|---|---|---|
+| Question | Sanitized facts for the scoped servers (same sanitizer as T-039, at most 20) plus the cleaned question go to the model with a fixed system prompt. Reply is capped (1500 chars), control-stripped, refused if command-looking. | yes, once |
+| Change request: "update", "restart", "reboot", "yes", "do it", "approve", "sudo ...", "can you ...", "let's ...", and mixed ones like "How is Nabire? Also reboot it." | Fixed reply: changes go through a reviewed plan and are not available yet; "yes"/"do it" approves nothing. | **no** |
+| Secret: private key block, `sk-...`, `password=`/`password is ...`, `token:`/`api_key=`, bearer token, AWS/GitHub/Slack tokens, JWTs, URL with credentials, or the configured API key itself | Fixed reply. Not sent to the AI, not echoed, not logged. Notice: use the protected server setup (not available yet). | **no** |
+| AI down or unusable | Deterministic summary of the scoped servers, with a notice giving the reason. | tried |
+
+- **Classifier errs toward refusing.** Questions that mention actions ("Is a reboot required?", "Should I update Nabire?", "Is it safe to restart nginx?") stay questions. A sentence that merely starts with an action word is refused politely (known false positive, tested: "start with the oldest server").
+- **Injection:** the question is placed inside `<question>` as a JSON string with `<` escaped, so it cannot close its fence or open a new `<observations>` block. An obedient reply such as "PWNED" is shown as inert text (tested). A reply with a command is withheld (tested).
+- **Rate limit:** 10 accepted messages per minute, **one global window**. There is no authenticated user yet, and every dev request arrives through the Vite proxy from loopback, so a per-client key would be one shared key anyway. It also caps spend on the metered provider. Invalid input does not use the limit. Change requests and secret pastes do.
+- **Logging:** never the message text or the answer. Each request logs only `kind, messageChars, scope ("all"/"server"), servers, source, reason, httpStatus, latencyMs`.
+- **Providers:** `openai_compatible` answers questions. `kiro` cannot take a custom system prompt, so it returns the deterministic summary with reason `not_supported`. `none` or a failed config returns the summary with `provider_disabled` or `not_configured`.
+- **Vite proxy:** already added in T-042 (`/api` -> `http://127.0.0.1:3001`), so no change was needed.
+
+## Checks run (real output)
+
+```
+packages/contracts tsc ok   packages/ssh tsc ok   packages/ai tsc ok   apps/api tsc ok   apps/web tsc ok
+packages/ssh   exit=0  1s  ℹ tests 40 ℹ pass 40 ℹ fail 0 ℹ cancelled 0
+packages/ai    exit=0  1s  ℹ tests 99 ℹ pass 99 ℹ fail 0 ℹ cancelled 0   (was 73)
+apps/api       exit=0  1s  ℹ tests 74 ℹ pass 74 ℹ fail 0 ℹ cancelled 0   (was 54)
+apps/web       exit=0  1s  ℹ tests 34 ℹ pass 34 ℹ fail 0 ℹ cancelled 0   (was 23)
+```
+
+Route tests (20) use a real mock HTTP server: AI working, scoping, no-observation evidence, every 400 case, change requests (AI never called), secret pastes (absent from response and log), AI down for 500/401/timeout/malformed/unreachable/unconfigured (all 200), injection, command-looking reply withheld, message text never logged, rate limit with `Retry-After`, invalid input not counting, and no fleet collection triggered by chat.
+
+### End-to-end against the real provider (one metered AI call, fixture fleet only)
+
+Run in-process with `SERVRSIT_FLEET_MODE=fixture`, so no SSH happened and only synthetic server data reached the AI:
+
+```
+provider: openai_compatible
+question      -> HTTP 200, 3136 ms, source=ai, model=cb/deepseek-v4.1-flash, evidence=0
+change req    -> HTTP 200, 4 ms, source=deterministic, model=null
+secret paste  -> HTTP 200, 3 ms, source=deterministic, echoed=false
+empty message -> HTTP 400 {"error":"INVALID_INPUT"}
+
+key present in this output: false
+key present in server log:  false
+message text in server log: false
+```
+
+## Defect found during the end-to-end run (fixed in D5, below)
+
+In fixture mode the AI answered "Timika ... reported fresh data as of 14:47" while `evidence` was empty and the notice said there were no observations. **The answer and the evidence disagreed.** The cause: fixture servers carry an `observedAt` and a `fresh` status with no observation behind them, and the model is shown `observedAt`. Live mode is consistent (live `observedAt` exists only with an observation). The root cause is the same as Tester's D5 (fixture mode asserts states it never observed).
+
+## Process problems I caused and fixed
+
+- **Leftover API servers.** My T-038 and T-042 checks reported the API "stopped" and ports "free", but I had only killed the child holding the port. The `tsx watch` parents survived and later **restarted the API on 127.0.0.1:3001 and 127.0.0.1:3101**, which kept running the read-only Nabire collection every 15 minutes for several hours. I found them while debugging a test hang. I stopped them by PID after checking each one's working directory was in `/projects/servrsit-coder`. Designer's and Orchestrator's processes in `/projects/servrsit` were not touched. Verified afterwards: no process has a working directory in the worktree, and ports 3001, 3101 and 5199 are free. This explains the PID Tester saw on :3001 (D2). All server runs in this task were in-process with `app.close()`, with no watcher.
+- **Two test hangs.** Both were teardown bugs in my tests, not product hangs. (1) A mock handler slept 4 s on a timer nothing cancelled. The mock server now has a cancellable `delay()`, and the T-043 `openai.test.ts` timeout test uses it too (its 800 ms sleep did not hang but held the process open). (2) A failing assertion threw before `close()`, leaving a mock server open. Cleanup there is now in `try/finally`. All suites exit in about 1 s.
+- **`pkill -f` killed my own shell twice.** It matches the pattern in its own command line. I now stop processes only by verified PID.

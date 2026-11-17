@@ -19,7 +19,7 @@
 
 import { z } from "zod";
 import type { OpenAiConfig } from "./config.js";
-import type { AiUnavailableReason, ModelProvider, ProviderOutcome } from "./explainer.js";
+import type { AiUnavailableReason, CompletionRequest, ModelProvider, ProviderOutcome } from "./explainer.js";
 import type { AiServerInput } from "./input.js";
 import { buildPrompt, SYSTEM_PROMPT } from "./prompt.js";
 
@@ -42,12 +42,12 @@ export interface OpenAiProviderDeps {
 }
 
 /** The exact request body. Tests assert this shape, so no field is added casually. */
-export function buildRequestBody(model: string, input: AiServerInput): Record<string, unknown> {
+export function buildRequestBody(model: string, request: CompletionRequest): Record<string, unknown> {
   return {
     model,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: buildPrompt(input) },
+      { role: "system", content: request.system },
+      { role: "user", content: request.user },
     ],
     temperature: 0.2,
     max_tokens: MAX_REPLY_TOKENS,
@@ -81,14 +81,20 @@ function statusReason(status: number): AiUnavailableReason {
   return "provider_error";
 }
 
-export function createOpenAiProvider(config: OpenAiConfig, deps: OpenAiProviderDeps = {}): ModelProvider {
+/** This provider always implements `complete`, so its type says so. */
+export type OpenAiProvider = ModelProvider & Required<Pick<ModelProvider, "complete">>;
+
+export function createOpenAiProvider(config: OpenAiConfig, deps: OpenAiProviderDeps = {}): OpenAiProvider {
   const doFetch = deps.fetchImpl ?? globalThis.fetch.bind(globalThis);
   const endpoint = `${config.baseUrl}/chat/completions`;
 
   return {
     id: "openai_compatible",
     requestedModel: config.model,
-    async call(input: AiServerInput): Promise<ProviderOutcome> {
+    call(input: AiServerInput): Promise<ProviderOutcome> {
+      return this.complete({ system: SYSTEM_PROMPT, user: buildPrompt(input) });
+    },
+    async complete(request: CompletionRequest): Promise<ProviderOutcome> {
       const fail = (reason: AiUnavailableReason, httpStatus: number | null = null): ProviderOutcome => ({
         ok: false,
         reason,
@@ -111,7 +117,7 @@ export function createOpenAiProvider(config: OpenAiConfig, deps: OpenAiProviderD
             Accept: "application/json",
             Authorization: `Bearer ${config.apiKey}`,
           },
-          body: JSON.stringify(buildRequestBody(config.model, input)),
+          body: JSON.stringify(buildRequestBody(config.model, request)),
           redirect: "error",
           signal: controller.signal,
         });
