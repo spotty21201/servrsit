@@ -32,3 +32,4 @@ coverage/
 
 # runtime data (pinned host keys, caches)
 .data/
+!.env.example

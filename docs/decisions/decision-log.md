@@ -194,6 +194,19 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 
 **Interim AI (Kiro CLI) deviations from the spec (Bedrock):** adapter calls `kiro-cli chat --no-interactive` with a dedicated agent that has NO tools. Input is sanitized structured observations only: no credentials, no raw files, no raw command output. Output is explanation text only and is never executed or treated as authorization or proof. Kiro's data retention and processing terms have not been verified against the product data policy, so this is for the founder's own servers only, never customer data. Kiro usage is metered (a monthly limit was already hit once), and AI failure must not break inspection (FR-08).
 
+## ADR-013 — Interim AI: OpenAI-compatible routing endpoint (replaces Kiro CLI as default)
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-15 |
+| **Status** | [FOUNDER DECISION] |
+
+**Decision:** AI calls go to an OpenAI-compatible endpoint (`AI_BASE_URL`, provider `vip-api.mind-aku.my.id`), model `deepseek-v4.1-flash`, via `/chat/completions`. Configured in `apps/api/.env` (gitignored, mode 600); `.env.example` committed with placeholders. Kiro adapter kept as `AI_PROVIDER=kiro`; `none` = deterministic only.
+
+**Limits (unchanged from ADR-012):** sanitized structured observations only; no credentials, key paths, raw files or raw output; explanation text only; never executed, never authorization or proof; timeout and deterministic fallback (FR-08).
+
+**Risks accepted for dev:** (1) the key was shared in chat, so it should be rotated before any wider use; (2) this is a third-party routing proxy whose data retention and onward routing are unknown, so it is acceptable for the founder's own sanitized server facts only, never customer data; (3) the response reports model `cb/deepseek-v4.1-flash`, so the actual upstream is set by the proxy and is not verified. Replace with the spec's Bedrock adapter (or a vetted provider) and a secrets manager before Stage B.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
