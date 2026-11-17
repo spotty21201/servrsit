@@ -2,5 +2,31 @@
   "name": "@servrsit/domain",
   "private": true,
   "version": "0.0.0",
-  "description": "ServrSit deterministic policy, plan validation, and finding rules"
+  "description": "ServrSit deterministic policy, plan validation, operation state rules",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "pnpm --filter \"@servrsit/domain^...\" run build",
+    "build": "tsc -p tsconfig.build.json",
+    "pretypecheck": "pnpm --filter \"@servrsit/domain^...\" run build",
+    "typecheck": "tsc --noEmit",
+    "pretest": "pnpm --filter \"@servrsit/domain^...\" run build",
+    "test": "tsx --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@servrsit/contracts": "workspace:*",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
 }

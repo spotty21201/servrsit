@@ -21,7 +21,10 @@
     "@fastify/session": "11.1.6",
     "@servrsit/ai": "workspace:*",
     "@servrsit/contracts": "workspace:*",
+    "@servrsit/domain": "workspace:*",
     "@servrsit/ssh": "workspace:*",
+    "@servrsit/store": "workspace:*",
+    "@servrsit/worker": "workspace:*",
     "fastify": "5.12.8",
     "fastify-type-provider-zod": "4.0.2",
     "zod": "3.25.76"

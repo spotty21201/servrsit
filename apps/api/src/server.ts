@@ -18,6 +18,10 @@ import { FleetService } from "./fleet/service.js";
 import { knownHostsPath, loadFleetConfig, type FleetConfig } from "./fleet/config.js";
 import { createAssistant, createScrubber, resolveAiConfig, type AssistantResponder } from "@servrsit/ai";
 import assistantRoutes from "./routes/assistant.js";
+import careRoutes, { type CareServer } from "./routes/care.js";
+import { CsrfGuard } from "./csrf.js";
+import { SqliteCareStore, type CareStore } from "@servrsit/store";
+import { SshWriteTarget, type WriteTarget } from "@servrsit/worker";
 import { buildFixtureFleet } from "./fleet/fixture.js";
 import { createLoggerOptions, installResponseRedaction, type LogStream } from "./redaction.js";
 
@@ -42,6 +46,50 @@ export interface BuildServerOptions {
   readonly assistant?: AssistantResponder | undefined;
   /** For tests: the clock the assistant uses for local times and ages. */
   readonly now?: (() => Date) | undefined;
+  /** Care loop wiring. Defaults to an in-memory store and real servers only (all writes disabled). */
+  readonly care?: CareOptions | undefined;
+}
+
+/** A simulated server, injectable only in code (tests and local demos), never via config or API. */
+export interface SimulatedCareServer {
+  readonly server: CareServer & { readonly kind: "simulated" };
+  readonly target: WriteTarget;
+}
+
+export interface CareOptions {
+  readonly store?: CareStore | undefined;
+  readonly simulated?: readonly SimulatedCareServer[] | undefined;
+  readonly csrf?: CsrfGuard | undefined;
+  readonly now?: (() => Date) | undefined;
+}
+
+/** Simulated servers use obviously fake ids and can never shadow a real server. */
+const SIMULATED_ID = /^00000000-0000-4000-8000-[0-9a-f]{12}$/;
+
+function careWiring(config: FleetConfig, care: CareOptions | undefined) {
+  const real: CareServer[] = config.hosts.map((h) => ({
+    id: h.id,
+    name: h.name,
+    production: h.production,
+    kind: "ssh",
+    writesEnabled: h.writesEnabled,
+  }));
+  if (real.some((s) => s.writesEnabled)) throw new Error("writesEnabled must be false for real servers (ADR-014)");
+  const targets = new Map<string, WriteTarget>(real.map((s) => [s.id, new SshWriteTarget(s.id)]));
+  const realIds = new Set(real.map((s) => s.id));
+  const realNames = new Set(real.map((s) => s.name.toLowerCase()));
+  const simulated: CareServer[] = [];
+  for (const sim of care?.simulated ?? []) {
+    const s = sim.server;
+    if (s.kind !== "simulated" || sim.target.kind !== "simulated") throw new Error("only simulated targets can be injected");
+    if (!SIMULATED_ID.test(s.id) || realIds.has(s.id) || realNames.has(s.name.toLowerCase())) {
+      throw new Error("a simulated server must use a fake id and must not shadow a real server");
+    }
+    simulated.push(s);
+    targets.set(s.id, sim.target);
+  }
+  const servers = [...real, ...simulated];
+  return { servers: () => servers, targets };
 }
 
 export async function buildServer(options: BuildServerOptions = {}) {
@@ -142,6 +190,17 @@ export async function buildServer(options: BuildServerOptions = {}) {
     fleet: () => (mode === "fixture" ? buildFixtureFleet(config, new Date()) : service.snapshot()),
     timeZone: config.ownerTimeZone,
     now: options.now,
+  });
+  const care = careWiring(config, options.care);
+  const careStore = options.care?.store ?? new SqliteCareStore({ path: ":memory:" });
+  await fastify.register(careRoutes, {
+    store: careStore,
+    servers: care.servers,
+    targets: care.targets,
+    csrf: options.care?.csrf ?? new CsrfGuard(),
+    // AUTH STUB (D3): a fixed owner until Cognito sessions (T-023).
+    owner: () => "owner-dev-stub",
+    now: options.care?.now,
   });
 
   // Fixture mode never contacts any server.

@@ -14,6 +14,11 @@ const HostBase = z.object({
   production: z.boolean(),
   collect: z.boolean(),
   collectDisabledReason: z.string().max(200).optional(),
+  /**
+   * HARD GATE (ADR-014): writes to real servers are disabled. Configuration
+   * can only ever say false; true fails to load. There is no API to change it.
+   */
+  writesEnabled: z.literal(false, { errorMap: () => ({ message: "writesEnabled must be false for real servers (ADR-014)" }) }).default(false),
 });
 
 const SshHost = HostBase.extend({

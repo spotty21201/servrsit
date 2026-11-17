@@ -2,5 +2,32 @@
   "name": "@servrsit/worker",
   "private": true,
   "version": "0.0.0",
-  "description": "ServrSit worker and executor — Node.js TypeScript"
+  "description": "ServrSit worker: dispatch, execution targets, reconciliation, verification",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "pnpm --filter \"@servrsit/worker^...\" run build",
+    "build": "tsc -p tsconfig.build.json",
+    "pretypecheck": "pnpm --filter \"@servrsit/worker^...\" run build",
+    "typecheck": "tsc --noEmit",
+    "pretest": "pnpm --filter \"@servrsit/worker^...\" run build",
+    "test": "tsx --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@servrsit/contracts": "workspace:*",
+    "@servrsit/domain": "workspace:*",
+    "@servrsit/store": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
 }
