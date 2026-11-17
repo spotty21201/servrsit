@@ -1,0 +1,49 @@
+{
+  "healthIntervalMinutes": 15,
+  "hosts": [
+    {
+      "id": "11111111-1111-4111-a111-111111111111",
+      "name": "Timika",
+      "access": "ssh",
+      "address": "timika",
+      "port": 22,
+      "user": "spotty",
+      "role": null,
+      "production": true,
+      "collect": false,
+      "collectDisabledReason": "No usable SSH key is configured for this host on the controller yet."
+    },
+    {
+      "id": "22222222-2222-4222-a222-222222222222",
+      "name": "Nabire",
+      "access": "ssh",
+      "address": "nabire",
+      "port": 22,
+      "user": "spotty",
+      "identityFile": "~/.ssh/id_ed25519_nabire",
+      "role": null,
+      "production": true,
+      "collect": true
+    },
+    {
+      "id": "33333333-3333-4333-a333-333333333333",
+      "name": "Sentani",
+      "access": "ssh",
+      "address": "sentani",
+      "port": 22,
+      "user": "spotty",
+      "role": null,
+      "production": true,
+      "collect": false,
+      "collectDisabledReason": "No usable SSH key is configured for this host on the controller yet."
+    },
+    {
+      "id": "44444444-4444-4444-a444-444444444444",
+      "name": "Merauke",
+      "access": "local",
+      "role": "Dev host",
+      "production": false,
+      "collect": true
+    }
+  ]
+}

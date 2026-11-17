@@ -22,6 +22,9 @@ importers:
       '@servrsit/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@servrsit/ssh':
+        specifier: workspace:*
+        version: link:../../packages/ssh
       fastify:
         specifier: 5.12.8
         version: 5.12.8
