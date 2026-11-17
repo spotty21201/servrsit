@@ -207,6 +207,19 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 
 **Risks accepted for dev:** (1) the key was shared in chat, so it should be rotated before any wider use; (2) this is a third-party routing proxy whose data retention and onward routing are unknown, so it is acceptable for the founder's own sanitized server facts only, never customer data; (3) the response reports model `cb/deepseek-v4.1-flash`, so the actual upstream is set by the proxy and is not verified. Replace with the spec's Bedrock adapter (or a vetted provider) and a secrets manager before Stage B.
 
+## ADR-014 — Local-only hosting for development; disposable server after development; dedicated keys
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-15 |
+| **Status** | [FOUNDER DECISION] with Orchestrator gate |
+
+**Decisions:** (1) The disposable Ubuntu server will be provided after development. (2) Dedicated ServrSit SSH keys for Sentani and Timika, stored on Merauke in `~/.ssh/servrsit/` (mode 700/600), installed by the founder with `restrict,from="100.104.220.8"` (no forwarding/PTY; only from Merauke's tailnet address). (3) No AWS for now; ServrSit runs locally on Merauke. Prepare the AWS deployment definition and runbook so it is ready when the founder approves spend.
+
+**Orchestrator gate (non-negotiable, execution-security invariants 11-12):** write operations (package updates, restart, reboot, directory preparation) may be fully built and tested against simulated targets, but stay **disabled for real servers** behind a per-server `writesEnabled=false` flag until the disposable-server tests (T-010–T-014, fault-injection FI-*) pass and the founder authorizes specific live work. Mocks and containers cannot prove APT locking, transient-job survival or reboot behavior.
+
+**Consequences:** Feasibility checkpoint and alpha exit remain open: Merauke is both controller and managed host (PRD D-04 requires independence). Nabire still uses the founder's existing key; moving it to a dedicated ServrSit key is recommended before revocation tests. If the controller's address changes (AWS), the `from=` restriction must be updated on each server.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
