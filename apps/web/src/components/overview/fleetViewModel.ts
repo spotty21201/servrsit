@@ -145,6 +145,10 @@ function primaryLine(s: FleetServer): string {
   if (s.status === "partial" && s.coverage) {
     return `${s.coverage.passed} of ${s.coverage.total} checks ran`;
   }
+  // Light cheek only for routine good news: fresh, no findings, nothing pending.
+  if (s.status === "fresh" && s.observation.packages.pendingCount.status === "ok" && s.observation.packages.pendingCount.value === 0) {
+    return "No pending updates. Nothing to babysit.";
+  }
   return packagesLine(s) ?? s.statusReason;
 }
 
