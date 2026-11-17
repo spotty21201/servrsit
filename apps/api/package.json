@@ -2,16 +2,18 @@
   "name": "@servrsit/api",
   "private": true,
   "version": "0.0.0",
-  "description": "ServrSit API \u2014 Fastify + TypeScript",
+  "description": "ServrSit API — Fastify + TypeScript",
   "type": "module",
   "scripts": {
-    "predev": "pnpm --filter @servrsit/contracts --filter @servrsit/ssh --filter @servrsit/ai run build",
+    "predev": "pnpm --filter \"@servrsit/api^...\" run build",
     "dev": "tsx watch src/index.ts",
-    "prebuild": "pnpm --filter @servrsit/contracts --filter @servrsit/ssh --filter @servrsit/ai run build",
+    "prebuild": "pnpm --filter \"@servrsit/api^...\" run build",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"src/**/*.test.ts\"",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "pretest": "pnpm --filter \"@servrsit/api^...\" run build",
+    "pretypecheck": "pnpm --filter \"@servrsit/api^...\" run build"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.5",

@@ -15,7 +15,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test \"src/**/*.test.ts\""
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "pretest": "pnpm --filter \"@servrsit/ssh^...\" run build",
+    "pretypecheck": "pnpm --filter \"@servrsit/ssh^...\" run build",
+    "prebuild": "pnpm --filter \"@servrsit/ssh^...\" run build"
   },
   "dependencies": {
     "@servrsit/contracts": "workspace:*",
