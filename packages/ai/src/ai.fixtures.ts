@@ -98,3 +98,6 @@ export function hostileServer(): ExplainableServer {
     }),
   );
 }
+
+/** An obviously fake credential for tests. It is not, and never was, a real key. */
+export const FAKE_API_KEY = "sk-test-FAKE-0000-not-a-real-key-123456";

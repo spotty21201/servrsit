@@ -19,6 +19,9 @@ importers:
       '@fastify/session':
         specifier: 11.1.6
         version: 11.1.6
+      '@servrsit/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@servrsit/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

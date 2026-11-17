@@ -16,6 +16,8 @@ import healthPlugin from "./routes/health.js";
 import fleetPlugin from "./routes/fleet.js";
 import { FleetService } from "./fleet/service.js";
 import { knownHostsPath, loadFleetConfig, type FleetConfig } from "./fleet/config.js";
+import { createScrubber } from "@servrsit/ai";
+import { createLoggerOptions, installResponseRedaction, type LogStream } from "./redaction.js";
 
 const isDev = process.env["NODE_ENV"] !== "production";
 
@@ -30,14 +32,27 @@ export interface BuildServerOptions {
   /** Start the background refresh timer. Tests leave this off. */
   readonly startChecks?: boolean | undefined;
   readonly logger?: boolean | undefined;
+  /** Secret values (for example the AI API key) that must never appear in logs, errors or responses. */
+  readonly redactSecrets?: readonly string[] | undefined;
+  /** For tests: capture log lines. */
+  readonly logStream?: LogStream | undefined;
 }
 
 export async function buildServer(options: BuildServerOptions = {}) {
   const config = options.config ?? (await loadFleetConfig());
   const mode = options.mode ?? (process.env["SERVRSIT_FLEET_MODE"] === "fixture" ? "fixture" : "live");
   const fastify = Fastify({
-    logger: options.logger === false ? false : { level: isDev ? "info" : "warn" },
+    logger:
+      options.logger === false
+        ? false
+        : createLoggerOptions({
+            level: isDev ? "info" : "warn",
+            secrets: options.redactSecrets ?? [],
+            stream: options.logStream,
+          }),
   });
+  const secrets = options.redactSecrets ?? [];
+  installResponseRedaction(fastify, createScrubber(secrets), secrets.length > 0);
 
   // Set Zod as the schema validator and serializer for all routes
   fastify.setValidatorCompiler(validatorCompiler);
