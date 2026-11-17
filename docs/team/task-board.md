@@ -465,3 +465,16 @@ Last updated: 2026-11-15 | Milestone: M0 — Establish the project
 - **Designer:** T-017 token system (depends on T-007 contracts skeleton from Coder)
 - **Tester:** T-009 acceptance matrix (depends on T-007)
 - **Orchestrator:** T-006 git init, T-015 AWS cost worksheet research
+
+
+---
+
+## Live wiring (post-M2, founder-authorized read-only; see ADR-012)
+
+| ID | Owner | Task | Depends | Status |
+|---|---|---|---|---|
+| T-037 | Coder | Read-only collectors (`inspect.host.v1`, `inspect.services.v1`-lite, `inspect.packages.v1` without refresh) in `packages/ssh`; pinned known_hosts; bounded output; unit tests against recorded fixtures | T-007 | todo |
+| T-038 | Coder | API `GET /api/fleet` live mode with per-server `source: live|fixture`, freshness, partial/failed states; fixture fallback clearly labeled | T-037 | todo |
+| T-039 | Coder | Kiro AI adapter (`packages/ai`): no-tools agent, sanitized input, prompt-injection fixtures, failure fallback | T-038 | todo |
+| T-040 | Designer | Merauke card (Dev host) + per-card data-source badge (FIXTURE/LIVE) | T-018 | todo |
+| T-041 | Orchestrator | Founder fingerprint verification, then add pinned known_hosts entries | founder | blocked on founder |

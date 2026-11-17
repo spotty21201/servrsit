@@ -175,6 +175,25 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 
 ---
 
+## ADR-012 — Dev wiring: read-only inspection of real servers, Kiro as interim AI
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-15 |
+| **Owner** | Orchestrator |
+| **Status** | [FOUNDER DECISION] with Orchestrator-imposed limits |
+
+**Founder authorization (2026-11-15):** wire the app to Sentani, Nabire, Timika and Merauke over SSH (`ssh spotty@<host>`), and use Kiro as the AI for now.
+
+**Scope limits (Orchestrator):**
+1. **Read-only inspection only.** Fixed, reviewed collectors. No sudo, no writes, no `apt update` (it is a write), no helper install, no restart/reboot, no fault injection. Maintenance stays blocked until disposable-target gates pass and specific live work is authorized (execution-security invariants 11-12).
+2. **Host identity:** the app uses a pinned known_hosts file with StrictHostKeyChecking=yes. Entries are added only after the founder verifies each fingerprint out of band. Until then the app must not log in to that host.
+3. **Credentials:** dev uses the founder's existing SSH keys on the dev host (Nabire has a dedicated key). Spec 5 prefers dedicated keys; recommended later. Keys are never read into the app, logged, or sent to AI.
+4. **Merauke is the dev host and controller** (it runs the app and agents). It resolves to loopback, which Technical Spec 6.2 blocks. Accepted for dev only: Merauke is inspected by a local collector (no SSH to itself) and labeled "Dev host". The production controller on AWS will not manage itself.
+5. **Data labeling:** every card shows its data source (FIXTURE or LIVE). Live and fixture data never mix without a visible label (invariant 14).
+
+**Interim AI (Kiro CLI) deviations from the spec (Bedrock):** adapter calls `kiro-cli chat --no-interactive` with a dedicated agent that has NO tools. Input is sanitized structured observations only: no credentials, no raw files, no raw command output. Output is explanation text only and is never executed or treated as authorization or proof. Kiro's data retention and processing terms have not been verified against the product data policy, so this is for the founder's own servers only, never customer data. Kiro usage is metered (a monthly limit was already hit once), and AI failure must not break inspection (FR-08).
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |

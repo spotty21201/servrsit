@@ -261,3 +261,83 @@ git commit -m "T-018 round 6: 4-column server grid (experiment)"
 ```
 
 To abandon the experiment: `git switch -c <name> founder-approved-overview-v3`, or revert this one commit.
+
+---
+
+# Round 7 addendum — denser spacing, 3-line chat
+
+**Status: code written in apps/web only. NOT built, NOT run, NOT committed.** I still have no shell or network tool. I couldn't run `pnpm run build`, read pane w1:p5, or commit as `T-018 round 7: denser spacing, 3-line chat`. The approved state stays at tag `founder-approved-overview-v4`. I didn't touch git.
+
+## Values (round 6 value in brackets)
+
+| Item | Desktop / tablet | Mobile ≤767 px |
+|---|---|---|
+| Body, compact, technical line-height | **1.3** [1.375 / 1.35 / 1.4] | same |
+| Page title (pixel 24 px) | 26 px = **1.08** [28 px, 1.17] | same |
+| Server name (pixel) | 24/26 = **1.08** [24/28] | 16/17 = **1.06** [16/18] |
+| Section title | 20/22 = **1.1** [20/24] | 18/19 = **1.06** [18/22] |
+| Gap between section blocks | **24** [32] | **12** [16] |
+| Gap between cards | **16** [24] | **8** [12] |
+| Card padding | **12** [16] | **8** [12] |
+| Gap between card rows | **8** [12] | **4** [8] |
+| Card icon ↔ name | **8** [12] | 8 (unchanged mobile rule) |
+| Card check-row icon ↔ text | **4** [8] | 4 |
+| Status badge vertical padding | **1** [2] | 1 |
+| List row padding (attention, activity) | **4** [8] | 4 |
+| List row icon ↔ text | **8** [12] | 8 |
+| Section heading rule: padding / margin below | **2 / 4** [4 / 8] | same |
+| Content top / bottom padding | **16 / 24** [24 / 32]; tablet **12 / 24** [16 / 32] | **8 / 16** [12 / 24] |
+
+## Tap targets (≥ 44 px kept with padding on the hit area, not gaps)
+
+- Card action button, nav items, account button, chat send button and "View all activity": unchanged `min-height` / size of 44 px.
+- **Recent activity rows:** row padding dropped to 4 px, so the title link alone is a ~18 px target. The link now uses a **stretched hit area**: an `::after` covers the whole row, and the row has `min-height: 44px`. The keyboard focus ring is drawn on that row-sized area.
+- Needs attention rows have no links, so no target is needed.
+
+## Chat console
+
+`rows={3}` on **every breakpoint**: 3 × 20.8 px + 16 px padding ≈ 78 px, in a ~82 px console. The round 2/3 mobile single-line override was removed, as the brief applies 3 rows to mobile too. The send button is 44×44 bottom-right inside the console on all sizes. Label, scope chip, note, 600 px max width and bottom position are unchanged.
+
+## Unchanged
+
+- Columns (1 / 2 / 3 / 4 at ≤767 / 768 / 1024 / 1300 px), colors, fonts, nav, mobile anchoring.
+- A grep shows no `100vw`. The only `100vh` is the existing fallback before `100dvh`.
+
+**Side effect worth knowing:** the card gap dropped from 24 to 16 px, so at 1280 px a 4-column card would now be ~264 px (above the 260 floor). The 4-column breakpoint could move from 1300 to 1280 px as originally asked. I didn't change it, because the brief said not to change columns.
+
+## Fit at 1440×900 (calculated)
+
+| Part | Height (px) |
+|---|---|
+| Banner | 36 |
+| Band | 10 |
+| Top padding | 16 |
+| Servers header | ~34 |
+| Card row | ~228 |
+| Shadow room | 8 |
+| Gap | 24 |
+| Attention (2 rows, taller of the two lists) | ~200 |
+| Gap | 24 |
+| Chat | ~110 |
+| Bottom padding | 24 |
+| **Total** | **≈ 714**, about 140 px under 900 |
+
+## Not verified (no browser)
+
+- Build and Vite pane output.
+- Readability at line-height 1.3, especially two-line findings and wrapped badges.
+- Whether 16 px pixel names at 17 px line-height look cramped on mobile.
+- The stretched-link rows: the whole row clicks, the focus ring draws around the row, and nothing else in the row is blocked (there are no other controls in those rows today).
+- That `rows={3}` renders exactly 3 lines in Chrome, Safari and Firefox (scrollbar and padding handling differs slightly).
+- How the 3-row console and send button look on a 390 px phone.
+- The fit total above, and that mobile still has no horizontal overflow (recheck `scrollWidth === innerWidth` at 390 and 320 px).
+
+## To close (round 7)
+
+```bash
+git switch feat/designer/overview-v3
+pnpm -F @servrsit/web run build 2>&1 | tail -20
+herdr pane read w1:p5 --source recent-unwrapped --lines 60
+git add apps/web docs/team/handoff-designer-m2c.md
+git commit -m "T-018 round 7: denser spacing, 3-line chat"
+```
