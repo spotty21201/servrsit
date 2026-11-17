@@ -781,3 +781,105 @@ In fixture mode the AI answered "Timika ... reported fresh data as of 14:47" whi
 - **Leftover API servers.** My T-038 and T-042 checks reported the API "stopped" and ports "free", but I had only killed the child holding the port. The `tsx watch` parents survived and later **restarted the API on 127.0.0.1:3001 and 127.0.0.1:3101**, which kept running the read-only Nabire collection every 15 minutes for several hours. I found them while debugging a test hang. I stopped them by PID after checking each one's working directory was in `/projects/servrsit-coder`. Designer's and Orchestrator's processes in `/projects/servrsit` were not touched. Verified afterwards: no process has a working directory in the worktree, and ports 3001, 3101 and 5199 are free. This explains the PID Tester saw on :3001 (D2). All server runs in this task were in-process with `app.close()`, with no watcher.
 - **Two test hangs.** Both were teardown bugs in my tests, not product hangs. (1) A mock handler slept 4 s on a timer nothing cancelled. The mock server now has a cancellable `delay()`, and the T-043 `openai.test.ts` timeout test uses it too (its 800 ms sleep did not hang but held the process open). (2) A failing assertion threw before `close()`, leaving a mock server open. Cleanup there is now in `try/finally`. All suites exit in about 1 s.
 - **`pkill -f` killed my own shell twice.** It matches the pattern in its own command line. I now stop processes only by verified PID.
+
+---
+
+# Tester defects from `test-report-live-001.md` §7 (after T-044)
+
+One commit per defect, on `feat/coder/live-inspection`:
+
+| ID | Commit | Result |
+|---|---|---|
+| D1 | `9e90a9f` | Fixed. Reproduced first in a fresh worktree |
+| D2 | none | Already fixed in T-042 (`0f8002e`). Tester tested `f83fdf5`, the commit before. Now also verified on the real entry point |
+| D3 | none | Known stub, by instruction. See the note below |
+| D4 | `09f204b` | Fixed. Root cause found and reproduced |
+| D5 | `c7500c9` | Fixed |
+| D6 | none | Designer's (fonts), not in my scope |
+| O1 | `a545dd8` | Fixed (contract change) |
+| O2 | `508a0b3` | Fixed |
+
+## D1 — tests and typecheck fail on a clean checkout
+
+**Reproduced** in a throwaway worktree with no `dist/`: `packages/ssh`, `packages/ai` and `apps/api` failed with `ERR_MODULE_NOT_FOUND`, and `ai` and `api` typecheck failed with `TS2307`. Cause: workspace packages export `dist/`, which is gitignored.
+
+**Fix:** each package builds its own workspace dependencies first via `pretest`, `pretypecheck`, `prebuild` (and `predev` for the API), using pnpm's `"<pkg>^..."` filter, which selects exactly that package's dependencies in build order. `apps/web` already did this. I did not point `exports` at `src`: the consuming `tsc` would then compile other packages' sources, causing `rootDir` errors and copying dependency code into `apps/api/dist`.
+
+**Verified from a clean checkout of the final HEAD (`508a0b3`):**
+
+```
+root pnpm test exit=0 in 37s
+  apps/web 36 pass, packages/ssh 40 pass, packages/ai 99 pass, apps/api 99 pass, 0 fail
+root pnpm typecheck exit=0 in 29s
+```
+
+## D2 — PORT override
+
+Already in T-042. Now also verified on the real `index.ts`, which Tester noted they had not run: `PORT=3213` gave exactly one listener, on `127.0.0.1:3213`, and nothing on any other address. The D4 process test checks this again on every run (it asserts `::1` does not answer).
+
+## D4 — no exit on SIGINT/SIGTERM with stalled output
+
+**Root cause (product, not Tester's launcher).** pino's default stdout destination writes synchronously, retries a full pipe in a blocking `Atomics.wait` loop, and flushes synchronously on exit. Reproduced against the real `index.ts` (fixture mode, no SSH):
+
+- **Reader dead (EPIPE):** exits cleanly, status 0. This is not the bug.
+- **Reader alive but not reading (stopped `tee`):** after SIGTERM or SIGINT the port closes, but the process stays in `futex_wait_queue` until SIGKILL. **This is Tester's symptom.**
+
+**Fix:**
+
+- **`log-stream.ts`, non-blocking output:** async `fs.write`, one write at a time so order is kept. `EAGAIN` is retried on an unref'd timer. Pending output is capped at 1 MiB, with drops counted. Output stops on `EPIPE`. There is no synchronous flush.
+- **`shutdown.ts`, deadline on close:** a graceful close with a 10 s unref'd deadline (then exit 1), and a second signal exits at once. This also covers a close that waits on an in-flight SSH collection.
+
+**Regression test that actually catches it:** `process.test.ts` spawns the real `index.ts`, never reads its stdout so the pipe fills, and sends the signal:
+
+```
+new index.ts: ✔ exits on SIGTERM ... (1136 ms)   ✔ exits on SIGINT ... (847 ms)
+old index.ts: ✖ exits on SIGTERM ... process did not exit within 12 s of SIGTERM
+              ✖ exits on SIGINT ...  (12842 ms)
+```
+
+**Trade-off:** log lines can be lost while the reader is stalled or gone. Being able to stop the process matters more.
+
+## D5 — fixture mode reused live host ids and names
+
+Fixture cards were built from configured hosts (real UUID and real name) with invented states.
+
+**Fix:** fixture mode is now independent of the real fleet:
+
+- **Identity:** fixed fake ids `00000000-0000-4000-8000-0000000000NN`, names `Fixture A` to `D`, `[FIXTURE]` roles, `production: false`. Nothing is read from the configured hosts, and a collision with a configured id throws.
+- **Data:** synthetic observations, with `observedAt` set exactly when an observation exists. Coverage and findings come from the live rules, and a test checks each fixture's status equals what the live rules derive.
+- **Cards:** fresh, partial, unreachable (last success kept), and one no-data card.
+
+This also fixes the **T-044 evidence mismatch** (fixture cards had `observedAt` with no observation). In fixture mode the assistant's evidence now matches the 3 fixture servers that have observations (tested).
+
+## O1 — no-data cards were badged `source: "live"`
+
+**Contract change** in `@servrsit/contracts`: `FleetServer.source` is now `"live" | "fixture" | "none"`.
+
+- **`"live"`:** a real successful observation exists. This includes historical data, for example a host that is currently `unreachable` but has an older success; the status says it is historical.
+- **`"none"`:** live mode with nothing to show, for example `unverified-host`, `collection-disabled` or not yet checked.
+- **`"fixture"`:** fixture mode only, including the no-data fixture card.
+
+I changed the existing field rather than adding a second one, so any UI that badges on `source` is corrected.
+
+**Designer, before wiring the API:**
+
+- **Badge bug:** `ServerCard.tsx` `SourceBadge` renders **"Fixture" for any value that is not `"live"`**, so a `"none"` card would be mislabelled "Fixture". It needs its own badge, for example "No data".
+- **Type:** your local `DataSource` type is `"fixture" | "live"`, so assigning the API type to it will fail to compile until `"none"` is handled. That is intended.
+- **Nothing broken today:** no component consumes the API yet, and `apps/web` typechecks.
+
+## O2 — HOST_KEY_CHANGED raised no finding
+
+New rule `host.key-changed.v1`: **critical**, raised on the **first** occurrence (a changed key is a security event, so there is no two-observation window). The text is a fixed template telling the owner to verify the new fingerprint independently. It sorts above older findings, which stay visible, and it is not reported as "unreachable". It persists because the service does not retry a changed-key host.
+
+## D3 — no authentication (known stub): the loopback bind does NOT protect `/api` once Vite proxies it
+
+The API binds to `127.0.0.1` only (kept, and tested). **That bind is not the protection it looks like.** Designer's Vite dev server listens on `100.104.220.8:5173` (the tailnet) and, since T-042, proxies `/api` to `127.0.0.1:3001`. So **any device on the tailnet that can reach `100.104.220.8:5173` can call the API without authentication**:
+
+- **`GET /api/fleet`:** full live observations (boot IDs, mounts, uptime, package counts, failure reasons).
+- **`POST /api/assistant/messages` (T-044):** it **spends the founder's AI provider quota** and sends sanitized live facts to the third-party proxy. The global limit of 10 messages per minute caps how fast, not whether.
+
+Per instruction no token check was added. A shared dev token or the real Cognito work (T-023) is what closes this. Until then, keep the tailnet ACL tight, or run the Vite proxy only when needed.
+
+## Process note
+
+All servers in this work ran in-process with `close()`, or as test children killed in `finally`. Final check: no process has a working directory in `/projects/servrsit-coder` or my throwaway worktree, which I removed with `git worktree remove`. Designer's and Orchestrator's processes in `/projects/servrsit` were not touched.
