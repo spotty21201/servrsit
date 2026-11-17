@@ -22,6 +22,7 @@ import {
   type AiUnavailableReason,
   type ModelProvider,
 } from "./explainer.js";
+import { checkFacts, type FactMismatch } from "./fact-check.js";
 import { buildAiInput, type AiServerInput, type ExplainableServer } from "./input.js";
 import { TIME_AND_PACKAGE_RULES, timeContextFor } from "./prompt.js";
 import { timesAreQuoted, type TimeContext } from "./time.js";
@@ -192,6 +193,8 @@ export interface AssistantReply {
   readonly httpStatus: number | null;
   /** How many servers' sanitized facts were put in the prompt. */
   readonly serversUsed: number;
+  /** T-051: which kind of claim did not match the checks. Null unless reason is "fact_mismatch". */
+  readonly factMismatch: FactMismatch | null;
 }
 
 function finalizeAnswer(raw: string): { ok: true; text: string } | { ok: false; reason: "empty_output" | "unsafe_output" } {
@@ -243,7 +246,7 @@ export class AssistantResponder {
   ): Promise<AssistantReply> {
     const cleaned = cleanUserMessage(message);
     const kind = classifyMessage(cleaned, this.knownSecrets);
-    const none = { model: null, reason: null, latencyMs: null, httpStatus: null, serversUsed: 0 } as const;
+    const none = { model: null, reason: null, latencyMs: null, httpStatus: null, serversUsed: 0, factMismatch: null } as const;
 
     if (kind === "secret") return { kind, source: "deterministic", text: SECRET_ANSWER, ...none };
     if (kind === "change_request") return { kind, source: "deterministic", text: CHANGE_REQUEST_ANSWER, ...none };
@@ -258,6 +261,7 @@ export class AssistantResponder {
       latencyMs,
       httpStatus,
       serversUsed: 0,
+      factMismatch: null,
     });
 
     const provider = this.provider;
@@ -276,6 +280,9 @@ export class AssistantResponder {
     if (!final.ok) return fallback(final.reason, outcome.httpStatus, latencyMs);
     // DEF-L1: every clock time in the answer must be one the model was given.
     if (!timesAreQuoted(outcome.text, user).ok) return fallback("unverified_time", outcome.httpStatus, latencyMs);
+    // T-051: every claim must match the checks for the server it is about. Tone does not loosen this.
+    const facts = checkFacts(final.text, inputs, user);
+    if (!facts.ok) return { ...fallback("fact_mismatch", outcome.httpStatus, latencyMs), factMismatch: facts.mismatch };
 
     return {
       kind,
@@ -286,6 +293,7 @@ export class AssistantResponder {
       latencyMs,
       httpStatus: outcome.httpStatus,
       serversUsed: scoped.length,
+      factMismatch: null,
     };
   }
 }
