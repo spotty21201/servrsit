@@ -136,3 +136,54 @@ herdr pane read w1:p5 --source recent-unwrapped --lines 60
 git add apps/web docs/team/handoff-designer-m2c.md
 git commit -m "feat(web): overview round 4 — desktop three-column viewport fit with internal column scrolling"
 ```
+
+---
+
+# Round 5 addendum — round 4 desktop layout reverted
+
+**Status: code written in apps/web only. NOT built, NOT run, NOT committed.** I still have no shell or network tool. I couldn't run `pnpm run build`, read pane w1:p5, run `git show HEAD` to compare against the round 4 snapshot, or commit. I compared against the round 4 files by reading them in the workspace instead.
+
+## What changed
+
+| Path | Change |
+|---|---|
+| `components/overview/OverviewScreen.tsx` | Back to a vertical flow: Servers roster (h1 "Your servers" + cards) → Needs attention / Recent activity → chat console. Round 4 three-column wrapper removed. |
+| `components/overview/OverviewScreen.module.css` | Removed: `.columns`, grid areas, `.serversCol`, the ≥1024 viewport-fit block (`height: max(100dvh, 40rem)`, flex chain) and the 1024–1199 fit block. Added explicit roster columns: **3 per row ≥1024 px, 2 per row 768–1023 px, 1 per row ≤767 px**, all `minmax(0, 1fr)`. `.lowerGrid`: Attention and Activity side by side at ≥768 px, stacked on mobile. |
+| `components/ScrollRegion/*` | **Deleted.** Nothing needs it: the page scrolls normally again. |
+| `components/overview/AttentionColumn.*`, `RecentActivity.*` | Scroll-region wrappers, `className` props and ≥1024 fill-height blocks removed. |
+| `components/overview/ChatBar.module.css` | Round 4 desktop clamp height and 640 px width removed. The round 3 console is back: 5-row textarea (about 126 px), max 600 px, single line on mobile. |
+
+## Kept from rounds 1–4
+
+- Rounds 1–3 unchanged: white page, no headline, Silkscreen titles and names, pixel icons, card anatomy, Historical chip and dashed border, density tokens, 44 px tap targets, compact mobile cards, anchored mobile.
+- **Kept from round 4 (small, not layout):** the h1 sits in the Servers section header with the same 2 px Ink rule as the other section headings, and Recent activity uses `aria-labelledby`. I can undo either if the founder wants a pure round 3 state.
+
+## Widths (calculated)
+
+- 1440 px: content about 1240 px, so 3 cards at about 398 px each.
+- 1200 px (rail): about 328 px each. 1024 px (top nav): about 309 px each, still above the 280 px card minimum.
+- 768–1023 px: 2 cards at about 348–488 px each.
+- Attention and Activity at ≥768 px: two equal columns under the cards. They stay compact: rows have 8 px padding and there are no fixed heights.
+
+## Mobile
+
+No change to the ≤767 px rules. A grep of `apps/web/src` finds no `100vw`. The only `100vh` is the existing fallback before `100dvh` on the shell's `min-height`.
+
+## Not verified (no browser)
+
+- Build and Vite pane output.
+- That 3 cards per row look right at 1024–1199 px (about 309 px each, so long names wrap in the pixel font).
+- How much of the page fits above the fold at 1440×900. The page scrolls again by design.
+- The tablet two-column card grid.
+- Mobile still anchored: recheck `scrollWidth === innerWidth` at 390 and 320 px.
+
+## To close (round 5)
+
+```bash
+git switch feat/designer/overview-v3
+git diff HEAD --stat            # compare with the round-4 snapshot
+pnpm -F @servrsit/web run build 2>&1 | tail -20
+herdr pane read w1:p5 --source recent-unwrapped --lines 60
+git add -A apps/web docs/team/handoff-designer-m2c.md   # -A records the deleted ScrollRegion files
+git commit -m "feat(web): overview round 5 — revert three-column fit; 3-up server cards, lists below, chat at bottom"
+```

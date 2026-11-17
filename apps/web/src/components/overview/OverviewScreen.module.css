@@ -190,103 +190,52 @@
   color: var(--color-muted-ink);
 }
 
-/* ── Server cards ───────────────────────────────────────────────────────── */
+/* ── Server roster (top, full content width) ────────────────────────────── */
+/* Round 5: 3 cards per row ≥1024px, 2 per row 768–1023px, 1 per row ≤767px.
+ * minmax(0, 1fr) tracks: a long child can never widen the grid. */
 
-.serversCol {
-  display: flex;
-  flex-direction: column;
+.roster {
   min-width: 0;
-  min-height: 0;
 }
 
 .rosterGrid {
   display: grid;
-  /* min(280px,100%) lets one card shrink below 280px on a 320px screen */
-  grid-template-columns: repeat(auto-fit, minmax(min(var(--server-card-min-width), 100%), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--gap-cards);
   /* room for the 6–8px identity shadow so it is never clipped */
   padding-right: var(--space-1);
   padding-bottom: var(--space-1);
 }
 
-/* ── Columns: Servers | Needs attention | Recent activity ───────────────── */
-/* Mobile default: one column, DOM order. */
+/* ── Needs attention + Recent activity (compact, under the cards) ────────── */
 
-.columns {
-  display: flex;
-  flex-direction: column;
+.lowerGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--gap-section);
+  align-items: start;
   min-width: 0;
 }
 
-/* Tablet (768–1023): Servers | (Attention over Activity). Page scrolls. */
 @media (min-width: 768px) {
-  .columns {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas:
-      "servers attention"
-      "servers activity";
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: var(--gap-section) var(--space-3);
-    align-items: start;
+  .rosterGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .areaServers  { grid-area: servers; }
-  .areaAttention { grid-area: attention; }
-  .areaActivity  { grid-area: activity; }
+  .lowerGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
 }
 
-/* ── Desktop (≥1024): three columns that fit the viewport ────────────────
- * The shell is exactly one viewport tall (dvh), with a floor of 40rem so a
- * very short window falls back to page scrolling instead of crushing the
- * columns. Inside: banner + (top nav below 1200px) + band are fixed-size,
- * main takes the rest; columns take what's left after the chat console.
- * Each column body scrolls on its own (ScrollRegion); the page doesn't.
- * No fixed pixel heights on content: everything is flex/grid with min-height: 0.
- */
 @media (min-width: 1024px) {
-  .appShell {
-    height: max(100dvh, 40rem);
-    min-height: 0;
+  .rosterGrid {
+    /* at 1024px each card is ~309px; at 1440px ~398px */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .main {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .band {
-    flex-shrink: 0;
-  }
-
-  .contentWrapper {
-    flex: 1 1 auto;
-    min-height: 0;
-    padding-top: var(--space-2);
-    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
-    gap: var(--space-2);
-  }
-
-  .columns {
-    flex: 1 1 auto;
-    min-height: 0;
-    /* Servers gets 2.2 shares: at 1440px that is ~624px, enough for two
-       280px cards + 24px gap + scroll gutter + shadow room. */
-    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "servers attention activity";
-    grid-template-rows: minmax(0, 1fr);
-    gap: var(--space-3);
-    align-items: stretch;
-  }
-
-  .serversCol {
-    height: 100%;
-  }
-
-  .columnHeader {
-    flex-shrink: 0;
+  .lowerGrid {
+    gap: var(--space-4);
   }
 }
 
@@ -392,19 +341,5 @@
 
   .navLabel {
     font-size: 0.8125rem; /* 13px */
-  }
-}
-
-/* 1024–1199: the ≤1199 block above (top-bar nav) resets content padding/gap;
-   restore the compact fit-mode values. Also keep the in-flow top nav from
-   shrinking inside the viewport-height shell. */
-@media (min-width: 1024px) and (max-width: 1199px) {
-  .nav {
-    flex-shrink: 0;
-  }
-
-  .contentWrapper {
-    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
-    gap: var(--space-2);
   }
 }

@@ -8,13 +8,10 @@
  * note and the roster can expand."
  */
 import type { FindingFixture } from "../../fixtures/overview.js";
-import { ScrollRegion } from "../ScrollRegion/index.js";
 import styles from "./AttentionColumn.module.css";
 
 interface AttentionColumnProps {
   findings: FindingFixture[];
-  /** Layout placement from the parent (grid area). */
-  className?: string;
 }
 
 function FindingIcon({ severity }: { severity: "attention" | "failed" }) {
@@ -35,10 +32,10 @@ function FindingIcon({ severity }: { severity: "attention" | "failed" }) {
   );
 }
 
-export function AttentionColumn({ findings, className = "" }: AttentionColumnProps) {
+export function AttentionColumn({ findings }: AttentionColumnProps) {
   if (findings.length === 0) {
     return (
-      <section className={`${styles.column} ${className}`} aria-labelledby="attention-heading">
+      <section className={styles.column} aria-labelledby="attention-heading">
         <h2 id="attention-heading" className={styles.heading}>Needs attention</h2>
         <p className={styles.empty}>Nothing needs attention in the checks that ran.</p>
       </section>
@@ -46,7 +43,7 @@ export function AttentionColumn({ findings, className = "" }: AttentionColumnPro
   }
 
   return (
-    <section className={`${styles.column} ${className}`} aria-labelledby="attention-heading">
+    <section className={styles.column} aria-labelledby="attention-heading">
       <h2 id="attention-heading" className={styles.heading}>
         Needs attention
         <span className={styles.count}>
@@ -54,7 +51,6 @@ export function AttentionColumn({ findings, className = "" }: AttentionColumnPro
           <span className="sr-only"> items</span>
         </span>
       </h2>
-      <ScrollRegion label="Needs attention list">
       <ul className={styles.list} role="list">
         {findings.map((finding) => (
           <li key={finding.id} className={`${styles.finding} ${styles[finding.severity]}`}>
@@ -72,7 +68,6 @@ export function AttentionColumn({ findings, className = "" }: AttentionColumnPro
           </li>
         ))}
       </ul>
-      </ScrollRegion>
     </section>
   );
 }

@@ -123,17 +123,3 @@
     border-radius: 0;
   }
 }
-
-/* Desktop fit mode (round 4): fixed height in flow, never grows the page.
-   ~5 lines (126px) on tall screens, down to ~3 lines on short ones. */
-@media (min-width: 1024px) {
-  .wrap {
-    flex-shrink: 0;
-    max-width: 40rem; /* 640px */
-  }
-
-  .input {
-    height: clamp(4.5rem, 15dvh, 7.875rem);
-    overflow-y: auto;
-  }
-}

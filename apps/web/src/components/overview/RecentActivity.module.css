@@ -155,21 +155,3 @@
   color: var(--color-muted-ink);
   margin: 0;
 }
-
-/* Desktop three-column fit: the column fills its grid cell; the list scrolls
-   inside ScrollRegion; heading and "View all activity" stay visible. */
-@media (min-width: 1024px) {
-  .section {
-    min-height: 0;
-    height: 100%;
-  }
-
-  .heading,
-  .viewAll {
-    flex-shrink: 0;
-  }
-
-  .heading {
-    min-height: 1.75rem; /* aligns the rule with the 28px pixel h1 in the Servers column */
-  }
-}

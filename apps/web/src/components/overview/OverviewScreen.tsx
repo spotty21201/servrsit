@@ -3,16 +3,15 @@
  *
  * Order (DOM and reading order, all breakpoints):
  *   1. Fixture banner (non-dismissable)
- *   2. Servers column: "Your servers" h1 (pixel face) + cards
- *   3. Needs attention
- *   4. Recent activity
- *   5. Chat console (in document flow, never fixed)
+ *   2. Servers roster: "Your servers" h1 (pixel face) + cards, full width
+ *   3. Needs attention | Recent activity (side by side ≥768px)
+ *   4. Chat console (in document flow, never fixed)
  *
- * Round 4 layout:
- *   ≥1024px   three columns in one row, sized to the viewport; each column
- *             scrolls internally (ScrollRegion), the page does not
- *   768–1023  two columns: Servers | Attention over Activity; page scrolls
- *   ≤767px    single column; page scrolls (round 2 anchoring unchanged)
+ * Round 5 layout (round 4 three-column fit reverted):
+ *   ≥1024px   3 server cards per row; attention + activity two columns
+ *   768–1023  2 server cards per row; attention + activity two columns
+ *   ≤767px    single column (round 2 anchoring unchanged)
+ * The page scrolls normally; no internal scroll regions.
  *
  * Unknown/stale/unreachable state is carried by each card's status badge,
  * "Historical" chip and dashed border, and by the attention list. There is no
@@ -24,7 +23,6 @@ import { ServerCard } from "../server-card/index.js";
 import { AttentionColumn } from "./AttentionColumn.js";
 import { RecentActivity } from "./RecentActivity.js";
 import { ChatBar } from "./ChatBar.js";
-import { ScrollRegion } from "../ScrollRegion/index.js";
 import styles from "./OverviewScreen.module.css";
 
 interface OverviewScreenProps {
@@ -79,27 +77,25 @@ export function OverviewScreen({ data, isFixture }: OverviewScreenProps) {
         <div className={styles.band} aria-hidden="true" />
 
         <div className={styles.contentWrapper}>
-          <div className={styles.columns}>
-            <section className={`${styles.serversCol} ${styles.areaServers}`} aria-labelledby="servers-heading">
-              <header className={styles.columnHeader}>
-                <h1 id="servers-heading" className={`${styles.pageTitle} pixel-text`}>Your servers</h1>
-                <p className={styles.pageMeta}>
-                  <span>Spotty&rsquo;s fleet</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{data.servers.length} servers</span>
-                </p>
-              </header>
-              <ScrollRegion label="Servers list">
-                <div className={styles.rosterGrid}>
-                  {data.servers.map((server) => (
-                    <ServerCard key={server.id} server={server} />
-                  ))}
-                </div>
-              </ScrollRegion>
-            </section>
+          <section className={styles.roster} aria-labelledby="servers-heading">
+            <header className={styles.columnHeader}>
+              <h1 id="servers-heading" className={`${styles.pageTitle} pixel-text`}>Your servers</h1>
+              <p className={styles.pageMeta}>
+                <span>Spotty&rsquo;s fleet</span>
+                <span aria-hidden="true">·</span>
+                <span>{data.servers.length} servers</span>
+              </p>
+            </header>
+            <div className={styles.rosterGrid}>
+              {data.servers.map((server) => (
+                <ServerCard key={server.id} server={server} />
+              ))}
+            </div>
+          </section>
 
-            <AttentionColumn findings={data.findings} className={styles.areaAttention} />
-            <RecentActivity operations={data.recentOperations} className={styles.areaActivity} />
+          <div className={styles.lowerGrid}>
+            <AttentionColumn findings={data.findings} />
+            <RecentActivity operations={data.recentOperations} />
           </div>
 
           <ChatBar />
