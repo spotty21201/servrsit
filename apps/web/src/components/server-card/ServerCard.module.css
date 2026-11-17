@@ -27,19 +27,47 @@
   .card:hover { transform: none; }
 }
 
-/* Non-color cue for uncertain coverage: dashed border. The badge and the
-   "Historical" chip carry the explicit text. */
-.card.unreachable,
-.card.stale {
+/* Non-color cues for coverage (T-046), always with explicit badge text:
+   dashed = uncertain (stale, unreachable, partial: older or incomplete data)
+   dotted = nothing observed (source "none": unverified host, checks off,
+            access denied, host key changed, misconfigured, not yet checked) */
+.card.uncertain {
   border-style: dashed;
 }
 
-/* "unverified-host" (T-040) is deliberately NOT dashed: nothing was tried and
-   failed, there is no old result. It is distinguished from unreachable by:
-   amber badge with a lock icon and "Host key not verified" (vs grey ? badge
-   "Unreachable from ServrSit"), the explanation "Not contacted: host key not
-   verified yet", "Not checked yet" instead of a timestamp, no Historical
-   chip, and the "Verify host key" action. Solid border, unchanged. */
+.card.noData {
+  border-style: dotted;
+}
+
+/* ── Latest failed attempt, shown next to the last success ──────────────── */
+
+.failureRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-half);
+  margin: 0;
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+  color: var(--color-state-failed-fg);   /* 7.00:1 on white */
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.failureRow svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.sourceNone {
+  color: var(--color-state-unknown-fg);            /* 6.20:1 on its bg */
+  background-color: var(--color-state-unknown-bg);
+}
+
+/* unverified-host vs unreachable (T-040, updated T-046): unverified-host is a
+   "nothing observed" card (dotted, amber lock badge "Host key not verified",
+   the API's statusReason as its line, "Never observed", no Historical chip,
+   "Verify host key"). Unreachable is "uncertain" (dashed, grey badge,
+   Historical last result if any, latest-failure line, "Check connection"). */
 
 /* ── Data-source badge (T-040) ──────────────────────────────────────────── */
 

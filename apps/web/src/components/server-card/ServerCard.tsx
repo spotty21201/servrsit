@@ -1,36 +1,41 @@
 /**
  * ServerCard — server identity card for the fleet roster
  *
- * Anatomy unchanged from v1 (founder approved, ADR-011 F6), in reading order:
- * identity icon; server name link; purpose and production label; status badge;
- * one most useful finding; last health check; one routine action.
+ * Anatomy unchanged (founder approved, ADR-011 F6), in reading order:
+ * identity icon; server name link; role, production and data-source badge;
+ * status badge; one most useful line; observed / fresh-until; latest failure
+ * (only when the latest attempt failed); one routine action.
  *
- * An <article> with a heading link and a separate action link — never one big
- * button containing other controls (UX Spec §8.2).
+ * T-046: renders ServerCardVM from fleetViewModel.ts (live /api/fleet data).
+ * All text is plain text from the API; nothing is rendered as HTML.
  *
  * Identity vs health:
- *   - Identity color (Lilac/Citron/Tangerine) appears in the pixel icon and the
- *     card's offset shadow. It never changes with health.
- *   - Health appears only in the StatusBadge (icon + text), the "Historical"
- *     chip, and a dashed border for unreachable/stale (a non-color cue).
+ *   - Identity color appears only in the pixel icon and the offset shadow.
+ *   - Health appears in the StatusBadge (icon + text), the Historical chip,
+ *     the failure line, and the border style (dashed = uncertain, dotted =
+ *     nothing observed). Never color alone.
  */
 import type { CSSProperties } from "react";
-import type { DataSource, ServerFixture, ServerEmblemVariant } from "../../fixtures/overview.js";
+import type { DataSourceVM, IdentityColor, ServerCardVM } from "../overview/fleetViewModel.js";
 import { StatusBadge } from "../StatusBadge/index.js";
 import { PixelServerIcon } from "./PixelServerIcon.js";
 import styles from "./ServerCard.module.css";
 
-const IDENTITY_VAR: Record<ServerEmblemVariant, string> = {
+const IDENTITY_VAR: Record<IdentityColor, string> = {
   lilac: "var(--color-lilac)",
   citron: "var(--color-citron)",
   tangerine: "var(--color-tangerine)",
   bubblegum: "var(--color-bubblegum)",
 };
 
-function FreshnessIcon({ isFresh }: { isFresh: boolean }) {
-  // Pixel clock / check, drawn in muted ink (not a health color on its own;
-  // the adjacent text carries the meaning).
-  return isFresh ? (
+const TONE_CLASS: Record<ServerCardVM["tone"], string | undefined> = {
+  normal: undefined,
+  uncertain: styles.uncertain,
+  "no-data": styles.noData,
+};
+
+function FreshnessIcon({ fresh }: { fresh: boolean }) {
+  return fresh ? (
     <svg width="16" height="16" viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
       <rect x="6" y="1" width="1" height="1" fill="currentColor" />
       <rect x="5" y="2" width="1" height="1" fill="currentColor" />
@@ -55,118 +60,128 @@ function FreshnessIcon({ isFresh }: { isFresh: boolean }) {
   );
 }
 
-interface ServerCardProps {
-  server: ServerFixture;
+function FailIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
+      <rect x="1" y="1" width="2" height="2" fill="currentColor" />
+      <rect x="5" y="1" width="2" height="2" fill="currentColor" />
+      <rect x="3" y="3" width="2" height="2" fill="currentColor" />
+      <rect x="1" y="5" width="2" height="2" fill="currentColor" />
+      <rect x="5" y="5" width="2" height="2" fill="currentColor" />
+    </svg>
+  );
 }
 
 /**
- * Per-card data-source badge (T-040): text + icon, never color alone.
- * FIXTURE uses the informational (progress) pair, matching the page banner.
- * LIVE is neutral (Ink outline on white) — "live" is not a health claim.
+ * Per-card data-source badge: text + icon, never color alone.
+ * FIXTURE: informational pair (matches the page banner).
+ * LIVE: neutral Ink outline — "live" is not a health claim.
+ * NO DATA: unknown pair — nothing has been observed for this card.
  */
-function SourceBadge({ source }: { source: DataSource }) {
-  const isLive = source === "live";
+function SourceBadge({ source }: { source: DataSourceVM }) {
+  const cls =
+    source === "live" ? styles.sourceLive : source === "fixture" ? styles.sourceFixture : styles.sourceNone;
+  const text = source === "live" ? "Live" : source === "fixture" ? "Fixture" : "No data";
   return (
-    <span className={`${styles.sourceBadge} ${isLive ? styles.sourceLive : styles.sourceFixture}`}>
-      {isLive ? (
-        // pixel "signal": dot with two arcs
+    <span className={`${styles.sourceBadge} ${cls}`}>
+      {source === "live" ? (
         <svg width="12" height="12" viewBox="0 0 6 6" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
           <rect x="2" y="2" width="2" height="2" fill="currentColor" />
           <rect x="0" y="1" width="1" height="4" fill="currentColor" />
           <rect x="5" y="1" width="1" height="4" fill="currentColor" />
         </svg>
-      ) : (
-        // pixel flask: synthetic / test data
+      ) : source === "fixture" ? (
         <svg width="12" height="12" viewBox="0 0 6 6" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
           <rect x="2" y="0" width="2" height="2" fill="currentColor" />
           <rect x="1" y="2" width="4" height="1" fill="currentColor" />
           <rect x="0" y="3" width="6" height="3" fill="currentColor" />
         </svg>
+      ) : (
+        // empty box: nothing observed
+        <svg width="12" height="12" viewBox="0 0 6 6" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
+          <rect x="0" y="0" width="6" height="1" fill="currentColor" />
+          <rect x="0" y="5" width="6" height="1" fill="currentColor" />
+          <rect x="0" y="1" width="1" height="4" fill="currentColor" />
+          <rect x="5" y="1" width="1" height="4" fill="currentColor" />
+        </svg>
       )}
       <span className="sr-only">Data source: </span>
-      {isLive ? "Live" : "Fixture"}
+      {text}
     </span>
   );
 }
 
-export function ServerCard({ server }: ServerCardProps) {
-  const {
-    id,
-    name,
-    role,
-    isProduction,
-    emblemVariant,
-    cardState,
-    statusLabel,
-    statusSemanticKey,
-    primaryFinding,
-    lastHealthCheckAt,
-    lastHealthCheckRelative,
-    isFresh,
-    primaryActionLabel,
-    primaryActionHref,
-    source,
-  } = server;
+interface ServerCardProps {
+  server: ServerCardVM;
+}
 
-  const headingId = `server-${id}-name`;
-  const isUnverifiedHost = cardState === "unverified-host";
-  // "Historical" only when there IS an older result being shown. An
-  // unverified host has never been contacted, so it has no history.
-  const showHistorical = !isFresh && lastHealthCheckAt !== null && !isUnverifiedHost;
+export function ServerCard({ server: s }: ServerCardProps) {
+  const headingId = `server-${s.id}-name`;
+  const isFresh = s.status === "fresh" || s.status === "partial";
 
   return (
     <article
-      className={`${styles.card} ${styles[cardState] ?? ""}`}
+      className={`${styles.card} ${TONE_CLASS[s.tone] ?? ""}`}
       aria-labelledby={headingId}
-      style={{ "--card-identity": IDENTITY_VAR[emblemVariant] } as CSSProperties}
+      style={{ "--card-identity": IDENTITY_VAR[s.identity] } as CSSProperties}
     >
       <header className={styles.header}>
-        <PixelServerIcon variant={emblemVariant} className={styles.icon} />
+        <PixelServerIcon variant={s.identity} className={styles.icon} />
         <div className={styles.identity}>
           <h2 id={headingId} className={`${styles.name} pixel-text`}>
-            <a href={`/servers/${id}`} className={styles.nameLink} title={name}>
-              {name}
+            <a href={`/servers/${encodeURIComponent(s.id)}`} className={styles.nameLink} title={s.name}>
+              {s.name}
             </a>
           </h2>
           <div className={styles.meta}>
-            <span className={styles.role}>{role}</span>
-            {isProduction && <span className={styles.productionLabel}>Production</span>}
-            <SourceBadge source={source} />
+            <span className={styles.role}>{s.role}</span>
+            {s.isProduction && <span className={styles.productionLabel}>Production</span>}
+            <SourceBadge source={s.source} />
           </div>
         </div>
       </header>
 
       <div className={styles.statusRow}>
         <StatusBadge
-          state={statusSemanticKey}
-          label={statusLabel}
-          {...(isUnverifiedHost ? { icon: "lock" as const } : {})}
+          state={s.statusKey}
+          label={s.statusLabel}
+          {...(s.statusIcon ? { icon: s.statusIcon } : {})}
         />
       </div>
 
       <p className={styles.finding}>
-        {showHistorical && <span className={styles.historical}>Historical</span>}
-        {primaryFinding}
+        {s.historical && <span className={styles.historical}>Historical</span>}
+        {s.primaryLine}
       </p>
 
       <p className={styles.checkRow}>
-        <FreshnessIcon isFresh={isFresh} />
-        {lastHealthCheckAt === null ? (
-          <span>Not checked yet</span>
-        ) : (
-          <span>
-            {isFresh ? "Checked" : "Last successful check"}{" "}
-            <time dateTime={lastHealthCheckAt} className={styles.timestamp}>
-              {lastHealthCheckRelative}
-            </time>
-          </span>
-        )}
+        <FreshnessIcon fresh={isFresh} />
+        <span>
+          {s.observedAt ? (
+            <time dateTime={s.observedAt} className={styles.timestamp}>{s.observedText}</time>
+          ) : (
+            s.observedText
+          )}
+          {s.freshUntil && s.freshUntilText && (
+            <>
+              {" · "}
+              <time dateTime={s.freshUntil} className={styles.timestamp}>{s.freshUntilText}</time>
+            </>
+          )}
+        </span>
       </p>
 
+      {s.latestFailure && (
+        <p className={styles.failureRow}>
+          <FailIcon />
+          <span>{s.latestFailure.text}</span>
+        </p>
+      )}
+
       <div className={styles.actions}>
-        <a href={primaryActionHref} className={styles.primaryAction}>
-          {primaryActionLabel}
-          <span className="sr-only"> for {name}</span>
+        <a href={s.actionHref} className={styles.primaryAction}>
+          {s.actionLabel}
+          <span className="sr-only"> for {s.name}</span>
         </a>
       </div>
     </article>

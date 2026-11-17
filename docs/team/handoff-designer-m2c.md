@@ -493,3 +493,96 @@ git commit -m "T-045: usable Ask ServrSit chat with answer panel (stubbed client
 # later, when Coder's apps/web/src/api/assistant.ts lands:
 #   edit apps/web/src/api/assistantClient.ts → export * from "./assistant.js";
 ```
+
+---
+
+# T-046 addendum — live /api/fleet data on the cards
+
+**Status: code written in apps/web (UI layer only). NOT built, NOT run, NOT committed, and the `/api/fleet` proxy is NOT curl-checked.** I still have no shell or network tool. I couldn't build, read pane w1:p5, `curl http://100.104.220.8:5173/api/fleet`, or commit as T-046 on `integration/live-v1`.
+
+Not edited: `apps/api/**`, `src/api/*` (including `assistantClient.ts`, `useFleet.ts`, `fleet.ts`, `fleetState.ts`, `assistant.stub.ts`), `packages/*`.
+
+## Changed files
+
+| Path | Change |
+|---|---|
+| `src/components/overview/fleetViewModel.ts` (new) | **The one mapping file.** `toOverviewVM(fleetState, now)`: `FleetServer` → `ServerCardVM`, findings/status → `AttentionItemVM`, page counts, received/next-check times, error. Every one of the 10 contract statuses has an explicit label, badge key, icon, border tone and action. |
+| `src/App.tsx` | `useFleet()` → `toOverviewVM` → `OverviewScreen`. The fixture import is removed. A 30 s clock tick keeps relative times honest between polls and while the API is down. |
+| `components/overview/OverviewScreen.tsx/.module.css` | Props `vm` + `onRetry`. Loading, error-without-data, refresh-failed-with-data and empty states. Header meta adds "Updated HH:MM", "Next check HH:MM", "(N without data)" and "Refreshing…", and now wraps. Banner shown only if `vm.anyFixture`. Recent activity gets `[]` (the API has no operations yet), so it shows its honest empty state. |
+| `components/server-card/ServerCard.tsx/.module.css` | Renders `ServerCardVM`. Source badge **Live / Fixture / No data**. Observed time + fresh-until. New **latest-failure line** under the last success. Border tone: dashed = uncertain, dotted = nothing observed. |
+| `components/overview/AttentionColumn.tsx` | Uses `AttentionItemVM`. New `unavailable` prop: shows "Unknown until server data loads" instead of claiming nothing needs attention. Times are `<time>` and hidden when unknown. |
+
+`src/fixtures/overview.ts` is no longer rendered. It stays because `src/api/assistant.stub.ts` (not mine to edit) imports it.
+
+## Status mapping (only "fresh" can be green)
+
+| API status | Badge (key) | Border | Main line | Action |
+|---|---|---|---|---|
+| fresh | All checks passed (passed); "Needs attention" if a warning finding; "Critical issue" if critical | solid | top non-advisory finding, else package summary, else statusReason | View server |
+| partial | Partially checked (attention) | dashed | top finding, else "N of M checks ran" | View server |
+| stale | Check overdue (unknown) | dashed | Historical + last result | View server |
+| unreachable | Unreachable from ServrSit (unknown) | dashed | Historical + last result, or statusReason if never observed | Check connection |
+| not-yet-checked | Not checked yet (progress) | dotted | statusReason | View server |
+| unverified-host | Host key not verified (attention, lock) | dotted | statusReason | Verify host key |
+| collection-disabled | Checks switched off (unknown) | dotted | statusReason | View settings |
+| access-denied | Access denied (failed, lock) | dotted | statusReason | Fix access |
+| host-key-changed | Host key changed (failed, lock) | dotted | statusReason | Review host key |
+| misconfigured | Configuration rejected (failed) | dotted | statusReason | View settings |
+
+- **`source: "none"` cards always show the API's `statusReason`** as their main line, a **No data** source badge (unknown pair, empty-box icon), "Never observed" when `observedAt` is null, and no Historical chip.
+- **Observed / fresh until:** "Observed 3 min ago · fresh until 10:09" (or "expired 09:55"), using `<time datetime>` with the browser timezone.
+- **Failed latest attempt:** whenever `latestAttempt.succeeded === false`, a red ✕ line reads "Latest check failed 2 min ago (3 in a row): <failure.message>". It sits under the last-success line, so a failure is never hidden behind an older good result.
+- **Attention list:** statuses unreachable, stale, partial, unverified-host, access-denied, host-key-changed and misconfigured, plus warning/critical findings. Failed items sort first. Advisory findings are left out (PRD: CPU/memory are advisory).
+
+## Page states
+
+| State | What shows |
+|---|---|
+| Loading (no data yet) | "Loading your servers…" (`role="status"`), no placeholder cards. Attention says "Unknown until server data loads." |
+| API unreachable, no data | Red inline box: "Couldn't load your servers. <fixed message from fleet.ts> Nothing is shown until real data arrives." + **Try again** (44 px). No cards. |
+| API down after data | Amber dashed inline box: "Couldn't refresh. <message> Showing data received at HH:MM. Each card shows when it was observed." + Try again. **The last data stays**, with each card's own observed and fresh-until times. |
+| Partial | Per card (partial status, coverage line). The header counts "(N without data)". |
+| 0 servers | "No servers are configured yet." |
+
+Errors are inline (`role="alert"`), never toast-only. Error text comes from `fleet.ts`'s fixed messages, never from response bodies.
+
+## Contrast (new pairs)
+
+| Pair | Ratio |
+|---|---|
+| Failure line `#A32F2B` on white | 7.00 |
+| Error box (failed pair) | 5.92 |
+| Stale-refresh box (attention pair) | 6.66 |
+| No data badge (unknown pair) | 6.20 |
+| Try again: Ink on white (hover: Ink on Citron 12.00) | 15.41 |
+
+## Flagged for Coder / Orchestrator
+
+1. **Identity color has no API field.** I assign it by position in the API's server list: tangerine, lilac, citron, bubblegum. That isn't stable if the order changes or a server is added. The UX Spec wants it assigned at registration and stable through renames, so the API should return an identity slot. Colors may differ from the fixture mockup (e.g. Timika was citron).
+2. **Recent activity:** there's no operations endpoint, so the list is empty by design.
+3. `nextCheckAt` and `generatedAt` are shown in browser-local time with no zone label yet. UX Spec §13.2 wants the owner's chosen timezone with an abbreviation.
+
+## Layout and anchoring
+
+Unchanged: 4 / 3 / 2 / 1 columns, density tokens, 3-row chat. New rows (failure line, notices, meta) all wrap (`overflow-wrap: anywhere`, `flex-wrap`); nothing is `nowrap` except the small badges. A grep shows no `100vw`; the only `100vh` is the existing dvh fallback. A failure line makes that card taller; the grid keeps cards in a row aligned.
+
+## Not verified (no browser, no shell)
+
+- `pnpm run build` (type errors would most likely be in `fleetViewModel.ts` against the built `@servrsit/contracts` types), and Vite pane w1:p5.
+- **`curl -s http://100.104.220.8:5173/api/fleet`** returning JSON through the Vite proxy.
+- That the real response maps as intended for Sentani, Nabire, Timika and Merauke, and which statuses they actually return.
+- Visuals: dotted vs dashed borders, the failure line, the notice boxes, the header meta wrapping on mobile.
+- The API-down path: stop the API and confirm the amber notice appears and cards remain.
+- Screen-reader output for `role="alert"` notices on repeated poll failures. Each failed poll re-renders the same alert text; it may be re-announced every 30 s. That needs a check and possibly a fix: announce only on change.
+- Mobile `scrollWidth === innerWidth` at 390 and 320 px.
+
+## To close (T-046)
+
+```bash
+cd /projects/servrsit && git branch --show-current     # expect integration/live-v1
+pnpm -F @servrsit/web run build 2>&1 | tail -20
+herdr pane read w1:p5 --source recent-unwrapped --lines 60
+curl -s -i http://100.104.220.8:5173/api/fleet | head -20   # expect 200, application/json
+git add apps/web/src/App.tsx apps/web/src/components docs/team/handoff-designer-m2c.md
+git commit -m "T-046: live /api/fleet data on Overview cards"
+```

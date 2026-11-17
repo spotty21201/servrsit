@@ -7,11 +7,13 @@
  * "Avoid filling every available gap. With no findings, it becomes a small quiet
  * note and the roster can expand."
  */
-import type { FindingFixture } from "../../fixtures/overview.js";
+import type { AttentionItemVM } from "./fleetViewModel.js";
 import styles from "./AttentionColumn.module.css";
 
 interface AttentionColumnProps {
-  findings: FindingFixture[];
+  findings: AttentionItemVM[];
+  /** True while there is no fleet data (loading or API down): don't claim "nothing needs attention". */
+  unavailable?: boolean;
 }
 
 function FindingIcon({ severity }: { severity: "attention" | "failed" }) {
@@ -32,7 +34,16 @@ function FindingIcon({ severity }: { severity: "attention" | "failed" }) {
   );
 }
 
-export function AttentionColumn({ findings }: AttentionColumnProps) {
+export function AttentionColumn({ findings, unavailable = false }: AttentionColumnProps) {
+  if (unavailable) {
+    return (
+      <section className={styles.column} aria-labelledby="attention-heading">
+        <h2 id="attention-heading" className={styles.heading}>Needs attention</h2>
+        <p className={styles.empty}>Unknown until server data loads.</p>
+      </section>
+    );
+  }
+
   if (findings.length === 0) {
     return (
       <section className={styles.column} aria-labelledby="attention-heading">
@@ -60,7 +71,11 @@ export function AttentionColumn({ findings }: AttentionColumnProps) {
             <div className={styles.findingContent}>
               <div className={styles.findingHeader}>
                 <span className={styles.serverName}>{finding.serverName}</span>
-                <span className={styles.findingTime}>{finding.firstObservedRelative}</span>
+                {finding.firstObservedRelative && (
+                  <time dateTime={finding.firstObservedAt} className={styles.findingTime}>
+                    {finding.firstObservedRelative}
+                  </time>
+                )}
               </div>
               <p className={styles.findingTitle}>{finding.title}</p>
               <p className={styles.findingDetail}>{finding.detail}</p>
