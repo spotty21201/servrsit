@@ -3,9 +3,10 @@
  * can create it without listening on a port.
  */
 
+import { resolvePort } from "./port.js";
 import { buildServer } from "./server.js";
 
-const PORT = 3001;
+const PORT = resolvePort();
 const HOST = "127.0.0.1";
 
 async function start(): Promise<void> {

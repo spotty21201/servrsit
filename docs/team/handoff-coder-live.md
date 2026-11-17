@@ -519,3 +519,96 @@ Restarted with an empty pinned file (`SERVRSIT_KNOWN_HOSTS=/tmp/empty_known_host
 1. Timeout for the Kiro call (20 s is too tight for observed latency), and whether explanations run in the background.
 2. A key (or other method) for Sentani and Timika, supplied by the founder.
 3. Whether the badge for a live "no data" card should differ from a live observation.
+
+---
+
+# T-042 — Connect apps/web to the live API (data layer only)
+
+**Branch:** `feat/coder/live-inspection` (worktree `/projects/servrsit-coder`). No component was edited. `/projects/servrsit` was not touched.
+
+## For Designer: how to use it
+
+```ts
+import { useFleet } from "@/api/useFleet";
+
+const fleet = useFleet();            // polls every 30 s; useFleet({ pollMs: 0 }) disables polling
+fleet.phase        // "loading" | "ready" | "error"
+fleet.data         // last good FleetResponse, or null
+fleet.error        // most recent failure, or null. Can be set while fleet.data is also set
+fleet.receivedAt   // when this browser received fleet.data
+fleet.refreshing   // request in flight
+fleet.refresh()
+```
+
+- **A failed refresh keeps the last good data.** `data` and `error` can both be set. Show the failure next to the data and label the data by its own `observedAt` and `freshUntil`. Do not clear the card on error.
+- `data.servers[i].source` is `"live"` or `"fixture"`. `data.mode` is the same at fleet level. Fixture mode only occurs when the API runs with `SERVRSIT_FLEET_MODE=fixture`.
+- `status` values the cards must handle: `fresh`, `partial`, `stale`, `unreachable`, `access-denied`, `host-key-changed`, `misconfigured`, `unverified-host`, `collection-disabled`, `not-yet-checked`. Each server also has `statusReason` (fixed, display-safe text), `coverage`, `latestAttempt`, `findings`, and `observation` (the last successful observation, null if none).
+- `role` is `null` for Sentani, Nabire and Timika (not established anywhere). Merauke is `"Dev host"`.
+- Names inside `observation` and `findings` come from the servers. Render them as plain text only.
+- `fetchFleet()` in `src/api/fleet.ts` is the non-React entry point. It never throws. Errors are `{ kind: "timeout" | "network" | "http" | "invalid-response" | "aborted", message, status?, detail? }`, with fixed `message` text.
+
+## Files
+
+| Path | Change |
+|---|---|
+| `apps/web/src/api/fleet.ts` | `fetchFleet()`: validates against the shared schema, 10 s timeout that also covers the body, 512 KiB cap, no throw, no body text in messages |
+| `apps/web/src/api/fleetState.ts` | Pure reducer (keeps last good data on failure) |
+| `apps/web/src/api/useFleet.ts` | React hook (single in-flight request, abort on unmount, polling) |
+| `apps/web/src/api/fleet.test.ts`, `fleetState.test.ts`, `fleet.fixtures.ts` | 23 tests; fixtures labelled `[FIXTURE DATA]` |
+| `apps/web/vite.config.ts` | Added `server.proxy` for `/api`. `host` (100.104.220.8) and `port` (5173) unchanged |
+| `apps/web/package.json` | Added `predev`/`prebuild`/`pretypecheck`/`pretest` (build contracts), `test`, devDeps `tsx` and `@types/node` |
+| `apps/api/src/port.ts`, `port.test.ts`, `index.ts` | `PORT` env (default 3001, validated, bind stays `127.0.0.1`) |
+| `packages/contracts/src/fleet.ts`, `observation.ts`, `index.ts` | Fleet response and observation schemas, **moved here** (see below) |
+| `packages/ssh/src/schema.ts`, `package.json` | Now re-exports the observation schema from contracts; keeps `ok`/`unavailable`/byte caps |
+| `apps/api/src/fleet/schema.ts` | Now a thin re-export from contracts |
+
+## Decision: schemas moved into `@servrsit/contracts`
+
+The task asked for the client to be typed with contracts, but the fleet and observation schemas lived in `apps/api` and `packages/ssh`. Moving them avoids the web importing server packages or keeping a duplicate that could drift. The move is mechanical: the JSON the API returns did not change. All existing suites pass with unchanged counts (ssh 40, ai 21, api 38 before adding 4 port tests). **This is a contracts change, so it needs the Orchestrator's sign-off on the boundary.** Dependency direction is now `contracts <- ssh <- api`, `contracts <- web`; the web does not import `ssh`.
+
+## Checks run (real output)
+
+```
+packages/contracts tsc ok   packages/ssh tsc ok   packages/ai tsc ok   apps/api tsc ok   apps/web tsc ok
+packages/ssh   ℹ tests 40 ℹ pass 40 ℹ fail 0
+packages/ai    ℹ tests 21 ℹ pass 21 ℹ fail 0
+apps/api       ℹ tests 42 ℹ pass 42 ℹ fail 0
+apps/web       ℹ tests 23 ℹ pass 23 ℹ fail 0
+```
+
+`apps/web` `tsc --noEmit` covers Designer's components too, and passes.
+
+Browser bundle of `useFleet.ts` with esbuild (`--platform=browser`): 142,556 bytes (almost all zod), 0 Node-only imports.
+
+**End to end, nothing shared with Designer's server.** API on a second port (`PORT=3101`), Vite from this worktree on `127.0.0.1:5199` (not Designer's `100.104.220.8:5173`) with `SERVRSIT_API_URL=http://127.0.0.1:3101`:
+
+```
+{"msg":"Server listening at http://127.0.0.1:3101"}
+{"host":"Nabire","result":"ok","msg":"check finished"}
+{"host":"Merauke","result":"ok","msg":"check finished"}
+direct /health on 3101: http 200
+through Vite proxy :5199 /api/fleet -> HTTP/1.1 200 OK, content-type: application/json; charset=utf-8, 5216 bytes
+```
+
+The real `fetchFleet` through the proxy:
+
+```
+GET /api/fleet via proxy      ok mode=live servers=Timika:collection-disabled, Nabire:fresh, Sentani:collection-disabled, Merauke:fresh
+GET /api/nope (API 404)       ERROR kind=http status=404 | The fleet endpoint was not found. Is the API running and proxied?
+closed port                   ERROR kind=network | Could not reach the ServrSit API.
+Nabire via client: source=live status=fresh observedAt=2026-11-17T09:23:41.879Z coverage=15/15 access=ssh
+typed observation present: true | os: Ubuntu 24.04.5 LTS
+```
+
+Both of my servers were stopped afterwards (`Server closed cleanly`). Designer's `vite` process (pid 460265) was never touched.
+
+## Known gaps and notes
+
+- **`@types/node` is now a devDependency of `apps/web`** (needed for the `node:test` tests). Because `apps/web/tsconfig.json` has no `types` list, Node typings are visible to all web code. Nothing uses timers or Node globals today and typecheck passes, but a future `const t: number = setTimeout(...)` would fail with `NodeJS.Timeout`. Use `ReturnType<typeof setTimeout>`, or tell me and I will move the tests out of `src/` with their own tsconfig.
+- **Missing proxy shows as a 404, not as HTML.** Vite's SPA fallback only serves `index.html` for requests whose `Accept` includes `text/html`, and the client asks for JSON. The HTML-200 case (`response was not JSON`) is covered by a unit test only, not live.
+- **Contracts must be built before the web runs.** `predev`, `prebuild`, `pretypecheck` and `pretest` do it. Designer's `pnpm dev` now runs a quick contracts build first.
+- **Possible merge conflicts** with Designer's `apps/web/package.json` and `vite.config.ts` are limited to the lines listed above. I kept the em dash in `description` unchanged.
+- **Second API instance** also runs its own collection (one extra read-only SSH check of Nabire per start).
+- **Bundle size:** zod adds about 140 KB to the browser bundle once a component imports the client. No component does yet.
+- `PORT=0` is rejected on purpose, since a random port would be unknown to the proxy.
+- The API's bind address is still fixed at `127.0.0.1`. Auth is still the stub.
