@@ -489,3 +489,5 @@ Last updated: 2026-11-15 | Milestone: M0 — Establish the project
 | T-057 | Coder | O1: production approval requires the two specific acknowledgements (recovery route, interruption risk) | UX Spec 10.2 | todo |
 | T-058 | Coder | O2/O3: typed ROUTE_UNAVAILABLE on planning; worker-loop backoff | Tech Spec 13 | todo |
 | T-059 | Coder | F4: restart.service.v1, reboot.host.v1, prepare.directories.v1 (build only, simulated target, writes gated) | FR-13, FR-15 | todo |
+| T-061 | Coder | Clock-skew check: record controller time vs target time at collection; skew > 2 min raises a time-sync finding; ages derived from target timestamps are corrected or marked uncertain; skew beyond tolerance will block writes (Tech Spec 8.2). Found live: Sentani clock ~7 h slow (reports UTC 14:27 when real UTC is 21:27). | Tech Spec 8.2 | todo |
+| T-062 | Coder | Third-party package origins: pending updates from non-Ubuntu origins (e.g. Sentani docker-ce*) are listed separately and excluded from Stage A update plans by default (Tech Spec 10.2 step 2) | Tech Spec 10.2 | todo |
