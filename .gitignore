@@ -29,3 +29,6 @@ coverage/
 
 # pnpm
 .pnpm-store/
+
+# runtime data (pinned host keys, caches)
+.data/
