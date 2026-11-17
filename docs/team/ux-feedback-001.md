@@ -34,3 +34,11 @@ Subject: Overview screen v1 (fixture data), viewed in browser. Device/viewport: 
 - Viewed on desktop and mobile (Xiaomi 14T). **Defect:** on mobile the UI is not anchored to the screen and moves around (drags/shifts). Likely causes to check: horizontal overflow, missing/incorrect viewport meta, `100vw`/`100vh` sizing against the mobile browser bar, fixed-position elements.
 - Creative latitude granted ("surprise me"). Direction: **white background**; **pixelated font and pixel icons for servers**.
 - Supersedes the three-variant request: default is now white. Pixel-font scope decided by Orchestrator: pixel font for titles and server names only; body, controls, and data stay in a readable sans/mono (legibility and WCAG). Thin weight is not available in pixel fonts, so "thin/minimal" is satisfied by the pixel face at regular weight and small, restrained sizes.
+
+## Round 3 (human-tested on desktop and Xiaomi 14T)
+
+- General: all better. Make it more efficient: remove air between elements, reduce line spacing.
+- Desktop: AI chat console 4-5 lines taller.
+- Mobile: good, no wobble, locked to screen (the anchoring defect is fixed by Designer's changes, confirmed by founder). Titles (Timika, Your servers, Nabire) rendered in Courier.
+  - Root cause (Orchestrator-verified): the pixel font files were never in the repo (only a README), so the browser used the monospace fallback. Silkscreen Regular/Bold TTF and OFL license downloaded from google/fonts and committed under apps/web/public/fonts/silkscreen/.
+- Mobile: cards smaller and tighter.

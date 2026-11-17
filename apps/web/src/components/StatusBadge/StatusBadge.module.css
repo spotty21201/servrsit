@@ -7,13 +7,17 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-half);
-  padding: 3px var(--space-1);
+  max-width: 100%;
+  padding: 2px var(--space-1);
+  /* border in the state's own foreground color: a second, non-fill cue */
+  border: 1.5px solid currentColor;
   border-radius: var(--radius-pill);
   font-family: var(--font-sans);
   font-size: var(--text-compact-size);
   line-height: var(--text-compact-line-height);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
+  font-weight: var(--font-weight-semibold);
+  /* allow wrapping so "Unreachable from ServrSit" cannot widen a 320px card */
+  white-space: normal;
 }
 
 /* Semantic state variants */

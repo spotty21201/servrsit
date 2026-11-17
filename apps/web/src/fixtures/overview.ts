@@ -109,13 +109,6 @@ export interface RecentOperationFixture {
 }
 
 export interface OverviewFixture {
-  /**
-   * Briefing headline text.
-   * UX Spec §8.1: "Two things need a look." pattern.
-   */
-  briefingHeadline: string;
-  /** Subtitle below the headline with coverage and freshness. */
-  briefingSubtitle: string;
   /** ISO-8601 timestamp of most recent fleet observation. */
   lastObservedAt: string;
   /** Number of servers checked in this observation. */
@@ -141,8 +134,6 @@ export interface OverviewFixture {
 const FIXTURE_NOW = "2026-11-15T09:42:00+07:00"; // Asia/Jakarta, morning
 
 export const overviewFixture: FixtureData<OverviewFixture> = asFixture({
-  briefingHeadline: "Two things need a look.",
-  briefingSubtitle: "3 servers · 2 checked 3 minutes ago · 1 unreachable",
   lastObservedAt: "2026-11-15T09:39:00+07:00",
   serversChecked: 2,
   nextCheckAt: "2026-11-15T09:54:00+07:00",
@@ -196,7 +187,7 @@ export const overviewFixture: FixtureData<OverviewFixture> = asFixture({
       cardState: "unreachable",
       statusLabel: "Unreachable from ServrSit",
       statusSemanticKey: "unknown",
-      primaryFinding: "Last successful check 2 hours ago — disk at 71%",
+      primaryFinding: "Disk at 71% · 6 services running",
       lastHealthCheckAt: "2026-11-15T07:41:00+07:00",
       lastHealthCheckRelative: "2 hours ago",
       isFresh: false,

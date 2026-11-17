@@ -1,331 +1,363 @@
 /**
- * OverviewScreen layout
+ * OverviewScreen layout — white page, v2.
  *
- * UX Spec §5.2:
- *   Desktop (≥1200 px): 88 px navigation rail + content column, max 1320 px
- *   Tablet (768–1199):  compact top nav + single main column
- *   Mobile (≤767):      single column, 16 px padding
- *
- * No hardcoded colors — all via CSS custom properties from token system.
+ * MOBILE ANCHORING RULES (Xiaomi 14T drift defect):
+ *   - No 100vw anywhere. Widths are 100% / auto. Heights use dvh (vh fallback).
+ *   - Every grid track is minmax(0, …) so a long child can never widen it.
+ *   - Every flex/grid child that holds text has min-width: 0.
+ *   - The bottom chat bar is in normal document flow (not fixed/sticky) and the
+ *     page reserves env(safe-area-inset-bottom) at the end of the document.
+ *   - The old ≤1199px nav was one flex row (wordmark + 3 icon-and-label items +
+ *     account + 32px padding) that was wider than a 390px viewport. It is now
+ *     a wrapping two-row layout on mobile.
  */
-
-/* ── App shell ────────────────────────────────────────────────────────────── */
 
 .appShell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  background-color: var(--color-canvas);
+  min-height: 100vh;   /* fallback */
+  min-height: 100dvh;
+  width: 100%;
+  background-color: var(--color-page);
 }
 
-/* ── Navigation rail (desktop) ───────────────────────────────────────────── */
+/* ── Navigation rail (≥1200px) ──────────────────────────────────────────── */
 
 .nav {
   display: flex;
   flex-direction: column;
   align-items: center;
   position: fixed;
-  top: 0;
+  top: var(--banner-h);
   left: 0;
   bottom: 0;
   width: var(--nav-rail-width); /* 88px */
   background-color: var(--color-surface);
-  border-right: 1px solid var(--color-soft-line);
+  border-right: 2px solid var(--color-ink);
   padding: var(--space-3) 0;
   z-index: 10;
   gap: var(--space-2);
 }
 
 .wordmark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100%;
-  padding: var(--space-1) 0 var(--space-3);
-  border-bottom: 1px solid var(--color-soft-line);
+  display: flex;
+  justify-content: center;
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--color-ink);
 }
 
 .wordmarkText {
-  font-family: var(--font-display);
-  font-size: 11px;
-  font-weight: var(--font-weight-bold);
-  color: var(--color-ink);
-  letter-spacing: 0.02em;
-}
-
-.navList {
-  list-style: none;
-  margin: 0;
-  padding: var(--space-2) 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  font-size: 16px; /* 2 × 8px grid; rail shows "Servr" over "Sit" (88px rail too narrow for one line) */
+  line-height: 20px;
+  color: var(--color-ink);
+}
+
+.wordmarkStack { display: block; }
+
+.navList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: var(--space-1);
   flex: 1;
   width: 100%;
+  padding: var(--space-1) 0;
 }
 
 .navItem {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-half);
-  width: 100%;
+  min-height: var(--touch-target-min);
   padding: var(--space-1) 0;
-  text-decoration: none;
   color: var(--color-muted-ink);
-  transition: color var(--duration-interaction) var(--easing-snap),
-              background-color var(--duration-interaction) var(--easing-snap);
-  border-radius: 0;
+  text-decoration: none;
 }
 
 .navItem:hover {
   color: var(--color-ink);
   text-decoration: none;
-  background-color: color-mix(in srgb, var(--color-canvas) 60%, transparent);
-}
-
-.navItem:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: -2px;
 }
 
 .navItemActive {
   color: var(--color-ink);
-  position: relative;
 }
 
 .navItemActive::after {
   content: "";
   position: absolute;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 24px;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
   background-color: var(--color-tangerine);
-  border-radius: 2px 0 0 2px;
 }
 
 .navLabel {
-  font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: 0.75rem; /* 12px */
+  line-height: 1rem;
   font-weight: var(--font-weight-medium);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
 }
 
 .navAccount {
-  margin-top: auto;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-soft-line);
-  width: 100%;
   display: flex;
   justify-content: center;
-  padding-bottom: var(--space-1);
+  width: 100%;
+  padding-top: var(--space-2);
+  border-top: 2px solid var(--color-ink);
 }
 
 .accountButton {
-  display: flex;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-pill);
   background-color: var(--color-lilac);
   color: var(--color-ink);
-  font-family: var(--font-sans);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-small);
   font-weight: var(--font-weight-semibold);
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
-  transition: opacity var(--duration-interaction) var(--easing-snap);
 }
 
-.accountButton:hover {
-  opacity: 0.85;
-}
-
-.accountButton:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.accountAvatar {
-  display: block;
-  line-height: 1;
-}
-
-/* ── Main content ─────────────────────────────────────────────────────────── */
+/* ── Main ───────────────────────────────────────────────────────────────── */
 
 .main {
   flex: 1;
-  margin-left: var(--nav-rail-width); /* offset for fixed rail */
   min-width: 0;
+  margin-left: var(--nav-rail-width);
+}
+
+/* Confident three-color pixel band: hard stops, no gradients blur, no overflow */
+.band {
+  height: 8px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--color-tangerine) 0 32px,
+    var(--color-lilac) 32px 64px,
+    var(--color-citron) 64px 96px
+  );
+  border-bottom: 2px solid var(--color-ink);
 }
 
 .contentWrapper {
+  width: 100%;
   max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: var(--space-5) var(--content-margin-desktop);
+  padding-top: var(--space-3);
+  padding-right: max(var(--content-margin-desktop), env(safe-area-inset-right));
+  padding-left: max(var(--content-margin-desktop), env(safe-area-inset-left));
+  /* Reserve the home-indicator / gesture bar area at the end of the document */
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: var(--section-spacing-desktop-min);
+  gap: var(--gap-section);
 }
 
-/* Skip nav — visually hidden, shown on focus */
-.skipNav {
-  position: absolute;
-  left: calc(var(--nav-rail-width) + var(--space-2));
-  top: var(--space-2);
-  z-index: 999;
-  background-color: var(--color-surface);
-  color: var(--color-ink);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-button);
-  font-family: var(--font-sans);
-  font-size: var(--text-compact-size);
-  font-weight: var(--font-weight-medium);
-  text-decoration: none;
-  border: 2px solid var(--color-focus);
-}
+/* ── Column header (Servers column) ─────────────────────────────────────── */
+/* Matches the Attention / Activity headings: 2px Ink rule underneath. */
 
-/* ── Compact top line ─────────────────────────────────────────────────────── */
-
-.topLine {
+.columnHeader {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.workspaceName {
-  font-family: var(--font-sans);
-  font-size: var(--text-compact-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-ink);
-}
-
-.serviceIndicator {
-  display: flex;
-  align-items: center;
-  gap: var(--space-half);
-  font-family: var(--font-sans);
-  font-size: var(--text-compact-size);
-  color: var(--color-state-passed-fg);
-}
-
-.serviceIndicatorDot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--color-state-passed-fg);
-}
-
-/* ── Roster heading ───────────────────────────────────────────────────────── */
-
-.rosterHeading {
-  font-family: var(--font-sans);
-  font-size: var(--text-section-title-size);
-  line-height: var(--text-section-title-line-height);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-ink);
-  margin: 0 0 var(--space-3) 0;
-}
-
-/* ── Working area: 8+4 col grid ───────────────────────────────────────────── */
-
-.workingArea {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: var(--space-6);
-  align-items: start;
-}
-
-.roster {
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-1-half);
   min-width: 0;
+  margin-bottom: var(--space-1);
+  padding-bottom: var(--space-half);
+  border-bottom: 2px solid var(--color-ink);
 }
 
-/* ── Roster grid: 2 cards per row at desktop ──────────────────────────────── */
+.pageTitle {
+  font-size: var(--text-page-title-size);   /* 24px pixel */
+  line-height: var(--text-page-title-line-height);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.pageMeta {
+  display: flex;
+  gap: var(--space-1);
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+  color: var(--color-muted-ink);
+}
+
+/* ── Server cards ───────────────────────────────────────────────────────── */
+
+.serversCol {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
 
 .rosterGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(var(--server-card-min-width), 1fr));
-  gap: var(--space-3);
+  /* min(280px,100%) lets one card shrink below 280px on a 320px screen */
+  grid-template-columns: repeat(auto-fit, minmax(min(var(--server-card-min-width), 100%), 1fr));
+  gap: var(--gap-cards);
+  /* room for the 6–8px identity shadow so it is never clipped */
+  padding-right: var(--space-1);
+  padding-bottom: var(--space-1);
 }
 
-/* ── Responsive: tablet (768–1199 px) ────────────────────────────────────── */
+/* ── Columns: Servers | Needs attention | Recent activity ───────────────── */
+/* Mobile default: one column, DOM order. */
+
+.columns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-section);
+  min-width: 0;
+}
+
+/* Tablet (768–1023): Servers | (Attention over Activity). Page scrolls. */
+@media (min-width: 768px) {
+  .columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "servers attention"
+      "servers activity";
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: var(--gap-section) var(--space-3);
+    align-items: start;
+  }
+
+  .areaServers  { grid-area: servers; }
+  .areaAttention { grid-area: attention; }
+  .areaActivity  { grid-area: activity; }
+}
+
+/* ── Desktop (≥1024): three columns that fit the viewport ────────────────
+ * The shell is exactly one viewport tall (dvh), with a floor of 40rem so a
+ * very short window falls back to page scrolling instead of crushing the
+ * columns. Inside: banner + (top nav below 1200px) + band are fixed-size,
+ * main takes the rest; columns take what's left after the chat console.
+ * Each column body scrolls on its own (ScrollRegion); the page doesn't.
+ * No fixed pixel heights on content: everything is flex/grid with min-height: 0.
+ */
+@media (min-width: 1024px) {
+  .appShell {
+    height: max(100dvh, 40rem);
+    min-height: 0;
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .band {
+    flex-shrink: 0;
+  }
+
+  .contentWrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-top: var(--space-2);
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+    gap: var(--space-2);
+  }
+
+  .columns {
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Servers gets 2.2 shares: at 1440px that is ~624px, enough for two
+       280px cards + 24px gap + scroll gutter + shadow room. */
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "servers attention activity";
+    grid-template-rows: minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: stretch;
+  }
+
+  .serversCol {
+    height: 100%;
+  }
+
+  .columnHeader {
+    flex-shrink: 0;
+  }
+}
+
+/* ── Tablet and mobile: top bar instead of rail (≤1199px) ───────────────── */
 
 @media (max-width: 1199px) {
   .nav {
-    /* Switch from rail to top bar */
-    flex-direction: row;
     position: sticky;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: var(--banner-h); /* sits directly beneath the fixed-height banner */
     bottom: auto;
     width: 100%;
-    height: 56px;
+    flex-direction: row;
+    flex-wrap: wrap;           /* wrap instead of overflowing */
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 var(--space-2);
+    padding: var(--space-1) max(var(--space-2), env(safe-area-inset-right))
+             0 max(var(--space-2), env(safe-area-inset-left));
     border-right: none;
-    border-bottom: 1px solid var(--color-soft-line);
-    padding: 0 var(--space-3);
-    z-index: 10;
+    border-bottom: 2px solid var(--color-ink);
   }
 
   .wordmark {
-    padding: 0 var(--space-3) 0 0;
-    border-bottom: none;
-    border-right: 1px solid var(--color-soft-line);
     width: auto;
+    border-bottom: none;
+    padding: 0;
+    order: 1;
   }
 
   .wordmarkText {
-    font-size: 13px;
+    flex-direction: row;
+    font-size: 16px; /* single line in the top bar */
+  }
+
+  .navAccount {
+    width: auto;
+    padding: 0;
+    border-top: none;
+    order: 2;
   }
 
   .navList {
+    order: 3;
+    flex: 1 1 100%;            /* own row beneath wordmark + account */
     flex-direction: row;
-    padding: 0 var(--space-2);
+    width: 100%;
+    min-width: 0;
     gap: 0;
-    flex: 1;
-    justify-content: flex-start;
-    align-items: center;
+    padding: 0;
+  }
+
+  .navList > li {
+    flex: 1 1 0;
+    min-width: 0;              /* equal thirds, can shrink to 320px */
   }
 
   .navItem {
     flex-direction: row;
-    padding: 0 var(--space-2);
-    height: 56px;
+    justify-content: center;
     gap: var(--space-1);
-    width: auto;
+    min-height: var(--touch-target-min);
+    padding: var(--space-1);
   }
 
   .navItemActive::after {
-    right: auto;
-    bottom: 0;
+    right: 0;
+    left: 0;
     top: auto;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 24px;
-    height: 3px;
-    border-radius: 2px 2px 0 0;
-  }
-
-  .navLabel {
-    font-size: 13px;
-    text-transform: none;
-    letter-spacing: 0;
-  }
-
-  .navAccount {
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
-    border-left: 1px solid var(--color-soft-line);
-    padding: 0 0 0 var(--space-3);
+    bottom: 0;
     width: auto;
+    height: 4px;
   }
 
   .main {
@@ -333,47 +365,46 @@
   }
 
   .contentWrapper {
-    padding: var(--space-4) var(--space-4);
-    gap: var(--section-spacing-mobile-max);
-  }
-
-  /* Attention above roster on tablet */
-  .workingArea {
-    grid-template-columns: 1fr;
-    gap: var(--space-4);
-  }
-
-  /* Show attention column before roster on tablet */
-  .workingArea > aside {
-    order: -1;
+    padding-top: var(--space-2);
+    padding-right: max(var(--space-3), env(safe-area-inset-right));
+    padding-left: max(var(--space-3), env(safe-area-inset-left));
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+    gap: var(--gap-section);
   }
 }
 
-/* ── Responsive: mobile (≤767 px) ────────────────────────────────────────── */
+/* ── Mobile (≤767px) ────────────────────────────────────────────────────── */
 
 @media (max-width: 767px) {
-  .nav {
-    padding: 0 var(--content-padding-mobile);
-    height: 52px;
-  }
-
   .contentWrapper {
-    padding: var(--space-3) var(--content-padding-mobile);
-    gap: var(--section-spacing-mobile-min);
+    padding-top: var(--space-1-half);
+    padding-right: max(var(--content-padding-mobile), env(safe-area-inset-right));
+    padding-left: max(var(--content-padding-mobile), env(safe-area-inset-left));
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
   }
 
   .rosterGrid {
-    /* Single column on mobile */
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    /* 4px shadow on mobile cards needs only 4px of room */
+    padding-right: var(--space-half);
+    padding-bottom: var(--space-half);
   }
 
-  .workingArea {
-    gap: var(--space-3);
+  .navLabel {
+    font-size: 0.8125rem; /* 13px */
+  }
+}
+
+/* 1024–1199: the ≤1199 block above (top-bar nav) resets content padding/gap;
+   restore the compact fit-mode values. Also keep the in-flow top nav from
+   shrinking inside the viewport-height shell. */
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .nav {
+    flex-shrink: 0;
   }
 
-  .topLine {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-half);
+  .contentWrapper {
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+    gap: var(--space-2);
   }
 }

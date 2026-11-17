@@ -7,6 +7,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-width: 0;
 }
 
 .heading {
@@ -18,7 +19,20 @@
   line-height: var(--text-section-title-line-height);
   font-weight: var(--font-weight-semibold);
   color: var(--color-ink);
-  margin: 0 0 var(--space-3) 0;
+  margin: 0 0 var(--space-1) 0;
+  padding-bottom: var(--space-half);
+  border-bottom: 2px solid var(--color-ink);
+}
+
+/* pixel marker before the heading (decorative brand accent) */
+.heading::before {
+  content: "";
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  background-color: var(--color-tangerine);
+  box-shadow: 4px 4px 0 var(--color-ink);
+  margin-right: var(--space-1);
 }
 
 .count {
@@ -49,8 +63,8 @@
 .finding {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
+  gap: var(--space-1-half);
+  padding: var(--pad-row) 0;
   border-bottom: 1px solid var(--color-soft-line);
 }
 
@@ -76,15 +90,17 @@
 .findingContent {
   display: flex;
   flex-direction: column;
-  gap: var(--space-half);
+  gap: 2px;
   min-width: 0;
 }
 
 .findingHeader {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-1);
+  gap: 0 var(--space-1);
+  min-width: 0;
 }
 
 .serverName {
@@ -117,6 +133,8 @@
   line-height: var(--text-compact-line-height);
   color: var(--color-muted-ink);
   margin: 0;
+  /* package versions such as "9.6p1-3ubuntu13.3" may break rather than overflow */
+  overflow-wrap: anywhere;
 }
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
@@ -126,4 +144,18 @@
   font-size: var(--text-compact-size);
   color: var(--color-muted-ink);
   margin: 0;
+}
+
+/* Desktop three-column fit: the column fills its grid cell; the list scrolls
+   inside ScrollRegion; the heading stays visible. */
+@media (min-width: 1024px) {
+  .column {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .heading {
+    flex-shrink: 0;
+    min-height: 1.75rem; /* aligns the rule with the 28px pixel h1 in the Servers column */
+  }
 }

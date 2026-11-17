@@ -1,0 +1,139 @@
+/* ChatBar — 5-row console on desktop (max 600px), single line on mobile. */
+
+.wrap {
+  width: 100%;
+  max-width: 37.5rem; /* 600px */
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-ink);
+}
+
+.scope {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-1);
+  border: 1.5px solid var(--color-ink);
+  border-radius: var(--radius-small);
+  background-color: var(--color-lilac);
+  color: var(--color-ink);
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.25rem;
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.note {
+  font-size: 0.8125rem;
+  line-height: var(--text-compact-line-height);
+  color: var(--color-muted-ink);
+}
+
+.console {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  min-width: 0;
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-button);
+  /* hard pixel offset in brand Tangerine (decorative; no scroll overflow) */
+  box-shadow: 4px 4px 0 var(--color-tangerine);
+  overflow: hidden;
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;          /* never let the textarea's intrinsic width widen the row */
+  width: 100%;
+  padding: var(--space-1) var(--space-1-half);
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-body-size); /* 16px: no zoom-on-focus on mobile */
+  line-height: var(--text-body-line-height);
+  color: var(--color-ink);
+  resize: none;
+  /* rows=5 sets the desktop height (~5 × 22px + padding ≈ 126px) */
+}
+
+.input::placeholder {
+  color: var(--color-muted-ink);
+  opacity: 1;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
+
+.send {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  margin: var(--space-1);
+  background-color: var(--color-tangerine);
+  color: var(--color-ink); /* Ink on Tangerine, never white */
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-small);
+}
+
+.send:disabled {
+  cursor: not-allowed;
+}
+
+.console:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Mobile: keep the round-2 single-line height */
+@media (max-width: 767px) {
+  .console {
+    align-items: stretch;
+  }
+
+  .input {
+    height: 2.75rem;     /* 44px; overrides rows=5 */
+    padding: 0.625rem var(--space-1-half); /* centres one 22px line */
+  }
+
+  .send {
+    height: auto;
+    margin: 0;
+    border-width: 0 0 0 2px;
+    border-radius: 0;
+  }
+}
+
+/* Desktop fit mode (round 4): fixed height in flow, never grows the page.
+   ~5 lines (126px) on tall screens, down to ~3 lines on short ones. */
+@media (min-width: 1024px) {
+  .wrap {
+    flex-shrink: 0;
+    max-width: 40rem; /* 640px */
+  }
+
+  .input {
+    height: clamp(4.5rem, 15dvh, 7.875rem);
+    overflow-y: auto;
+  }
+}

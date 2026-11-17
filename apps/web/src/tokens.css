@@ -11,6 +11,50 @@
 /* apps/web/src → ../../../ is the workspace root */
 @import "../../../packages/ui/src/tokens/index.css";
 
+/* ── Round 3 density overrides (apps/web only) ──────────────────────────────
+ * Founder round 3: "remove air, reduce line spacing". Overrides the shared
+ * tokens for this app. Same specificity as the imported :root, later in
+ * source, so these win (including over the imported mobile media query,
+ * which is why the mobile block is repeated below).
+ * Line heights: body/compact ≤ 1.4, titles ≈ 1.15. Pixel title sizes stay at
+ * 8 px multiples (24 / 16).
+ */
+:root {
+  --text-body-line-height: 1.375;          /* 16/22 */
+  --text-compact-line-height: 1.35;        /* 14/~19 */
+  --text-technical-line-height: 1.4;
+
+  --text-page-title-size: 1.5rem;          /* 24px pixel */
+  --text-page-title-line-height: 1.75rem;  /* 28px ≈ 1.17 */
+  --text-card-title-size: 1.5rem;          /* 24px pixel */
+  --text-card-title-line-height: 1.75rem;
+  --text-section-title-size: 1.25rem;      /* 20px */
+  --text-section-title-line-height: 1.5rem; /* 24px = 1.2 */
+
+  /* App spacing (roughly ⅓ less than v2), 8 px rhythm with 4/8/12 steps */
+  --gap-section: var(--space-4);           /* 32px, was 48 */
+  --gap-cards: var(--space-3);             /* 24px, was 32 */
+  --pad-card: var(--space-2);              /* 16px, was 24 */
+  --gap-card-inner: var(--space-1-half);   /* 12px, was 16 */
+  --pad-row: var(--space-1);               /* 8px list rows, was 16 */
+}
+
+@media (max-width: 767px) {
+  :root {
+    --text-page-title-size: 1.5rem;        /* 24px */
+    --text-page-title-line-height: 1.75rem;
+    --text-card-title-size: 1rem;          /* 16px pixel on mobile cards */
+    --text-card-title-line-height: 1.125rem; /* 18px ≈ 1.13 */
+    --text-section-title-size: 1.125rem;   /* 18px */
+    --text-section-title-line-height: 1.375rem;
+
+    --gap-section: var(--space-2);         /* 16px, was 24 */
+    --gap-cards: var(--space-1-half);      /* 12px, was 24 */
+    --pad-card: var(--space-1-half);       /* 12px */
+    --gap-card-inner: var(--space-1);      /* 8px */
+  }
+}
+
 /* ── App-level baseline reset ───────────────────────────────────────────────
  *
  * Minimal reset that works with the token system.
@@ -26,23 +70,42 @@
 }
 
 html {
+  /* Height of the fixture banner; the sticky/fixed nav sits below it. */
+  --banner-h: 2.25rem; /* 36px */
   /* 1rem = 16px; never override browser font-size preference */
   font-size: 100%;
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background-color: var(--color-page);
 }
 
 body {
-  background-color: var(--color-canvas);
+  background-color: var(--color-page);
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: var(--text-body-size);
   line-height: var(--text-body-line-height);
   font-weight: var(--font-weight-regular);
-  /* Prevent layout shift from scrollbar appearing */
-  overflow-y: scroll;
-  /* Anti-aliasing */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /*
+   * BACKSTOP ONLY. The real overflow cause (the mobile nav row was wider than
+   * the viewport) is fixed in OverviewScreen.module.css. `clip` (not `hidden`)
+   * does not create a scroll container, so sticky positioning keeps working.
+   */
+  overflow-x: clip;
+}
+
+/* Pixel face rendering: no smoothing where the platform allows it.
+ * (macOS honours these; Android Chrome ignores them — crispness there depends
+ * on 8 px-multiple sizes and the device pixel ratio.) */
+.pixel-text {
+  font-family: var(--font-pixel);
+  font-weight: var(--font-weight-regular);
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: auto;
+  font-synthesis: none;
+  letter-spacing: 0;
 }
 
 /* Global focus ring — applied to all focusable elements */

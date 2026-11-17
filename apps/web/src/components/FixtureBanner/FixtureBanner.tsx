@@ -14,12 +14,13 @@ import styles from "./FixtureBanner.module.css";
 
 export function FixtureBanner() {
   return (
-    <div className={styles.banner} role="status" aria-live="off">
-      <span className={styles.label} aria-label="This screen displays fixture data, not live server information">
-        [FIXTURE DATA]
-      </span>
+    <div className={styles.banner} role="status">
+      <span className={styles.label}>[FIXTURE DATA]</span>
       <span className={styles.description}>
         Synthetic data only — not connected to any real server
+      </span>
+      <span className="sr-only">
+        This screen displays fixture data, not live server information.
       </span>
     </div>
   );

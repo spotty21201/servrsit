@@ -1,82 +1,58 @@
 /**
  * ServerCard — server identity card for the fleet roster
  *
- * UX Spec §8.2:
- * "In reading order: identity emblem; server name link; purpose and production
- * label; primary status label; one most useful finding or checked result; last
- * successful health check; selected routine action."
+ * Anatomy unchanged from v1 (founder approved, ADR-011 F6), in reading order:
+ * identity icon; server name link; purpose and production label; status badge;
+ * one most useful finding; last health check; one routine action.
  *
- * "A server card is an article with a heading link and separate action controls.
- * Do not implement the entire card as a button containing other buttons."
+ * An <article> with a heading link and a separate action link — never one big
+ * button containing other controls (UX Spec §8.2).
+ *
+ * Identity vs health:
+ *   - Identity color (Lilac/Citron/Tangerine) appears in the pixel icon and the
+ *     card's offset shadow. It never changes with health.
+ *   - Health appears only in the StatusBadge (icon + text), the "Historical"
+ *     chip, and a dashed border for unreachable/stale (a non-color cue).
  */
+import type { CSSProperties } from "react";
 import type { ServerFixture, ServerEmblemVariant } from "../../fixtures/overview.js";
 import { StatusBadge } from "../StatusBadge/index.js";
+import { PixelServerIcon } from "./PixelServerIcon.js";
 import styles from "./ServerCard.module.css";
 
-// ── Server emblem ──────────────────────────────────────────────────────────
-// UX Spec §4.4: "A server emblem is a small abstract arrangement of blocks or
-// rounded geometric shapes. Its color represents identity, never current health."
-// Colors: identity from Lilac/Citron/Tangerine — not health/semantic colors.
-
-const EMBLEM_COLORS: Record<ServerEmblemVariant, string> = {
+const IDENTITY_VAR: Record<ServerEmblemVariant, string> = {
   lilac: "var(--color-lilac)",
   citron: "var(--color-citron)",
   tangerine: "var(--color-tangerine)",
 };
 
-interface EmblemProps {
-  variant: ServerEmblemVariant;
-  serverName: string;
-}
-
-function ServerEmblem({ variant, serverName }: EmblemProps) {
-  const color = EMBLEM_COLORS[variant];
-  // Abstract geometric arrangement — 3 blocks in an asymmetric cluster.
-  // Color is identity only; this emblem does NOT change with health state.
-  return (
-    <svg
-      className={styles.emblem}
-      width="40"
-      height="40"
-      viewBox="0 0 40 40"
-      fill="none"
-      aria-hidden="true"
-      focusable="false"
-      role="img"
-    >
-      <title>{serverName} identity emblem</title>
-      {/* Large primary block */}
-      <rect x="4" y="4" width="20" height="20" rx="4" fill={color} opacity="0.9" />
-      {/* Small offset block — top right */}
-      <rect x="22" y="4" width="14" height="14" rx="3" fill={color} opacity="0.5" />
-      {/* Small offset block — bottom right */}
-      <rect x="22" y="22" width="14" height="14" rx="3" fill={color} opacity="0.7" />
-      {/* Small pip — bottom left */}
-      <rect x="4" y="28" width="14" height="8" rx="3" fill={color} opacity="0.4" />
-    </svg>
-  );
-}
-
-// ── Freshness indicator ────────────────────────────────────────────────────
-
 function FreshnessIcon({ isFresh }: { isFresh: boolean }) {
-  if (isFresh) {
-    return (
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">
-        <circle cx="6" cy="6" r="5" stroke="var(--color-state-passed-fg)" strokeWidth="1.5" />
-        <path d="M4 6L5.5 7.5L8.5 4.5" stroke="var(--color-state-passed-fg)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">
-      <circle cx="6" cy="6" r="5" stroke="var(--color-state-unknown-fg)" strokeWidth="1.5" />
-      <path d="M6 3.5V6L7.5 7.5" stroke="var(--color-state-unknown-fg)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  // Pixel clock / check, drawn in muted ink (not a health color on its own;
+  // the adjacent text carries the meaning).
+  return isFresh ? (
+    <svg width="16" height="16" viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
+      <rect x="6" y="1" width="1" height="1" fill="currentColor" />
+      <rect x="5" y="2" width="1" height="1" fill="currentColor" />
+      <rect x="4" y="3" width="1" height="1" fill="currentColor" />
+      <rect x="3" y="4" width="1" height="1" fill="currentColor" />
+      <rect x="2" y="3" width="1" height="1" fill="currentColor" />
+      <rect x="1" y="2" width="1" height="1" fill="currentColor" />
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
+      <rect x="2" y="0" width="4" height="1" fill="currentColor" />
+      <rect x="1" y="1" width="1" height="1" fill="currentColor" />
+      <rect x="6" y="1" width="1" height="1" fill="currentColor" />
+      <rect x="0" y="2" width="1" height="4" fill="currentColor" />
+      <rect x="7" y="2" width="1" height="4" fill="currentColor" />
+      <rect x="1" y="6" width="1" height="1" fill="currentColor" />
+      <rect x="6" y="6" width="1" height="1" fill="currentColor" />
+      <rect x="2" y="7" width="4" height="1" fill="currentColor" />
+      <rect x="3" y="2" width="1" height="3" fill="currentColor" />
+      <rect x="4" y="4" width="2" height="1" fill="currentColor" />
     </svg>
   );
 }
-
-// ── Main component ─────────────────────────────────────────────────────────
 
 interface ServerCardProps {
   server: ServerFixture;
@@ -84,74 +60,68 @@ interface ServerCardProps {
 
 export function ServerCard({ server }: ServerCardProps) {
   const {
+    id,
     name,
     role,
     isProduction,
     emblemVariant,
+    cardState,
     statusLabel,
     statusSemanticKey,
     primaryFinding,
+    lastHealthCheckAt,
     lastHealthCheckRelative,
     isFresh,
     primaryActionLabel,
     primaryActionHref,
   } = server;
 
+  const headingId = `server-${id}-name`;
+
   return (
     <article
-      className={`${styles.card} ${styles[server.cardState]}`}
-      aria-label={`${name} — ${statusLabel}`}
+      className={`${styles.card} ${styles[cardState] ?? ""}`}
+      aria-labelledby={headingId}
+      style={{ "--card-identity": IDENTITY_VAR[emblemVariant] } as CSSProperties}
     >
-      {/* ── Identity row ───────────────────────────────────────────────── */}
       <header className={styles.header}>
-        <ServerEmblem variant={emblemVariant} serverName={name} />
+        <PixelServerIcon variant={emblemVariant} className={styles.icon} />
         <div className={styles.identity}>
-          <div className={styles.nameRow}>
-            <h2 className={styles.name}>
-              <a href={`/servers/${server.id}`} className={styles.nameLink}>
-                {name}
-              </a>
-            </h2>
-            {isProduction && (
-              <span className={styles.productionLabel} aria-label="Production server">
-                Production
-              </span>
-            )}
+          <h2 id={headingId} className={`${styles.name} pixel-text`}>
+            <a href={`/servers/${id}`} className={styles.nameLink}>
+              {name}
+            </a>
+          </h2>
+          <div className={styles.meta}>
+            <span className={styles.role}>{role}</span>
+            {isProduction && <span className={styles.productionLabel}>Production</span>}
           </div>
-          <span className={styles.role}>{role}</span>
         </div>
       </header>
 
-      {/* ── Status ─────────────────────────────────────────────────────── */}
       <div className={styles.statusRow}>
         <StatusBadge state={statusSemanticKey} label={statusLabel} />
       </div>
 
-      {/* ── Primary finding ────────────────────────────────────────────── */}
-      <p className={styles.finding}>{primaryFinding}</p>
+      <p className={styles.finding}>
+        {!isFresh && <span className={styles.historical}>Historical</span>}
+        {primaryFinding}
+      </p>
 
-      {/* ── Last check ─────────────────────────────────────────────────── */}
-      <div className={styles.checkRow}>
+      <p className={styles.checkRow}>
         <FreshnessIcon isFresh={isFresh} />
-        <span className={styles.checkTime}>
-          {isFresh ? "Checked" : "Last checked"}{" "}
-          <time
-            dateTime={server.lastHealthCheckAt ?? undefined}
-            className={styles.timestamp}
-          >
+        <span>
+          {isFresh ? "Checked" : "Last successful check"}{" "}
+          <time dateTime={lastHealthCheckAt ?? undefined} className={styles.timestamp}>
             {lastHealthCheckRelative}
           </time>
         </span>
-      </div>
+      </p>
 
-      {/* ── Primary action ─────────────────────────────────────────────── */}
       <div className={styles.actions}>
-        <a
-          href={primaryActionHref}
-          className={styles.primaryAction}
-          aria-label={`${primaryActionLabel} — ${name}`}
-        >
+        <a href={primaryActionHref} className={styles.primaryAction}>
           {primaryActionLabel}
+          <span className="sr-only"> for {name}</span>
         </a>
       </div>
     </article>

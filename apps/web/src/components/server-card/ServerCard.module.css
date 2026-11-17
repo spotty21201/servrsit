@@ -1,156 +1,140 @@
 /**
- * ServerCard styles
- *
- * UX Spec §8.2: identity emblem, name, role, production label, status,
- * finding, check time, primary action.
- *
- * Card state modifier classes change the border accent only —
- * never the emblem color (identity).
- * Status colors come exclusively from StatusBadge using semantic tokens.
+ * ServerCard styles — white page, Ink border, hard identity-colored offset.
+ * --card-identity is set inline per server (Lilac/Citron/Tangerine).
  */
 
 .card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  gap: var(--gap-card-inner);
+  min-width: 0; /* grid child: never force the track wider than the viewport */
+  padding: var(--pad-card);
   background-color: var(--color-surface);
+  border: 2px solid var(--color-ink);
   border-radius: var(--radius-card);
-  border: 1px solid var(--color-soft-line);
-  min-width: var(--server-card-min-width);
-  /* UX Spec §4.3: use borders + surface difference, avoid heavy shadows */
-  transition: box-shadow var(--duration-interaction) var(--easing-snap),
-              border-color var(--duration-interaction) var(--easing-snap);
+  /* decorative identity shadow — box-shadow does not create scroll overflow */
+  box-shadow: 6px 6px 0 var(--card-identity, var(--color-lilac));
+  transition: transform var(--duration-interaction) var(--easing-snap),
+              box-shadow var(--duration-interaction) var(--easing-snap);
 }
 
 .card:hover {
-  box-shadow: var(--shadow-card-hover);
-  border-color: var(--color-control-boundary);
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0 var(--card-identity, var(--color-lilac));
 }
 
-/* ── Card state accent line (top border only) ───────────────────────────── */
-/* This is a structural hint, not the status color — status is in the badge. */
-
-.card.attention {
-  border-top: 3px solid var(--color-state-attention-fg);
+@media (prefers-reduced-motion: reduce) {
+  .card:hover { transform: none; }
 }
 
-.card.unreachable {
-  border-top: 3px solid var(--color-state-unknown-fg);
-}
-
-.card.fresh {
-  /* No accent — fresh cards stay neutral */
-}
-
+/* Non-color cue for uncertain coverage: dashed border. The badge and the
+   "Historical" chip carry the explicit text. */
+.card.unreachable,
 .card.stale {
-  border-top: 3px solid var(--color-state-unknown-fg);
-}
-
-.card.working {
-  border-top: 3px solid var(--color-state-progress-fg);
+  border-style: dashed;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
 .header {
   display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-1-half);
+  min-width: 0;
 }
 
-.emblem {
-  flex-shrink: 0;
-  /* Emblem does not resize with font scaling */
+.icon {
+  width: 48px;  /* 3 × 16-px grid */
+  height: 48px;
 }
 
 .identity {
   display: flex;
   flex-direction: column;
-  gap: var(--space-half);
-  min-width: 0; /* enable text truncation in flex child */
-}
-
-.nameRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
 }
 
 .name {
-  font-family: var(--font-sans);
-  font-size: var(--text-card-title-size);
-  line-height: var(--text-card-title-line-height);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-ink);
   margin: 0;
+  font-size: var(--text-card-title-size);     /* 24px — 8px multiple */
+  line-height: var(--text-card-title-line-height);
+  color: var(--color-ink);
+  /* long names wrap instead of widening the card */
+  overflow-wrap: anywhere;
 }
 
 .nameLink {
-  color: var(--color-ink);
+  color: inherit;
   text-decoration: none;
 }
 
 .nameLink:hover {
   text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 
-.nameLink:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-  border-radius: var(--radius-small);
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.role {
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+  color: var(--color-muted-ink);
 }
 
 .productionLabel {
   display: inline-flex;
   align-items: center;
-  padding: 1px var(--space-1);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-control-boundary);
-  font-family: var(--font-sans);
-  font-size: 11px; /* smaller than compact — eyebrow label */
-  font-weight: var(--font-weight-medium);
-  color: var(--color-muted-ink);
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-small);
+  background-color: var(--color-citron);
+  color: var(--color-ink);
+  font-size: 0.75rem; /* 12px */
+  line-height: 1.25rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
   white-space: nowrap;
 }
 
-.role {
-  font-family: var(--font-sans);
-  font-size: var(--text-compact-size);
-  line-height: var(--text-compact-line-height);
-  color: var(--color-muted-ink);
-}
-
-/* ── Status row ─────────────────────────────────────────────────────────── */
+/* ── Status ─────────────────────────────────────────────────────────────── */
 
 .statusRow {
   display: flex;
+  flex-wrap: wrap;
 }
 
-/* ── Primary finding ────────────────────────────────────────────────────── */
-
 .finding {
-  font-family: var(--font-sans);
+  margin: 0;
   font-size: var(--text-compact-size);
   line-height: var(--text-compact-line-height);
   color: var(--color-ink);
-  margin: 0;
 }
 
-/* ── Check time row ─────────────────────────────────────────────────────── */
+.historical {
+  display: inline-block;
+  margin-right: var(--space-1);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-small);
+  background-color: var(--color-state-unknown-bg);
+  color: var(--color-state-unknown-fg);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  font-weight: var(--font-weight-semibold);
+}
 
 .checkRow {
   display: flex;
   align-items: center;
-  gap: var(--space-half);
-  margin-top: auto; /* push check + actions to bottom of card */
-}
-
-.checkTime {
-  font-family: var(--font-sans);
+  gap: var(--space-1);
+  margin: auto 0 0; /* push check + action to the bottom */
   font-size: var(--text-compact-size);
   line-height: var(--text-compact-line-height);
   color: var(--color-muted-ink);
@@ -158,13 +142,13 @@
 
 .timestamp {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
-/* ── Actions ────────────────────────────────────────────────────────────── */
+/* ── Action ─────────────────────────────────────────────────────────────── */
 
 .actions {
   display: flex;
-  gap: var(--space-2);
 }
 
 .primaryAction {
@@ -173,33 +157,68 @@
   justify-content: center;
   min-height: var(--touch-target-min);
   padding: 0 var(--space-3);
+  border: 2px solid var(--color-ink);
   border-radius: var(--radius-button);
   background-color: var(--color-tangerine);
-  /* UX Spec §4.2: Tangerine MUST pair with Ink text, never white */
-  color: var(--color-ink);
-  font-family: var(--font-sans);
+  color: var(--color-ink); /* Ink on Tangerine, never white */
   font-size: var(--text-compact-size);
   font-weight: var(--font-weight-semibold);
   text-decoration: none;
-  transition: opacity var(--duration-interaction) var(--easing-snap);
   white-space: nowrap;
 }
 
 .primaryAction:hover {
-  opacity: 0.88;
   text-decoration: none;
+  background-color: var(--color-citron);
 }
 
-.primaryAction:focus-visible {
+.primaryAction:focus-visible,
+.nameLink:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
-/* ── Responsive ─────────────────────────────────────────────────────────── */
-
+/* ── Mobile (≤767px): smaller, tighter cards (round 3) ──────────────────────
+ * Padding/gaps come from --pad-card / --gap-card-inner (12 / 8 px on mobile,
+ * set in src/tokens.css). Width rules are unchanged: min-width: 0 on the card,
+ * overflow-wrap on the name, wrapping badge — no new horizontal overflow.
+ */
 @media (max-width: 767px) {
   .card {
-    /* Full width on mobile — no min-width constraint */
-    min-width: 0;
+    border-radius: var(--radius-panel); /* 16px — less corner on a small card */
+    box-shadow: 4px 4px 0 var(--card-identity, var(--color-lilac));
+  }
+
+  .card:hover {
+    transform: none;
+    box-shadow: 4px 4px 0 var(--card-identity, var(--color-lilac));
+  }
+
+  .header {
+    gap: var(--space-1);
+  }
+
+  .icon {
+    width: 32px;  /* 2 × 16-px grid, still integer-scaled */
+    height: 32px;
+  }
+
+  .role,
+  .finding,
+  .checkRow {
+    font-size: 0.8125rem; /* 13px */
+  }
+
+  .checkRow {
+    gap: var(--space-half);
+  }
+
+  .actions {
+    margin-top: var(--space-half);
+  }
+
+  .primaryAction {
+    min-height: var(--touch-target-min); /* stays 44px */
+    padding: 0 var(--space-2);
   }
 }

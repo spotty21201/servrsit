@@ -8,10 +8,13 @@
  * note and the roster can expand."
  */
 import type { FindingFixture } from "../../fixtures/overview.js";
+import { ScrollRegion } from "../ScrollRegion/index.js";
 import styles from "./AttentionColumn.module.css";
 
 interface AttentionColumnProps {
   findings: FindingFixture[];
+  /** Layout placement from the parent (grid area). */
+  className?: string;
 }
 
 function FindingIcon({ severity }: { severity: "attention" | "failed" }) {
@@ -32,24 +35,26 @@ function FindingIcon({ severity }: { severity: "attention" | "failed" }) {
   );
 }
 
-export function AttentionColumn({ findings }: AttentionColumnProps) {
+export function AttentionColumn({ findings, className = "" }: AttentionColumnProps) {
   if (findings.length === 0) {
     return (
-      <aside className={styles.column} aria-label="Needs attention">
-        <h2 className={styles.heading}>Needs attention</h2>
-        <p className={styles.empty}>Nothing needs attention right now.</p>
-      </aside>
+      <section className={`${styles.column} ${className}`} aria-labelledby="attention-heading">
+        <h2 id="attention-heading" className={styles.heading}>Needs attention</h2>
+        <p className={styles.empty}>Nothing needs attention in the checks that ran.</p>
+      </section>
     );
   }
 
   return (
-    <aside className={styles.column} aria-label="Needs attention">
-      <h2 className={styles.heading}>
+    <section className={`${styles.column} ${className}`} aria-labelledby="attention-heading">
+      <h2 id="attention-heading" className={styles.heading}>
         Needs attention
-        <span className={styles.count} aria-label={`${findings.length} items`}>
+        <span className={styles.count}>
           {findings.length}
+          <span className="sr-only"> items</span>
         </span>
       </h2>
+      <ScrollRegion label="Needs attention list">
       <ul className={styles.list} role="list">
         {findings.map((finding) => (
           <li key={finding.id} className={`${styles.finding} ${styles[finding.severity]}`}>
@@ -67,6 +72,7 @@ export function AttentionColumn({ findings }: AttentionColumnProps) {
           </li>
         ))}
       </ul>
-    </aside>
+      </ScrollRegion>
+    </section>
   );
 }

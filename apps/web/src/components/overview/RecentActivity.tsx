@@ -5,10 +5,13 @@
  * not another wall of metrics."
  */
 import type { RecentOperationFixture } from "../../fixtures/overview.js";
+import { ScrollRegion } from "../ScrollRegion/index.js";
 import styles from "./RecentActivity.module.css";
 
 interface RecentActivityProps {
   operations: RecentOperationFixture[];
+  /** Layout placement from the parent (grid area). */
+  className?: string;
 }
 
 function OperationStateIcon({ state }: { state: string }) {
@@ -55,13 +58,14 @@ function getStateClass(state: string): string {
   }
 }
 
-export function RecentActivity({ operations }: RecentActivityProps) {
+export function RecentActivity({ operations, className = "" }: RecentActivityProps) {
   return (
-    <section className={styles.section} aria-label="Recent activity">
-      <h2 className={styles.heading}>Recent activity</h2>
+    <section className={`${styles.section} ${className}`} aria-labelledby="activity-heading">
+      <h2 id="activity-heading" className={styles.heading}>Recent activity</h2>
       {operations.length === 0 ? (
         <p className={styles.empty}>No recent operations.</p>
       ) : (
+        <ScrollRegion label="Recent activity list">
         <ul className={styles.list} role="list">
           {operations.map((op) => {
             const stateClass = getStateClass(op.state);
@@ -83,6 +87,7 @@ export function RecentActivity({ operations }: RecentActivityProps) {
             );
           })}
         </ul>
+        </ScrollRegion>
       )}
 
       <a href="/activity" className={styles.viewAll}>

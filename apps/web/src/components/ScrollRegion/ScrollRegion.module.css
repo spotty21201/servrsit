@@ -1,0 +1,74 @@
+/**
+ * ScrollRegion — height-limited only at ≥1024px.
+ * Below that, it is ordinary flow: no internal scrolling, page scrolls.
+ */
+
+.outer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.region {
+  min-width: 0;
+}
+
+.more {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .outer {
+    flex: 1 1 auto;
+  }
+
+  .region {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;   /* wheel at the end doesn't scroll the page */
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-control-boundary) transparent;
+    scrollbar-gutter: stable;
+    /* 4px breathing room so child focus rings (2px + 2px offset) aren't
+       clipped by the scroll container; negative margin keeps alignment */
+    padding: var(--space-half);
+    margin: calc(-1 * var(--space-half));
+  }
+
+  .region:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 0;
+  }
+
+  .more {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--space-6); /* 48px fade */
+    padding-bottom: var(--space-half);
+    background: linear-gradient(to bottom, transparent, var(--color-page) 65%);
+    pointer-events: none;   /* clicks and wheel pass through to the list */
+  }
+
+  .moreLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-half);
+    padding: 0 var(--space-1);
+    border: 1.5px solid var(--color-ink);
+    border-radius: var(--radius-small);
+    background-color: var(--color-citron);
+    color: var(--color-ink);
+    font-size: 0.75rem;   /* 12px */
+    line-height: 1.125rem;
+    font-weight: var(--font-weight-semibold);
+  }
+}
