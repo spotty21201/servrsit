@@ -164,3 +164,18 @@ test("the function never throws, whatever fetch does", async () => {
     assert.equal(result.ok, false);
   }
 });
+
+test("O1: a live card with no data (source 'none') is accepted and not reported as live", async () => {
+  const body = fixtureFleet({ mode: "live" });
+  body.servers[0] = { ...body.servers[0]!, source: "none", status: "unverified-host", observedAt: null, freshUntil: null };
+  const result = await fetchFleet({ fetchImpl: respondWith(JSON.stringify(body)) });
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.data.servers[0]?.source, "none");
+});
+
+test("an unknown source value is rejected", async () => {
+  const body = fixtureFleet() as unknown as { servers: Array<Record<string, unknown>> };
+  body.servers[0]!["source"] = "maybe-live";
+  const result = await fetchFleet({ fetchImpl: respondWith(JSON.stringify(body)) });
+  assert.equal(result.ok === false && result.error.detail, "servers.0.source");
+});

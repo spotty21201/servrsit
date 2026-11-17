@@ -45,8 +45,17 @@ export const FleetServerSchema = z.object({
   role: z.string().nullable(),
   production: z.boolean(),
   access: z.enum(["ssh", "local"]),
-  /** "live" = derived from real checks (including a live "not verified" fact). */
-  source: z.enum(["live", "fixture"]),
+  /**
+   * Where this card's data comes from. Drives the data-source badge (O1).
+   *  - "live":    a real successful observation exists (it may be historical;
+   *               see status, observedAt and latestAttempt)
+   *  - "none":    live mode, but there is no observation to show (for example
+   *               unverified-host, collection-disabled, not yet checked).
+   *               Never badge this as live data.
+   *  - "fixture": synthetic data (fixture mode only), including fixture cards
+   *               that depict "no data"
+   */
+  source: z.enum(["live", "fixture", "none"]),
   status: FleetStatusSchema,
   statusReason: z.string().max(300),
   /** Time of the last SUCCESSFUL observation. Null if none has ever succeeded. */

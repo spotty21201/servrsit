@@ -46,10 +46,13 @@ test("live mode: schema-valid, per-server source live, unverified host reported 
   assert.equal(res.statusCode, 200);
   const body = FleetResponseSchema.parse(res.json());
   assert.equal(body.mode, "live");
-  assert.ok(body.servers.every((x) => x.source === "live"));
+  assert.ok(body.servers.every((x) => x.source !== "fixture"), "no fixture data in live mode");
   const by = Object.fromEntries(body.servers.map((x) => [x.name, x]));
   assert.equal(by["Alpha"]?.status, "fresh");
   assert.equal(by["Gamma"]?.status, "unverified-host");
+  assert.equal(by["Gamma"]?.source, "none", "a card with no observation is never badged live (O1)");
+  assert.equal(by["Alpha"]?.source, "live");
+  assert.equal(by["Local"]?.source, "live");
   assert.equal(by["Local"]?.role, "Dev host");
   assert.equal(by["Alpha"]?.role, null, "unknown roles stay null, not invented");
   assert.deepEqual(contacted.sort(), ["Alpha", "Local"]);

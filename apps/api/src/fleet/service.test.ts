@@ -154,3 +154,22 @@ test("overlapping refreshes coalesce into one pass", async () => {
   await Promise.all([service.refreshAll(), service.refreshAll(), service.refreshAll()]);
   assert.equal(calls.filter((c) => c === "Alpha").length, 1);
 });
+
+test("O1: source is 'none' for every card without an observation, and 'live' only with one", async () => {
+  const { service, clock, server } = setup((_h, n) => (n === 1 ? success(clock.now()) : fail("ROUTE_UNAVAILABLE", clock.now())), { alpha: "pinned", beta: "pinned" });
+  assert.equal(server("Alpha").source, "none", "before any check");
+  assert.equal(server("Local").source, "none", "before any check");
+  await service.refreshAll();
+  assert.equal(server("Alpha").source, "live");
+  assert.equal(server("Beta").source, "none", "collection-disabled has no data");
+  clock.advance(15 * MIN);
+  await service.refreshAll();
+  assert.equal(server("Alpha").status, "unreachable");
+  assert.equal(server("Alpha").source, "live", "the last success is real data, shown as historical by its status");
+});
+
+test("O1: an unverified host is 'none'", async () => {
+  const { service, server } = setup(() => success(new Date()), { alpha: "not-pinned" });
+  await service.refreshAll();
+  assert.deepEqual([server("Alpha").status, server("Alpha").source], ["unverified-host", "none"]);
+});

@@ -183,7 +183,7 @@ export class FleetService {
       role: host.role,
       production: host.production,
       access: host.access,
-      source: "live",
+      source: success === null ? "none" : "live",
       status: derived.status,
       statusReason: derived.statusReason,
       observedAt: success === null ? null : success.at.toISOString(),
