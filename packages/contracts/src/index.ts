@@ -326,3 +326,12 @@ export const OperationSchema = z.object({
 });
 
 export type Operation = z.infer<typeof OperationSchema>;
+
+// ---------------------------------------------------------------------------
+// Inspection observation and fleet response (live read-only wiring, ADR-012)
+// ---------------------------------------------------------------------------
+
+export * from "./observation.js";
+export * from "./fleet.js";
+
+export * from "./assistant.js";

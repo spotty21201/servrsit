@@ -1,0 +1,200 @@
+/**
+ * Build the ONLY data that is ever sent to the model.
+ *
+ * ADR-012: input is sanitised structured observations. No credentials, no raw
+ * files, no raw command output. Every value is either a number, a boolean, a
+ * member of a closed set, or a name that passed a strict well-formedness check.
+ * Names that fail the check are replaced by a count. No free text of any kind
+ * is passed: not status reasons, not finding summaries, not failure messages.
+ *
+ * Passing the check does not make a name trustworthy: a well-formed name can
+ * still be hostile ("ignore-previous-instructions.service"). The agent prompt
+ * treats the whole object as data, the agent has no tools, and its output is
+ * never executed. The permission boundary does not depend on this filter.
+ */
+
+import {
+  CHECK_NAMES,
+  isSafeMountPath,
+  isSafeUnitName,
+  type InspectionObservation,
+} from "@servrsit/ssh";
+import { z } from "zod";
+
+/** Structural subset of the API's fleet server record. */
+export interface ExplainableServer {
+  readonly name: string;
+  readonly role: string | null;
+  readonly production: boolean;
+  readonly access: "ssh" | "local";
+  readonly status: string;
+  readonly statusReason: string;
+  readonly observedAt: string | null;
+  readonly freshUntil: string | null;
+  readonly coverage: {
+    readonly passed: number;
+    readonly total: number;
+    readonly unavailable: ReadonlyArray<{ readonly check: string; readonly reason: string }>;
+  } | null;
+  readonly latestAttempt: {
+    readonly at: string;
+    readonly succeeded: boolean;
+    readonly failure: { readonly code: string; readonly message: string } | null;
+    readonly consecutiveFailures: number;
+  } | null;
+  readonly findings: ReadonlyArray<{
+    readonly severity: "critical" | "warning" | "advisory";
+    readonly rule: string;
+    readonly summary: string;
+  }>;
+  readonly observation: InspectionObservation | null;
+}
+
+const text = (max: number) => z.string().max(max);
+
+/** Closed sets. Anything else becomes "unknown", so free text cannot ride in these fields. */
+const KNOWN_STATUSES = [
+  "unverified-host", "host-key-changed", "access-denied", "unreachable", "misconfigured",
+  "collection-disabled", "not-yet-checked", "stale", "partial", "fresh", "unknown",
+] as const;
+const KNOWN_FAILURE_CODES = [
+  "HOST_UNTRUSTED", "HOST_KEY_CHANGED", "ROUTE_UNAVAILABLE", "AUTH_FAILED", "TIMEOUT",
+  "TARGET_REJECTED", "OUTPUT_INVALID", "COLLECTION_FAILED", "UNKNOWN",
+] as const;
+const RULE_ID = /^[a-z][a-z0-9.-]{0,62}\.v\d{1,3}$/;
+
+function oneOf<T extends string>(value: string, allowed: readonly T[], fallback: T): T {
+  return (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
+}
+
+export const AiServerInputSchema = z
+  .object({
+    server: z.object({
+      name: text(64),
+      role: text(64).nullable(),
+      production: z.boolean(),
+      access: z.enum(["ssh", "local"]),
+    }),
+    status: z.enum(KNOWN_STATUSES),
+    observedAt: text(40).nullable(),
+    freshUntil: text(40).nullable(),
+    latestAttempt: z
+      .object({
+        at: text(40),
+        succeeded: z.boolean(),
+        failureCode: z.enum(KNOWN_FAILURE_CODES).nullable(),
+        consecutiveFailures: z.number().int().nonnegative(),
+      })
+      .nullable(),
+    coverage: z
+      .object({
+        passed: z.number().int().nonnegative(),
+        total: z.number().int().nonnegative(),
+        unavailableChecks: z.array(text(40)).max(20),
+      })
+      .nullable(),
+    metrics: z
+      .object({
+        os: text(64).nullable(),
+        cpuCount: z.number().int().positive().nullable(),
+        load1: z.number().nonnegative().nullable(),
+        memoryUsedPercent: z.number().int().min(0).max(100).nullable(),
+        uptimeDays: z.number().int().nonnegative().nullable(),
+        filesystems: z.array(z.object({ mount: text(64), usedPercent: z.number().int().min(0).max(100) })).max(8).nullable(),
+        pendingUpdates: z.number().int().nonnegative().nullable(),
+        rebootRequired: z.boolean().nullable(),
+        failedUnits: z
+          .object({ names: z.array(text(100)).max(10), unrecognisedCount: z.number().int().nonnegative() })
+          .nullable(),
+      })
+      .nullable(),
+    findings: z
+      .array(z.object({ severity: z.enum(["critical", "warning", "advisory"]), rule: text(64) }))
+      .max(20),
+  })
+  .strict();
+
+export type AiServerInput = z.infer<typeof AiServerInputSchema>;
+
+const SERVER_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$/;
+const OS_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,63}$/;
+const KNOWN_CHECKS: ReadonlySet<string> = new Set(CHECK_NAMES);
+const UNRECOGNISED_MOUNT = "(unrecognised mount name)";
+
+function metricsFrom(o: InspectionObservation): NonNullable<AiServerInput["metrics"]> {
+  const h = o.host;
+  const mem = h.memory.status === "ok" ? h.memory.value : null;
+  const memoryUsedPercent =
+    mem !== null && mem.totalKib > 0
+      ? Math.max(0, Math.min(100, Math.round(((mem.totalKib - mem.availableKib) / mem.totalKib) * 100)))
+      : null;
+
+  let failedUnits: NonNullable<AiServerInput["metrics"]>["failedUnits"] = null;
+  if (o.services.failedUnits.status === "ok") {
+    const { units, unparsedLineCount } = o.services.failedUnits.value;
+    const names: string[] = [];
+    let unrecognised = unparsedLineCount;
+    for (const u of units) {
+      if (u.nameValid && isSafeUnitName(u.unit) && u.unit.length <= 100 && names.length < 10) names.push(u.unit);
+      else unrecognised += 1;
+    }
+    failedUnits = { names, unrecognisedCount: unrecognised };
+  }
+
+  return {
+    os: h.os.status === "ok" && OS_NAME.test(h.os.value.prettyName) ? h.os.value.prettyName : null,
+    cpuCount: h.cpuCount.status === "ok" ? h.cpuCount.value : null,
+    load1: h.load.status === "ok" ? Math.round(h.load.value.one * 100) / 100 : null,
+    memoryUsedPercent,
+    uptimeDays: h.uptimeSeconds.status === "ok" ? Math.floor(h.uptimeSeconds.value / 86400) : null,
+    filesystems:
+      h.filesystems.status === "ok"
+        ? h.filesystems.value.entries.slice(0, 8).map((e) => ({
+            mount: isSafeMountPath(e.mount) && e.mount.length <= 64 ? e.mount : UNRECOGNISED_MOUNT,
+            usedPercent: e.usedPercent,
+          }))
+        : null,
+    pendingUpdates: o.packages.pendingCount.status === "ok" ? o.packages.pendingCount.value : null,
+    rebootRequired: o.packages.rebootRequired.status === "ok" ? o.packages.rebootRequired.value : null,
+    failedUnits,
+  };
+}
+
+/** Rebuild the model input from scratch. Nothing is copied wholesale. */
+export function buildAiInput(server: ExplainableServer): AiServerInput {
+  return AiServerInputSchema.parse({
+    server: {
+      name: SERVER_NAME.test(server.name) ? server.name : "(unnamed server)",
+      role: server.role !== null && SERVER_NAME.test(server.role) ? server.role : null,
+      production: server.production,
+      access: server.access,
+    },
+    status: oneOf(server.status, KNOWN_STATUSES, "unknown"),
+    observedAt: server.observedAt,
+    freshUntil: server.freshUntil,
+    latestAttempt:
+      server.latestAttempt === null
+        ? null
+        : {
+            at: server.latestAttempt.at,
+            succeeded: server.latestAttempt.succeeded,
+            failureCode:
+              server.latestAttempt.failure === null
+                ? null
+                : oneOf(server.latestAttempt.failure.code, KNOWN_FAILURE_CODES, "UNKNOWN"),
+            consecutiveFailures: server.latestAttempt.consecutiveFailures,
+          },
+    coverage:
+      server.coverage === null
+        ? null
+        : {
+            passed: server.coverage.passed,
+            total: server.coverage.total,
+            unavailableChecks: server.coverage.unavailable.map((u) => u.check).filter((c) => KNOWN_CHECKS.has(c)),
+          },
+    metrics: server.observation === null ? null : metricsFrom(server.observation),
+    findings: server.findings
+      .slice(0, 20)
+      .map((f) => ({ severity: f.severity, rule: RULE_ID.test(f.rule) ? f.rule : "unknown.v1" })),
+  });
+}

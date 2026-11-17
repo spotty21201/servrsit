@@ -25,6 +25,14 @@ export default defineConfig({
     // Dev only: bind to the founder's Tailscale address so the tailnet can
     // reach it. Do not widen to all interfaces.
     host: "100.104.220.8",
+    // Dev only: forward /api to the local API so the browser stays same-origin.
+    // Override the target with SERVRSIT_API_URL to reach a second API instance.
+    proxy: {
+      "/api": {
+        target: process.env["SERVRSIT_API_URL"] ?? "http://127.0.0.1:3001",
+        changeOrigin: false,
+      },
+    },
   },
   // Prevent Vite from pre-bundling workspace packages that we resolve
   // directly from TypeScript source.
