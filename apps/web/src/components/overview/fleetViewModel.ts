@@ -13,6 +13,7 @@
  */
 import type { Finding, FleetServer, FleetStatus } from "@servrsit/contracts";
 import type { FleetState } from "../../api/fleetState";
+import { formatClock, formatClockWithAge, formatRelative, parseIso, resolveTimeZone } from "../../lib/time";
 
 // ── View-model types ────────────────────────────────────────────────────────
 
@@ -74,6 +75,8 @@ export interface OverviewVM {
   anyFixture: boolean;
   /** Counts for the header line. */
   counts: { total: number; live: number; fixture: number; none: number };
+  /** Owner time zone (IANA) used for every time on the screen. */
+  timeZone: string;
   receivedText: string | null;
   nextCheckText: string | null;
   refreshing: boolean;
@@ -82,35 +85,9 @@ export interface OverviewVM {
 }
 
 // ── Time helpers ────────────────────────────────────────────────────────────
+// All formatting lives in lib/time.ts and uses the owner's time zone.
 
-function parse(iso: string | null | undefined): Date | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-/** "09:42" today, otherwise "16 Nov 09:42" (browser locale and timezone). */
-export function clockText(d: Date, now: Date): string {
-  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  if (sameDay(d, now)) return time;
-  return `${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })} ${time}`;
-}
-
-/** "just now", "4 min ago", "2 h ago", or an absolute date for older times. */
-export function relativeText(d: Date, now: Date): string {
-  const sec = Math.round((now.getTime() - d.getTime()) / 1000);
-  if (sec < 0) return clockText(d, now); // clock skew: don't claim the future
-  if (sec < 45) return "just now";
-  const min = Math.round(sec / 60);
-  if (min < 60) return `${min} min ago`;
-  const h = Math.round(min / 60);
-  if (h < 24) return `${h} h ago`;
-  return clockText(d, now);
-}
+const parse = parseIso;
 
 // ── Status mapping ──────────────────────────────────────────────────────────
 
@@ -178,7 +155,7 @@ function primaryLine(s: FleetServer): string {
  */
 const IDENTITY_ORDER: IdentityColor[] = ["tangerine", "lilac", "citron", "bubblegum"];
 
-function toCard(s: FleetServer, index: number, now: Date): ServerCardVM {
+function toCard(s: FleetServer, index: number, now: Date, tz: string): ServerCardVM {
   const p = effectiveStatus(s);
   const observed = parse(s.observedAt);
   const freshUntil = parse(s.freshUntil);
@@ -191,7 +168,7 @@ function toCard(s: FleetServer, index: number, now: Date): ServerCardVM {
     const why = attempt.failure?.message ?? "No reason given";
     latestFailure = {
       at: attempt.at,
-      text: `Latest check failed ${relativeText(attemptAt, now)}${times}: ${why}`,
+      text: `Latest check failed ${formatRelative(attemptAt, now, tz)}${times}: ${why}`,
     };
   }
 
@@ -199,8 +176,8 @@ function toCard(s: FleetServer, index: number, now: Date): ServerCardVM {
   if (freshUntil) {
     freshUntilText =
       freshUntil.getTime() >= now.getTime()
-        ? `fresh until ${clockText(freshUntil, now)}`
-        : `expired ${clockText(freshUntil, now)}`;
+        ? `fresh until ${formatClock(freshUntil, now, tz)}`
+        : `expired ${formatClock(freshUntil, now, tz)}`;
   }
 
   return {
@@ -218,7 +195,7 @@ function toCard(s: FleetServer, index: number, now: Date): ServerCardVM {
     primaryLine: primaryLine(s),
     historical: observed !== null && s.status !== "fresh" && s.status !== "partial",
     observedAt: s.observedAt,
-    observedText: observed ? `Observed ${relativeText(observed, now)}` : "Never observed",
+    observedText: observed ? `Observed ${formatRelative(observed, now, tz)}` : "Never observed",
     freshUntil: s.freshUntil,
     freshUntilText,
     latestFailure,
@@ -238,7 +215,7 @@ const ATTENTION_STATUSES: ReadonlySet<FleetStatus> = new Set<FleetStatus>([
   "misconfigured",
 ]);
 
-function toAttention(s: FleetServer, now: Date): AttentionItemVM[] {
+function toAttention(s: FleetServer, now: Date, tz: string): AttentionItemVM[] {
   const items: AttentionItemVM[] = [];
   const p = STATUS[s.status];
   const refIso = s.latestAttempt?.at ?? s.observedAt ?? "";
@@ -253,7 +230,7 @@ function toAttention(s: FleetServer, now: Date): AttentionItemVM[] {
       title: p.label,
       detail: s.statusReason,
       firstObservedAt: refIso,
-      firstObservedRelative: ref ? relativeText(ref, now) : "",
+      firstObservedRelative: ref ? formatRelative(ref, now, tz) : "",
     });
   }
 
@@ -269,7 +246,7 @@ function toAttention(s: FleetServer, now: Date): AttentionItemVM[] {
       title: f.summary,
       detail: s.status === "fresh" || s.status === "partial" ? `Rule ${f.rule}` : `Rule ${f.rule} · from an older observation`,
       firstObservedAt: s.observedAt ?? "",
-      firstObservedRelative: observed ? relativeText(observed, now) : "",
+      firstObservedRelative: observed ? formatRelative(observed, now, tz) : "",
     });
   }
   return items;
@@ -279,10 +256,11 @@ function toAttention(s: FleetServer, now: Date): AttentionItemVM[] {
 
 export function toOverviewVM(state: FleetState, now: Date): OverviewVM {
   const data = state.data;
-  const servers = data ? data.servers.map((s, i) => toCard(s, i, now)) : [];
+  const tz = resolveTimeZone(data?.ownerTimeZone);
+  const servers = data ? data.servers.map((s, i) => toCard(s, i, now, tz)) : [];
   const attention = data
     ? data.servers
-        .flatMap((s) => toAttention(s, now))
+        .flatMap((s) => toAttention(s, now, tz))
         .sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "failed" ? -1 : 1))
     : [];
 
@@ -302,8 +280,9 @@ export function toOverviewVM(state: FleetState, now: Date): OverviewVM {
     attention,
     anyFixture: counts.fixture > 0,
     counts,
-    receivedText: received ? clockText(received, now) : null,
-    nextCheckText: nextCheck ? clockText(nextCheck, now) : null,
+    timeZone: tz,
+    receivedText: received ? formatClockWithAge(received, now, tz) : null,
+    nextCheckText: nextCheck ? formatClock(nextCheck, now, tz) : null,
     refreshing: state.refreshing,
     error: state.error ? { message: state.error.message } : null,
   };

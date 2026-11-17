@@ -172,7 +172,7 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
             <RecentActivity operations={[]} />
           </div>
 
-          <ChatBar servers={vm.servers.map((s) => ({ id: s.id, name: s.name }))} />
+          <ChatBar servers={vm.servers.map((s) => ({ id: s.id, name: s.name }))} timeZone={vm.timeZone} />
         </div>
       </main>
     </div>
