@@ -140,6 +140,38 @@ test("RC6 tone on GOOD news (everything clear): correct facts; humour is allowed
   assert.ok(/(up to date|no pending|nothing (is )?pending|all clear|everything|fine|healthy|checked)/i.test(reply.text));
 });
 
+// ---- end-to-end with the T-051 fact check in the loop: does it throw away CORRECT real answers? ----
+import { REAL } from "./support/real-scenarios.mts";
+import { FACTS as F } from "./support/synthetic.mts";
+const NUMS: Record<string, Set<number>> = Object.fromEntries(Object.values(F).map((f) => [f.name, new Set<number>([
+  f.pending ?? 0, (f as any).held ?? 0, f.disk ?? 40, f.inode ?? 0, f.memUsedPct ?? 30, f.uptimeDays ?? 3, f.load1 ?? 0.2, f.cpu ?? 4, 15, 4,
+])]));
+/** My own judge, independent of the product's checker: numbers in a sentence naming exactly one server must be that server's. */
+function wrongNumbers(text: string): string[] {
+  const bad: string[] = [];
+  for (const sentence of text.split(/(?<=[.!?])\s+|\n+/)) {
+    const named = Object.keys(NUMS).filter((n) => new RegExp(`\\b${n}\\b`, "i").test(sentence));
+    if (named.length !== 1) continue;
+    const scrubbed = sentence.replace(/\b\d+\s*(h|min|minutes?|hours?|days?)\b(\s+\d+\s*min)?/gi, "").replace(/\b15 checks\b/gi, "");
+    for (const m of scrubbed.matchAll(/\b(\d+(?:\.\d+)?)\b/g)) if (!NUMS[named[0]!]!.has(Number(m[1]))) bad.push(`${named[0]}: ${m[1]} in "${sentence.slice(0, 80)}"`);
+  }
+  return bad;
+}
+
+for (const label of ["RE1-held-back-reality", "RE2-overview", "RE3-sentani-pressure"]) {
+  test(`${label}: a real, correct answer is not thrown away by the fact check`, async (t) => {
+    if (!guard(t, label)) return;
+    const sc = REAL.find((r) => r.label === label)!;
+    const { reply, replayed } = await ask(label, sc.message, sc.servers, sc.ownerContext);
+    const raw = callLog().find((c) => c.label === label)?.answer ?? "";
+    const wrong = wrongNumbers(raw);
+    console.log(`[${label}] replayed=${replayed} outcome=${reply.source === "ai" ? "ACCEPTED" : `REJECTED(${(reply as any).factMismatch})`} independent-number-check=${wrong.length === 0 ? "all numbers right" : "WRONG: " + wrong.join("; ")}\n   raw: ${JSON.stringify(raw)}`);
+    assert.ok(raw.length > 0, `no model answer (reason ${reply.reason})`);
+    assert.deepEqual(wrong, [], "the model itself misattributed a number; the checker was right to object");
+    assert.equal(reply.source, "ai", `FALSE POSITIVE: every number in the model's answer is right (by an independent check), yet it was rejected: ${(reply as any).factMismatch}`);
+  });
+}
+
 test("zz: real-call ledger (for the report): calls, models, latency. No keys, no request bodies", () => {
   const rows = callLog().map((c) => `#${c.n} ${c.label.padEnd(30)} ok=${c.ok} http=${c.httpStatus} ${c.ms ?? "-"}ms model=${c.model ?? "-"}`);
   console.log(`\n[AI budget] ${callsUsed()} of ${BUDGET_LIMIT} used\n${rows.join("\n")}`);
