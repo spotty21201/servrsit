@@ -883,3 +883,75 @@ Per instruction no token check was added. A shared dev token or the real Cognito
 ## Process note
 
 All servers in this work ran in-process with `close()`, or as test children killed in `finally`. Final check: no process has a working directory in `/projects/servrsit-coder` or my throwaway worktree, which I removed with `git worktree remove`. Designer's and Orchestrator's processes in `/projects/servrsit` were not touched.
+
+---
+
+# DEF-L1, DEF-L2, and the "no pending updates" investigation
+
+**Commit:** `0370e6b` on `feat/coder/live-inspection`. **Not** on `integration/live-v1`: that branch is checked out in `/projects/servrsit`, where Designer has 13 uncommitted changes (components, tokens, a new `fleetViewModel.ts`) under an open `kiro-designer` session. Committing there would mean working in their tree. Orchestrator merges `0370e6b` into `integration/live-v1` as usual.
+
+## Investigation: Nabire "no pending updates" at about 15:25 UTC
+
+**Verdict: the AI was wrong. The collector and the API were right.**
+
+| Layer | What it said | Evidence |
+|---|---|---|
+| Collector | 1 pending (sosreport) | Live observation 17:10 UTC: `pendingCount 1`, `heldBackCount 0`, `metadataUpdatedAt 2026-11-17T08:29:39Z`. The apt update stamp still read 08:29:39 at 17:10, so the lists were not refreshed in between, and `apt-get -s upgrade` on unchanged lists is deterministic, so the 15:25:03 check had the same 1. Matches the founder's `apt list --upgradable`. |
+| API | `"pendingUpdates": 1` and finding `packages.pending.v1` sent to the model | Prompt rebuilt from the running API's cached data with the code it runs (no model call) |
+| Model | "no pending updates" | API log, 15:25:38 UTC: `assistant: answered`, `kind: question`, `source: ai`, `httpStatus: 200`, `servers: 4`, `scope: all`. Nabire had been checked at 15:25:03. |
+
+- **Not the stub.** The chat UI was a stub until `486b296` at 15:25:51 UTC, but the stub replies "This is a stub reply ... No assistant is connected yet", never anything about updates. The answer at 15:25:38 was logged by the real assistant route with `source: ai`.
+- **Likely mechanism:** cross-server misattribution. All four servers are in one JSON array, and Merauke's entry, next to Nabire's, has `"pendingUpdates": 0`.
+- **Limit of the proof:** the API keeps state in memory only and logs no counts, so the exact 15:25:03 values cannot be recovered. The conclusion rests on the unchanged update stamp, the deterministic simulation, and the current data.
+- **Earlier "0 pending" readings were correct for their lists.** My 07:28 run reported 0 against lists from 16 Nov 02:34, before the host's 08:29 refresh.
+
+**Not fixed by this commit** (it was an investigation): nothing deterministically checks the counts the model states. DEF-L1's check only covers times. Options, for your decision: (a) a narrow check that rejects "no pending updates" / "up to date" claims for a server whose `pendingUpdates > 0`; (b) give the model one pre-rendered fact line per server to quote; (c) answer count questions deterministically. Until then the notice ("not evidence ... check the server cards") is the only guard.
+
+## DEF-L1: one time zone, no raw UTC in answers
+
+- **Config:** `ownerTimeZone` in `apps/api/config/hosts.json`, default `Asia/Jakarta`, validated at load (an invalid zone fails at startup).
+- **Model input has no raw timestamps.** Every time is `{at, age}`, already formatted in the owner's zone (`"18 Nov 2026, 00:10 GMT+7"`, `"12 min ago"`). The prompt also carries `timeZone` and the local `now`.
+- **System prompts** (assistant, explainer, Kiro agent, which are kept identical where required): quote a time only exactly as given; never convert, compute or round; never write UTC or ISO.
+- **Deterministic check on every reply:** each clock time it states, in 24-hour or 12-hour form ("12:10 AM" counts as 00:10), must be one it was given, and it may contain no ISO timestamp and no "UTC". Otherwise the reply is withheld: reason `unverified_time`, deterministic summary, and the notice "The AI's reply was withheld because it stated a time that was not in the data...".
+- **Deterministic text** uses local times with ages.
+- **Explainer cache** now hits only on identical input. Ages are part of the input, so replaying cached text later would quote stale ages. The 10-minute guard still caps spend. The assistant has no cache.
+- **Sub-minute gaps** in either direction read "just now", not "in under a minute" (clock skew).
+
+**Designer, the UI half of DEF-L1:** the evidence line was formatted in the browser's zone ("Nov 18, 12:10 AM"). It matched only because the browser happened to be in Jakarta. `/api/fleet` now returns **`ownerTimeZone`** (additive field). Format `evidence[].observedAt` and card times with `Intl.DateTimeFormat(..., { timeZone: fleet.ownerTimeZone })` so the UI always agrees with the answer. The assistant response contract is unchanged; evidence times stay ISO.
+
+## DEF-L2: age of package information
+
+- **Model input:** `metrics.packageLists: {at, age}` from the host's own apt update stamp. Prompt rule: whenever pending updates (or "up to date") are mentioned, state how old the package information is, and that the host refreshed it, not ServrSit.
+- **Deterministic text:** "Package information was last refreshed by the host at 17 Nov 2026, 15:29 GMT+7 (8 h 53 min ago). ServrSit does not refresh package lists." If the stamp is unavailable: "The age of the package information is unknown."
+
+## Checks run (real output)
+
+On the founder's real cached Nabire data, through the new code, with no AI call:
+
+```
+observed      {"at":"18 Nov 2026, 00:10 GMT+7","age":"12 min ago"}
+freshUntil    {"at":"18 Nov 2026, 00:40 GMT+7","age":"in 17 min"}
+latestAttempt {"at":"18 Nov 2026, 00:10 GMT+7","age":"12 min ago"}
+packageLists  {"at":"17 Nov 2026, 15:29 GMT+7","age":"8 h 53 min ago"}  pendingUpdates: 1
+ISO timestamps left in the prompt: 0
+the founder's reply 'succeeded at 17:10' -> {"ok":false,"offending":"17:10"}
+a reply 'checked at 00:10'         -> {"ok":true}
+```
+
+```
+packages/contracts tsc ok   packages/ssh tsc ok   packages/ai tsc ok   apps/api tsc ok   apps/web tsc ok
+packages/ssh   exit=0  1s  ℹ tests 40  ℹ pass 40  ℹ fail 0
+packages/ai    exit=0  1s  ℹ tests 114 ℹ pass 114 ℹ fail 0   (was 99)
+apps/api       exit=0 15s  ℹ tests 105 ℹ pass 105 ℹ fail 0   (was 99)
+apps/web       exit=0  1s  ℹ tests 36  ℹ pass 36  ℹ fail 0
+```
+
+No real AI call was made for this work. The time check enforces the rule whatever the model does. One check against the real provider would show how often it complies; ask if you want it.
+
+## Process problem I caused: needs a decision
+
+**The API the founder is testing against (`127.0.0.1:3001`) is run by my leftover `tsx watch` from T-023 (PID 458878, started 04:42 UTC, logging to `/tmp/api-dev.log`).** In T-023 I worked in `/projects/servrsit/apps/api`. My cleanup matched `"[t]sx watch"`, but this process's command line reads `.../tsx/dist/cli.mjs watch`, so it survived. In T-044 I wrongly listed it as Designer's or Orchestrator's. It runs whatever code is in Designer's working tree, including uncommitted changes.
+
+**Effect on a production server:** every file change in that tree restarts the API, and every restart logs in to Nabire and runs the read-only collector. Between 15:23:50 and 15:24:14 UTC it restarted 11 times in 24 seconds: **about 13 SSH logins to Nabire in under 90 seconds.** All read-only, nothing written, but unintended load and log noise on production.
+
+**I have not stopped it**, because the founder is actively using it. Recommendation: stop PID 458878 (and its child) when the founder is done, and run the integration API without `watch`, or from a clean checkout. A restart-safe per-host collection limit would also stop repeated logins; that is a product change, so ask if you want it.
