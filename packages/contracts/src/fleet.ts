@@ -44,6 +44,8 @@ export const FleetServerSchema = z.object({
   name: z.string(),
   role: z.string().nullable(),
   production: z.boolean(),
+  /** Systemd units the owner marked as important for this server (from configuration). */
+  importantServices: z.array(z.string().max(200)).max(20),
   access: z.enum(["ssh", "local"]),
   /**
    * Where this card's data comes from. Drives the data-source badge (O1).

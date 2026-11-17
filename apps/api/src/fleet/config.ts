@@ -5,13 +5,25 @@
 
 import { readFile } from "node:fs/promises";
 import { DEFAULT_TIME_ZONE, isValidTimeZone } from "@servrsit/ai";
+import { isSafeUnitName } from "@servrsit/ssh";
 import { z } from "zod";
+
+const UNIT_SUFFIX = /\.(service|socket|target|timer|mount|path|slice|scope|swap|automount|device)$/;
+
+/** A systemd unit the owner cares about. "nginx" means "nginx.service". */
+const ImportantService = z
+  .string()
+  .max(200)
+  .transform((s) => (UNIT_SUFFIX.test(s) ? s : `${s}.service`))
+  .refine(isSafeUnitName, { message: "importantServices entries must be plain systemd unit names" });
 
 const HostBase = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(64),
   role: z.string().min(1).max(64).nullable(),
   production: z.boolean(),
+  /** Units the owner cares about on this host (owner-maintained, no secrets). */
+  importantServices: z.array(ImportantService).max(20).default([]),
   collect: z.boolean(),
   collectDisabledReason: z.string().max(200).optional(),
   /**

@@ -183,6 +183,7 @@ export class FleetService {
       name: host.name,
       role: host.role,
       production: host.production,
+      importantServices: [...host.importantServices],
       access: host.access,
       source: success === null ? "none" : "live",
       status: derived.status,

@@ -31,6 +31,8 @@ export interface ExplainableServer {
   readonly name: string;
   readonly role: string | null;
   readonly production: boolean;
+  /** Units the owner marked as important (from configuration). Optional for older callers. */
+  readonly importantServices?: readonly string[] | undefined;
   readonly access: "ssh" | "local";
   readonly status: string;
   readonly statusReason: string;
@@ -79,6 +81,7 @@ export const AiServerInputSchema = z
       role: text(64).nullable(),
       production: z.boolean(),
       access: z.enum(["ssh", "local"]),
+      importantServices: z.array(text(100)).max(20),
     }),
     status: z.enum(KNOWN_STATUSES),
     /** Last successful check, owner-local. */
@@ -108,6 +111,8 @@ export const AiServerInputSchema = z
         memoryUsedPercent: z.number().int().min(0).max(100).nullable(),
         uptimeDays: z.number().int().nonnegative().nullable(),
         filesystems: z.array(z.object({ mount: text(64), usedPercent: z.number().int().min(0).max(100) })).max(8).nullable(),
+        /** Inode use per filesystem (T-051: so inode claims can be checked). */
+        inodes: z.array(z.object({ mount: text(64), usedPercent: z.number().int().min(0).max(100) })).max(8).nullable(),
         pendingUpdates: z.number().int().nonnegative().nullable(),
         /**
          * When the HOST last refreshed its package lists (DEF-L2), owner-local.
@@ -118,6 +123,8 @@ export const AiServerInputSchema = z
         failedUnits: z
           .object({ names: z.array(text(100)).max(10), unrecognisedCount: z.number().int().nonnegative() })
           .nullable(),
+        /** Important services that are currently in the failed list. Null when failed units are unavailable. */
+        importantServicesFailed: z.array(text(100)).max(20).nullable(),
       })
       .nullable(),
     findings: z
@@ -129,11 +136,17 @@ export const AiServerInputSchema = z
 export type AiServerInput = z.infer<typeof AiServerInputSchema>;
 
 const SERVER_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$/;
+/** Owner-written role text: plain words and light punctuation; never < > " ` $ ; or newlines. */
+const ROLE = /^[A-Za-z0-9][A-Za-z0-9 ._,()/&'+:-]{0,63}$/;
 const OS_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,63}$/;
 const KNOWN_CHECKS: ReadonlySet<string> = new Set(CHECK_NAMES);
 const UNRECOGNISED_MOUNT = "(unrecognised mount name)";
 
-function metricsFrom(o: InspectionObservation, ctx: TimeContext): NonNullable<AiServerInput["metrics"]> {
+function metricsFrom(
+  o: InspectionObservation,
+  ctx: TimeContext,
+  important: readonly string[],
+): NonNullable<AiServerInput["metrics"]> {
   const h = o.host;
   const mem = h.memory.status === "ok" ? h.memory.value : null;
   const memoryUsedPercent =
@@ -166,23 +179,41 @@ function metricsFrom(o: InspectionObservation, ctx: TimeContext): NonNullable<Ai
             usedPercent: e.usedPercent,
           }))
         : null,
+    inodes:
+      h.inodes.status === "ok"
+        ? h.inodes.value.entries.slice(0, 8).map((e) => ({
+            mount: isSafeMountPath(e.mount) && e.mount.length <= 64 ? e.mount : UNRECOGNISED_MOUNT,
+            usedPercent: e.usedPercent,
+          }))
+        : null,
     pendingUpdates: o.packages.pendingCount.status === "ok" ? o.packages.pendingCount.value : null,
     packageLists:
       o.packages.metadataUpdatedAt.status === "ok" ? localTime(o.packages.metadataUpdatedAt.value, ctx) : null,
     rebootRequired: o.packages.rebootRequired.status === "ok" ? o.packages.rebootRequired.value : null,
     failedUnits,
+    importantServicesFailed:
+      o.services.failedUnits.status === "ok"
+        ? important.filter((name) => o.services.failedUnits.status === "ok" && o.services.failedUnits.value.units.some((u) => u.nameValid && u.unit === name))
+        : null,
   };
 }
 
 /** Rebuild the model input from scratch. Nothing is copied wholesale. */
+/** Only well-formed unit names, at most 20. */
+function importantFrom(server: ExplainableServer): string[] {
+  return (server.importantServices ?? []).filter((n) => isSafeUnitName(n) && n.length <= 100).slice(0, 20);
+}
+
 export function buildAiInput(server: ExplainableServer, ctx: TimeContext): AiServerInput {
+  const important = importantFrom(server);
   const attemptAt = server.latestAttempt === null ? null : localTime(server.latestAttempt.at, ctx);
   return AiServerInputSchema.parse({
     server: {
       name: SERVER_NAME.test(server.name) ? server.name : "(unnamed server)",
-      role: server.role !== null && SERVER_NAME.test(server.role) ? server.role : null,
+      role: server.role !== null && ROLE.test(server.role) ? server.role : null,
       production: server.production,
       access: server.access,
+      importantServices: important,
     },
     status: oneOf(server.status, KNOWN_STATUSES, "unknown"),
     observed: localTime(server.observedAt, ctx),
@@ -207,7 +238,7 @@ export function buildAiInput(server: ExplainableServer, ctx: TimeContext): AiSer
             total: server.coverage.total,
             unavailableChecks: server.coverage.unavailable.map((u) => u.check).filter((c) => KNOWN_CHECKS.has(c)),
           },
-    metrics: server.observation === null ? null : metricsFrom(server.observation, ctx),
+    metrics: server.observation === null ? null : metricsFrom(server.observation, ctx, important),
     findings: server.findings
       .slice(0, 20)
       .map((f) => ({ severity: f.severity, rule: RULE_ID.test(f.rule) ? f.rule : "unknown.v1" })),

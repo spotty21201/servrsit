@@ -53,3 +53,28 @@ test("T-047: each identity reaches ssh only as '-i <path>' with IdentitiesOnly=y
     assert.ok(argv.includes("IdentityAgent=none"), h.name);
   }
 });
+
+// ---- T-050: founder roles (ADR-015) and important services ---------------------
+
+test("T-050: roles and production flags are the founder's (ADR-015)", async () => {
+  const hosts = Object.fromEntries((await loadFleetConfig()).hosts.map((h) => [h.name, h]));
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(hosts).map(([n, h]) => [n, [h.role, h.production]])),
+    {
+      Timika: ["Client-facing VPS (Europe)", true],
+      Nabire: ["Development server", false],
+      Sentani: ["Personal server (Hermes), limited resources", false],
+      Merauke: ["Development server (dev host)", false],
+    },
+  );
+  for (const h of Object.values(hosts)) assert.deepEqual(h.importantServices, [], `${h.name}: none selected yet`);
+});
+
+test("T-050: important services are plain unit names; a bare name means .service", () => {
+  const base = { id: "11111111-1111-4111-a111-111111111111", name: "One", access: "local", role: null, production: true, collect: true };
+  const ok = FleetConfigSchema.parse({ healthIntervalMinutes: 15, hosts: [{ ...base, importantServices: ["nginx", "postgresql.service", "backup.timer"] }] });
+  assert.deepEqual(ok.hosts[0]!.importantServices, ["nginx.service", "postgresql.service", "backup.timer"]);
+  for (const bad of ["nginx; rm -rf /", "a b", "$(reboot)", "x".repeat(250)]) {
+    assert.throws(() => FleetConfigSchema.parse({ healthIntervalMinutes: 15, hosts: [{ ...base, importantServices: [bad] }] }), bad);
+  }
+});

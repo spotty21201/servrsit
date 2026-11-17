@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { AssistantResponder, CHANGE_REQUEST_ANSWER, createOpenAiProvider, SECRET_ANSWER } from "@servrsit/ai";
+import { FACT_MISMATCH_NOTICE } from "./assistant.js";
 import { AssistantErrorSchema, AssistantResponseSchema } from "@servrsit/contracts";
 import { buildServer } from "../server.js";
 import { FleetConfigSchema } from "../fleet/config.js";
@@ -104,14 +105,14 @@ async function start(opts: { ai?: Mock | null; timeoutMs?: number } = {}) {
 // ---- contract ------------------------------------------------------------
 
 test("a question with a working AI: 200, source ai, returned model, evidence, notice", async () => {
-  const ai = await mockAi(() => reply("Alpha is fresh with two pending updates. Beta is not being collected."));
+  const ai = await mockAi(() => reply("Alpha has no pending updates. Beta is not being collected."));
   const { app, ask } = await start({ ai });
   const r = await ask({ message: "Which servers have pending updates?", scope: "all" });
   assert.equal(r.statusCode, 200);
   const body = AssistantResponseSchema.parse(r.json());
   assert.equal(body.source, "ai");
   assert.equal(body.model, "cb/deepseek-v4.1-flash");
-  assert.equal(body.answer, "Alpha is fresh with two pending updates. Beta is not being collected.");
+  assert.equal(body.answer, "Alpha has no pending updates. Beta is not being collected.");
   assert.deepEqual(body.evidence, [{ serverId: ALPHA, observedAt: "2026-11-17T08:00:00.000Z" }], "only servers with an observation are evidence");
   assert.match(body.notice ?? "", /AI-generated explanation/);
   assert.equal(r.headers["cache-control"], "no-store");
@@ -480,5 +481,74 @@ test("DEF-L1: /api/fleet tells the UI which zone the answers use", async () => {
     assert.equal(fleet.ownerTimeZone, "Asia/Jakarta");
   } finally {
     await app.close();
+  }
+});
+
+// ---- T-050: owner context reaches the model after the fixed rules ----------------
+
+test("T-050 via the route: the model gets the fixed rules, then the owner context; a secret-bearing file gives fixed rules only", async () => {
+  const { ASSISTANT_SYSTEM_PROMPT } = await import("@servrsit/ai");
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "servrsit-oc-route-"));
+  const good = join(dir, "good.md");
+  const bad = join(dir, "bad.md");
+  writeFileSync(good, "## Voice\nPlain English.\n");
+  writeFileSync(bad, "## Voice\nPlain.\ntoken: abcdef0123456789\n");
+
+  for (const [path, expectOwner] of [[good, true], [bad, false]] as const) {
+    const ai = await mockAi(() => reply("Alpha looks fine."));
+    const service = new FleetService({ config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }) });
+    await service.refreshAll();
+    const assistant = new AssistantResponder(createOpenAiProvider({ baseUrl: ai.baseUrl, apiKey: FAKE_KEY, model: "m", timeoutMs: 1500 }), "not_configured");
+    const app = await buildServer({ config, fleetService: service, startChecks: false, logger: false, assistant, ownerContextPath: path });
+    try {
+      await app.inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "How is Alpha?", scope: "all" }) });
+      const system = (JSON.parse(ai.bodies[0]!) as { messages: Array<{ content: string }> }).messages[0]!.content;
+      assert.ok(system.startsWith(ASSISTANT_SYSTEM_PROMPT), "fixed rules first");
+      assert.equal(system.includes("<owner_context>"), expectOwner, path);
+      if (expectOwner) assert.ok(system.includes("Plain English."));
+      assert.equal(system.includes("abcdef0123456789"), false);
+    } finally {
+      await app.close();
+      await ai.close();
+    }
+  }
+});
+
+// ---- T-051: the reply is fact-checked before it is shown --------------------------
+
+test("T-051 via the route: a reply that does not match the checks is withheld with the exact notice; only the mismatch type is logged", async () => {
+  const wrong = "Alpha has 5 pending updates and needs a reboot.";
+  const ai = await mockAi(() => reply(wrong));
+  const { app, ask, log } = await start({ ai });
+  try {
+    const body = AssistantResponseSchema.parse((await ask({ message: "Any updates on Alpha?", scope: "all" })).json());
+    assert.equal(body.source, "deterministic");
+    assert.equal(body.model, null);
+    assert.equal(body.notice, "The AI answer did not match the latest checks, so here are the checks directly.");
+    assert.equal(FACT_MISMATCH_NOTICE, body.notice);
+    assert.match(body.answer, /^Alpha: stale\./, "the deterministic checks are shown instead");
+    assert.equal(body.answer.includes(wrong), false);
+    assert.ok(log().includes('"reason":"fact_mismatch"'));
+    assert.ok(log().includes('"factMismatch":"pending_updates"'));
+    assert.equal(log().includes("5 pending updates"), false, "the withheld reply is not logged");
+  } finally {
+    await app.close();
+    await ai.close();
+  }
+});
+
+test("T-051 via the route: a correct reply is shown and logs no mismatch", async () => {
+  const ai = await mockAi(() => reply("Alpha has no pending updates and does not need a reboot."));
+  const { app, ask, log } = await start({ ai });
+  try {
+    const body = AssistantResponseSchema.parse((await ask({ message: "Any updates on Alpha?", scope: "all" })).json());
+    assert.equal(body.source, "ai");
+    assert.ok(log().includes('"factMismatch":null'));
+  } finally {
+    await app.close();
+    await ai.close();
   }
 });

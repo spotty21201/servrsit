@@ -39,6 +39,8 @@ export interface AssistantRouteOptions {
   readonly timeZone: string;
   /** For tests. */
   readonly now?: (() => Date) | undefined;
+  /** The prepared owner-context layer (T-050), or null for none. Read per request. */
+  readonly ownerContext?: (() => string | null) | undefined;
 }
 
 export const SECRET_NOTICE =
@@ -50,6 +52,9 @@ export const AI_SOURCE_NOTICE =
 export const NO_EVIDENCE_NOTICE =
   "No server in this scope has a successful check yet, so this answer has no observations to rely on.";
 
+/** T-051: exact wording from the brief. */
+export const FACT_MISMATCH_NOTICE = "The AI answer did not match the latest checks, so here are the checks directly.";
+
 const UNAVAILABLE_NOTICES: Readonly<Partial<Record<AiUnavailableReason, string>>> = {
   not_configured: "The AI is not configured, so this is a summary of the latest checks instead.",
   provider_disabled: "The AI is switched off, so this is a summary of the latest checks instead.",
@@ -58,6 +63,7 @@ const UNAVAILABLE_NOTICES: Readonly<Partial<Record<AiUnavailableReason, string>>
   quota_or_auth: "The AI refused the request (access or quota), so this is a summary of the latest checks instead.",
   unsafe_output: "The AI's reply was withheld because it looked like a command, so this is a summary of the latest checks instead.",
   unverified_time: "The AI's reply was withheld because it stated a time that was not in the data, so this is a summary of the latest checks instead.",
+  fact_mismatch: FACT_MISMATCH_NOTICE,
 };
 const DEFAULT_UNAVAILABLE_NOTICE = "The AI is unavailable right now, so this is a summary of the latest checks instead.";
 
@@ -119,10 +125,12 @@ export async function assistantRoutes(fastify: FastifyInstance, options: Assista
         return reply.code(429).header("retry-after", String(retry)).send({ error: "RATE_LIMITED" });
       }
 
-      const result = await options.assistant.respond(message, scoped, {
-        timeZone: options.timeZone,
-        now: (options.now ?? (() => new Date()))(),
-      });
+      const result = await options.assistant.respond(
+        message,
+        scoped,
+        { timeZone: options.timeZone, now: (options.now ?? (() => new Date()))() },
+        options.ownerContext?.() ?? null,
+      );
       const usedObservations = result.kind === "question";
       const evidence = usedObservations ? evidenceFor(scoped) : [];
 
@@ -143,6 +151,8 @@ export async function assistantRoutes(fastify: FastifyInstance, options: Assista
           servers: scoped.length,
           source: result.source,
           reason: result.reason,
+          // T-051: the mismatch type only, never the reply text.
+          factMismatch: result.factMismatch,
           httpStatus: result.httpStatus,
           latencyMs: result.latencyMs,
         },
