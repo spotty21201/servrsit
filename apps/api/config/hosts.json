@@ -36,8 +36,7 @@
       "identityFile": "~/.ssh/servrsit/id_ed25519_sentani",
       "role": null,
       "production": true,
-      "collect": false,
-      "collectDisabledReason": "Dedicated ServrSit key configured; waiting for the owner to install it on the server (ADR-014)."
+      "collect": true
     },
     {
       "id": "44444444-4444-4444-a444-444444444444",
