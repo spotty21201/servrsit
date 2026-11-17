@@ -21,16 +21,21 @@ test("an invalid time zone is rejected at load, not discovered in an answer", ()
 
 // ---- T-047: per-host identities ----------------------------------------------
 
-test("T-047: Sentani and Timika use their dedicated keys and stay disabled; Nabire is unchanged", async () => {
+test("T-047: Sentani and Timika use their dedicated keys; Timika is enabled, Sentani waits; Nabire is unchanged", async () => {
   const hosts = Object.fromEntries((await loadFleetConfig()).hosts.map((h) => [h.name, h]));
   for (const name of ["Sentani", "Timika"]) {
     const h = hosts[name]!;
     assert.equal(h.access, "ssh");
     if (h.access !== "ssh") continue;
     assert.equal(h.identityFile, `~/.ssh/servrsit/id_ed25519_${name.toLowerCase()}`, name);
-    assert.equal(h.collect, false, `${name} must stay disabled until the owner installs the key`);
-    assert.match(h.collectDisabledReason ?? "", /waiting for the owner to install it/);
+    assert.equal(h.writesEnabled, false, `${name}: read-only collection only`);
   }
+  // Timika: key installed by the owner and login verified by Orchestrator.
+  assert.equal(hosts["Timika"]!.collect, true);
+  assert.equal(hosts["Timika"]!.collectDisabledReason, undefined);
+  // Sentani: key not installed yet (host offline).
+  assert.equal(hosts["Sentani"]!.collect, false, "Sentani must stay disabled until the owner installs the key");
+  assert.match(hosts["Sentani"]!.collectDisabledReason ?? "", /waiting for the owner to install it/);
   const nabire = hosts["Nabire"]!;
   assert.equal(nabire.access === "ssh" && nabire.identityFile, "~/.ssh/id_ed25519_nabire");
   assert.equal(nabire.collect, true);

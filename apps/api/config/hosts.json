@@ -12,8 +12,7 @@
       "identityFile": "~/.ssh/servrsit/id_ed25519_timika",
       "role": null,
       "production": true,
-      "collect": false,
-      "collectDisabledReason": "Dedicated ServrSit key configured; waiting for the owner to install it on the server (ADR-014)."
+      "collect": true
     },
     {
       "id": "22222222-2222-4222-a222-222222222222",
