@@ -341,3 +341,155 @@ herdr pane read w1:p5 --source recent-unwrapped --lines 60
 git add apps/web docs/team/handoff-designer-m2c.md
 git commit -m "T-018 round 7: denser spacing, 3-line chat"
 ```
+
+---
+
+# T-040 addendum — Merauke card, per-card data-source badge, unverified-host state
+
+**Status: code written. NOT built, NOT run, NOT committed.** I still have no shell or network tool, so I couldn't build, read pane w1:p5, or commit on `feat/designer/overview-v3`. Round 7 was finished (in code) before this started. Not touched: `apps/api`, `packages/ssh`, `packages/ai`, `packages/contracts`.
+
+## Changed files
+
+| Path | Change |
+|---|---|
+| `packages/ui/src/tokens/colors.css`, `packages/ui/src/index.ts` | **New identity color `--color-bubblegum: #FFA3D7`** (CSS + TS mirror). Identity only, never health. |
+| `apps/web/src/fixtures/overview.ts` | New `DataSource = "fixture" \| "live"` type and a required `source` field on `ServerFixture` (all four are `"fixture"`). `ServerEmblemVariant` gains `"bubblegum"`. `ServerCardState` gains `"unverified-host"`. `primaryAction` gains `"verify-host"`. **Merauke** added: Dev host, non-production, bubblegum, fresh, 3 services healthy, checked 3 minutes ago. `serversChecked` 2 → 3. New exported, **not rendered** `unverifiedHostExample` (Wamena) to preview the new state. |
+| `components/server-card/ServerCard.tsx` | `SourceBadge` in the meta row (after role and Production) on every card: pixel icon + text **"Fixture"** or **"Live"** + sr-only "Data source:". Unverified host: lock icon on the badge, **no Historical chip**, and "Not checked yet" instead of a timestamp (`lastHealthCheckAt === null`). Historical now shows only when an older result exists. |
+| `components/server-card/ServerCard.module.css` | `.sourceBadge` styles. Comment documenting how unverified-host differs from unreachable. |
+| `components/server-card/PixelServerIcon.tsx` | `bubblegum` fill. Same 16×16 rack drawing. Merauke is distinguished by its identity color, not a new shape. |
+| `components/StatusBadge/StatusBadge.tsx` | Optional `icon="lock"` (pixel padlock). |
+
+## Unverified host vs unreachable
+
+| | Unreachable (Sentani) | Unverified host (example) |
+|---|---|---|
+| Badge | grey "unknown" pair, question icon, "Unreachable from ServrSit" | amber "attention" pair, **lock** icon, "Host key not verified" |
+| Finding | Historical chip + last known result | "Not contacted: host key not verified yet", no chip |
+| Check row | "Last successful check 2 hours ago" | "Not checked yet" |
+| Border | dashed | solid |
+| Action | Check connection | Verify host key |
+
+**Why amber "attention", not grey:** nothing failed. An owner action is outstanding before ServrSit is allowed to connect. The difference never relies on color alone: the label, icon, text, border and action all differ.
+
+## Contrast (new pairs)
+
+| Pair | Ratio |
+|---|---|
+| Ink on Bubblegum `#FFA3D7` (icon outline, card shadow is decorative) | 8.42 |
+| Bubblegum vs white | ~1.9, decorative; the icon shape is carried by the Ink outline (15.41) |
+| FIXTURE badge: `#344FA3` on `#E7ECFF` | 6.39 |
+| LIVE badge: Ink on white | 15.41 |
+| Lock badge: attention pair `#794A00` on `#FFF0CE` | 6.66 |
+
+The source badge text is 11 px, below the 12 px used elsewhere. It's uppercase monospace semibold and meets 4.5:1, but it's small: check readability.
+
+## For the Orchestrator (decisions to record — I don't own `docs/decisions/`)
+
+1. **New palette color Bubblegum `#FFA3D7`** as the 4th server identity color. Design steering lists a fixed palette, so this needs approval and a decision-log entry. A 5th+ server will need more identity colors (or icon shapes): an open design question.
+2. **`unverified-host` card state and `source` field** are web-local fixture types. When `packages/contracts` gets a server-summary schema, Coder should add both: `source` and a host-key state. Contracts already has `hostKeyTrust: "trusted" | "changed" | "unverified"`, so the card state can derive from it. This boundary needs agreeing with Coder.
+3. Note: `hostKeyTrust: "changed"` (key mismatch) is a different, more serious state than "unverified". It isn't designed yet and should probably use the failed/critical treatment.
+
+## Layout
+
+- ≥1300 px: 4 cards fill one row exactly (the empty 4th slot from round 6 is gone).
+- 1024–1299 px: 3 + 1 (two rows). 768–1023: 2 + 2. ≤767: 4 stacked.
+- Mobile: the meta row (`flex-wrap`) may now wrap to 2 lines on narrow cards (role + Production + Fixture). No horizontal overflow added: the badge is `nowrap` but small (~60 px) inside a wrapping row. A grep shows no `100vw`; the only `100vh` is the existing dvh fallback.
+- Fit at 1440×900: one card row, as before, so still ≈ 714 px (calculated).
+
+## Not verified (no browser)
+
+- Build and Vite pane output.
+- How Merauke's bubblegum icon and shadow look next to the other three.
+- Readability of the 11 px FIXTURE badge, and whether the meta row wraps acceptably at 263 px cards and on mobile.
+- The unverified-host card. No rendered fixture uses it; swap `unverifiedHostExample` into `servers` to see it.
+- Screen-reader output for the badge ("Data source: Fixture").
+- Mobile `scrollWidth === innerWidth` at 390 and 320 px.
+
+## To close (T-040)
+
+```bash
+git switch feat/designer/overview-v3
+pnpm -F @servrsit/web run build 2>&1 | tail -20
+herdr pane read w1:p5 --source recent-unwrapped --lines 60
+git add apps/web packages/ui docs/team/handoff-designer-m2c.md
+git commit -m "T-040: Merauke card, per-card data-source badge, unverified-host state"
+```
+
+---
+
+# T-045 addendum — usable chat box (stubbed client)
+
+**Status: code written in apps/web only. NOT built, NOT run, NOT committed.** I have no shell or network tool, so I couldn't build, read pane w1:p5, or commit on `feat/designer/overview-v3`. I didn't create `apps/web/src/api/assistant.ts` (Coder owns it), and didn't touch apps/api.
+
+## Changed files
+
+| Path | Change |
+|---|---|
+| `src/api/assistant.stub.ts` (new, temporary) | `askAssistant(message, scope, signal)` stub. 600 ms delay, honours abort, enforces 1–2000 chars (`INVALID_INPUT`). Returns `source: "deterministic"`, `model: null`, evidence from fixture servers in scope, `notice: "[FIXTURE] stub reply"`. Defines the contract types and `AssistantError`. **Stub-only test hooks:** a message containing `/ratelimit` → `RATE_LIMITED`; `/fail` → `NETWORK`. |
+| `src/api/assistantClient.ts` (new) | Single import point: `export * from "./assistant.stub.js";`. **The swap is this one line** → `export * from "./assistant.js";`. |
+| `components/overview/ChatBar.tsx` | Rewritten: form; Enter sends, Shift+Enter newline, no send during IME composition; Send disabled only when the message is empty or a request is in flight (then shows "Sending…", `aria-busy`); scope `<select>` (All servers + each server); answer panel; inline errors; draft kept on error, cleared on success; in-flight request aborted on unmount. The "not connected in this mockup" note is replaced by "Enter to send · Shift+Enter for a new line". The stub's notice now labels each answer. |
+| `components/overview/ChatBar.module.css` | Panel, error, select-as-chip and disabled/sending styles. The 3-row console is unchanged. |
+| `components/overview/OverviewScreen.tsx` | Passes `servers` (id + name) to ChatBar for the scope chip. |
+
+## What Coder's `assistant.ts` must export (same names as the stub)
+
+- `askAssistant(message: string, scope: "all" | string, signal?: AbortSignal): Promise<AssistantResponse>`
+- `class AssistantError extends Error { code: "INVALID_INPUT" | "RATE_LIMITED" | "NETWORK" | "UNKNOWN" }`. 400 → INVALID_INPUT, 429 → RATE_LIMITED, network failure → NETWORK, anything else → UNKNOWN.
+- An abort must reject with the platform `AbortError` (`DOMException`), which the UI ignores. It must not reject with an `AssistantError`.
+- Types: `AssistantScope`, `AssistantResponse` (`answer`, `source`, `model`, `evidence[]`, `notice`), `AssistantEvidence` (`serverId`, `observedAt`), `AssistantErrorCode`.
+- AI failure is a 200 with `source: "deterministic"` plus a notice, not an error. The UI shows the notice.
+
+## Answer panel
+
+- Sits just above the console. Max height ≈ 6 lines (`6 × 1.3em` at 14 px + padding ≈ 125 px). Scrolls internally (`overscroll-behavior: contain`). `tabIndex=0` with `role="region"`, "ServrSit answer". It sits inside an always-mounted `aria-live="polite"` slot, so the first answer is announced too.
+- Shows:
+  - an **AI** (Lilac) or **Deterministic** (white) tag. The text carries the meaning; the color is brand, not health.
+  - the model name when the source is AI.
+  - the **scope it answered for**. If the chip is changed afterwards, the old answer still says which scope it was for (UX Spec §9).
+  - the answer as plain text (`pre-wrap`).
+  - "Based on" evidence: server name (falls back to the id) · observed `<time>` in the browser locale.
+  - the notice.
+- Answer and notice are untrusted strings, rendered as text only (React escapes them). Nothing in the panel can approve or run anything.
+- Remounts per answer, so scrolling starts at the top.
+
+## Errors (inline, `role="alert"`, never a toast)
+
+| Code | Text |
+|---|---|
+| INVALID_INPUT | "That question can't be sent. Use 1–2000 characters." |
+| RATE_LIMITED | "Too many questions right now. Wait a moment, then try again." |
+| NETWORK | "ServrSit couldn't be reached. Your question is kept; try again." |
+| other | "ServrSit couldn't answer that. Your question is kept; try again." |
+
+The textarea gets `aria-invalid` and `aria-describedby` pointing at the error. `maxLength=2000` stops longer input at the field. Note that `maxLength` counts UTF-16 units, so emoji count as 2 and the server's "chars" may differ slightly. Coder and the API should agree on this.
+
+## Tap targets and contrast
+
+- Send: at least 44×44 (it widens for "Sending…"). The scope select is 28 px with a mouse and **44 px on touch screens** (`pointer: coarse`).
+- Error text `#A32F2B` on `#FDE7E5`: 5.92. Disabled Send (unknown pair): 6.20. Tags: Ink on Lilac 8.65, Ink on white 15.41. 12 px muted meta on white: 6.39.
+
+## Anchoring
+
+The panel and error are `width: 100%`, `min-width: 0` inside the existing 600 px column. Text uses `overflow-wrap: anywhere`; only the tiny tag is `nowrap`. Nothing is fixed or sticky, so the panel grows the page downward only. A grep shows no `100vw`; the only `100vh` is the existing dvh fallback.
+
+## Not verified (no browser)
+
+- Build and Vite pane output.
+- Typing, Enter / Shift+Enter, and IME (e.g. Japanese input) not sending mid-composition.
+- **Mobile:** Enter on a phone keyboard sends, so a newline needs Shift, which soft keyboards rarely offer. Many chat apps make Enter insert a newline on touch devices. That's a product choice for the founder; the brief said Enter sends.
+- Screen-reader announcement of the answer (live region + region inside it), and that the error is announced once.
+- The 6-line cap and internal scroll; the select chip's look on Android Chrome (`appearance: none` plus the gradient caret).
+- That long answers and long server ids wrap without horizontal overflow at 390 and 320 px.
+- The real API: only the stub exists. Behaviour with Coder's client (aborts, error mapping) is untested.
+
+## To close (T-045)
+
+```bash
+git switch feat/designer/overview-v3
+pnpm -F @servrsit/web run build 2>&1 | tail -20
+herdr pane read w1:p5 --source recent-unwrapped --lines 60
+git add apps/web docs/team/handoff-designer-m2c.md
+git commit -m "T-045: usable Ask ServrSit chat with answer panel (stubbed client)"
+# later, when Coder's apps/web/src/api/assistant.ts lands:
+#   edit apps/web/src/api/assistantClient.ts → export * from "./assistant.js";
+```

@@ -14,6 +14,7 @@ const IDENTITY_FILL: Record<ServerEmblemVariant, string> = {
   lilac: "var(--color-lilac)",
   citron: "var(--color-citron)",
   tangerine: "var(--color-tangerine)",
+  bubblegum: "var(--color-bubblegum)",
 };
 
 // k = Ink outline/slots, f = identity fill, w = white LED, . = transparent

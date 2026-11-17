@@ -34,12 +34,47 @@
   border-style: dashed;
 }
 
+/* "unverified-host" (T-040) is deliberately NOT dashed: nothing was tried and
+   failed, there is no old result. It is distinguished from unreachable by:
+   amber badge with a lock icon and "Host key not verified" (vs grey ? badge
+   "Unreachable from ServrSit"), the explanation "Not contacted: host key not
+   verified yet", "Not checked yet" instead of a timestamp, no Historical
+   chip, and the "Verify host key" action. Solid border, unchanged. */
+
+/* ── Data-source badge (T-040) ──────────────────────────────────────────── */
+
+.sourceBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 var(--space-half);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-small);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;   /* 11px */
+  line-height: 1.125rem;  /* 18px */
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sourceFixture {
+  color: var(--color-state-progress-fg);           /* 6.39:1 on its bg */
+  background-color: var(--color-state-progress-bg);
+}
+
+.sourceLive {
+  color: var(--color-ink);                          /* 15.41:1 */
+  background-color: var(--color-surface);
+}
+
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
 .header {
   display: flex;
   align-items: center;
-  gap: var(--space-1-half);
+  gap: var(--space-1);   /* 8px [12] icon ↔ name */
   min-width: 0;
 }
 
@@ -140,7 +175,7 @@
 .checkRow {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-half);   /* 4px [8] */
   margin: auto 0 0; /* push check + action to the bottom */
   font-size: var(--text-compact-size);
   line-height: var(--text-compact-line-height);

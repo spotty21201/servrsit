@@ -98,7 +98,7 @@ export function OverviewScreen({ data, isFixture }: OverviewScreenProps) {
             <RecentActivity operations={data.recentOperations} />
           </div>
 
-          <ChatBar />
+          <ChatBar servers={data.servers.map((s) => ({ id: s.id, name: s.name }))} />
         </div>
       </main>
     </div>

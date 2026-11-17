@@ -1,4 +1,7 @@
-/* ChatBar — 5-row console on desktop (max 600px), single line on mobile. */
+/* ChatBar — 3-row console (max 600px) + compact answer panel above it (T-045).
+ * Width rules: everything is width 100% / min-width 0 inside a 600px max
+ * column, text wraps (overflow-wrap: anywhere), so neither the panel nor
+ * long answers can push the page sideways. */
 
 .wrap {
   width: 100%;
@@ -9,6 +12,123 @@
   gap: var(--space-1);
   min-width: 0;
 }
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* ── Answer panel ───────────────────────────────────────────────────────── */
+
+.liveSlot {
+  min-width: 0;
+}
+
+.panel {
+  /* ~6 lines of 14px × 1.3 text + padding; scrolls internally */
+  max-height: calc(6 * 1.3em + var(--space-1) * 2);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-control-boundary) transparent;
+  padding: var(--space-1) var(--space-1-half);
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-button);
+  box-shadow: 4px 4px 0 var(--color-lilac);
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+  color: var(--color-ink);
+  min-width: 0;
+}
+
+.panel:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.panelMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-half);
+  margin-bottom: 2px;
+}
+
+.sourceTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-half);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-small);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem; /* 11px */
+  line-height: 1rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Identity/brand accents only — not health colors. Text says AI / Deterministic. */
+.sourceAi  { background-color: var(--color-lilac); }   /* Ink on Lilac 8.65 */
+.sourceDet { background-color: var(--color-surface); } /* Ink on white 15.41 */
+
+.model,
+.panelScope {
+  font-size: 0.75rem;
+  color: var(--color-muted-ink);
+  overflow-wrap: anywhere;
+}
+
+.panelScope::before {
+  content: "· ";
+}
+
+.answer {
+  margin: 0;
+  white-space: pre-wrap;     /* keep the server's line breaks */
+  overflow-wrap: anywhere;   /* long tokens never widen the panel */
+}
+
+.evidence,
+.notice {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: var(--color-muted-ink);
+  overflow-wrap: anywhere;
+}
+
+.evidenceLabel,
+.noticeLabel {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-ink);
+}
+
+.evidenceItem time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Inline error (never a toast) ───────────────────────────────────────── */
+
+.error {
+  margin: 0;
+  padding: var(--space-half) var(--space-1);
+  border: 1.5px solid var(--color-state-failed-fg);
+  border-radius: var(--radius-small);
+  background-color: var(--color-state-failed-bg);
+  color: var(--color-state-failed-fg);  /* 5.92:1 */
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+  overflow-wrap: anywhere;
+}
+
+/* ── Header: label, scope chip, hint ────────────────────────────────────── */
 
 .header {
   display: flex;
@@ -25,25 +145,43 @@
   color: var(--color-ink);
 }
 
+/* Scope chip is a native <select> styled as the Lilac chip. */
 .scope {
-  display: inline-flex;
-  align-items: center;
-  padding: 0 var(--space-1);
+  appearance: none;
+  -webkit-appearance: none;
+  max-width: 100%;
+  min-height: 1.75rem;            /* 28px with a mouse… */
+  padding: 0 1.5rem 0 var(--space-1);
   border: 1.5px solid var(--color-ink);
   border-radius: var(--radius-small);
+  /* pixel caret drawn with gradients (no image file, no hex) */
   background-color: var(--color-lilac);
+  background-image:
+    linear-gradient(var(--color-ink), var(--color-ink)),
+    linear-gradient(var(--color-ink), var(--color-ink));
+  background-repeat: no-repeat;
+  background-size: 6px 2px, 2px 2px;
+  background-position: right 8px center, right 10px calc(50% + 2px);
   color: var(--color-ink);
-  font-size: 0.8125rem; /* 13px */
-  line-height: 1.25rem;
+  font: inherit;
+  font-size: 0.8125rem;           /* 13px */
   font-weight: var(--font-weight-medium);
-  white-space: nowrap;
+  cursor: pointer;
+}
+
+@media (pointer: coarse) {
+  .scope {
+    min-height: var(--touch-target-min); /* …44px on touch screens */
+  }
 }
 
 .note {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   line-height: var(--text-compact-line-height);
   color: var(--color-muted-ink);
 }
+
+/* ── Console ────────────────────────────────────────────────────────────── */
 
 .console {
   display: flex;
@@ -70,7 +208,12 @@
   line-height: var(--text-body-line-height);
   color: var(--color-ink);
   resize: none;
-  /* rows=5 sets the desktop height (~5 × 22px + padding ≈ 126px) */
+  /* rows=3 sets the height on every breakpoint:
+     3 × 20.8px (16px × 1.3) + 16px padding ≈ 78px */
+}
+
+.input:focus {
+  outline: none; /* the console draws the focus ring (:focus-within) */
 }
 
 .input::placeholder {
@@ -78,48 +221,45 @@
   opacity: 1;
 }
 
-.input:disabled {
-  cursor: not-allowed;
-}
-
 .send {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--touch-target-min);
+  min-width: var(--touch-target-min);
   height: var(--touch-target-min);
   margin: var(--space-1);
+  padding: 0 var(--space-1);
   background-color: var(--color-tangerine);
   color: var(--color-ink); /* Ink on Tangerine, never white */
   border: 2px solid var(--color-ink);
   border-radius: var(--radius-small);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
 }
 
+/* Disabled (empty or sending): still clearly a button, visibly inactive.
+   Ink text on the muted fill keeps it readable (no contrast requirement for
+   disabled controls, but we keep it legible anyway). */
 .send:disabled {
   cursor: not-allowed;
+  background-color: var(--color-state-unknown-bg);
+  color: var(--color-state-unknown-fg);
+  border-color: var(--color-state-unknown-fg);
+}
+
+.send.sending {
+  cursor: progress;
+}
+
+.send:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .console:focus-within {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
-}
-
-/* Mobile: keep the round-2 single-line height */
-@media (max-width: 767px) {
-  .console {
-    align-items: stretch;
-  }
-
-  .input {
-    height: 2.75rem;     /* 44px; overrides rows=5 */
-    padding: 0.625rem var(--space-1-half); /* centres one 22px line */
-  }
-
-  .send {
-    height: auto;
-    margin: 0;
-    border-width: 0 0 0 2px;
-    border-radius: 0;
-  }
 }

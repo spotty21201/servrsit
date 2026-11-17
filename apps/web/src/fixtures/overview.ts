@@ -17,7 +17,14 @@ import type { OperationState } from "@servrsit/contracts";
 // Server state types (web-local — full types come from T-007/T-023 API work)
 // ---------------------------------------------------------------------------
 
-export type ServerEmblemVariant = "lilac" | "citron" | "tangerine";
+export type ServerEmblemVariant = "lilac" | "citron" | "tangerine" | "bubblegum";
+
+/**
+ * Where a server card's data comes from (T-040). Shown as a per-card badge.
+ * "fixture" = synthetic data in this file; "live" = an authenticated API
+ * observation. Everything is "fixture" until the API is wired.
+ */
+export type DataSource = "fixture" | "live";
 
 /** Observation-derived status for a single check category. */
 export type CheckStatus =
@@ -33,11 +40,19 @@ export type ServerCardState =
   | "attention"   // Fresh issue detected
   | "unreachable" // Latest connection attempt failed
   | "stale"       // Checks overdue / stale
-  | "working";    // Operation currently running
+  | "working"     // Operation currently running
+  /**
+   * Host key not yet verified by the owner, so ServrSit has NOT contacted the
+   * server at all (T-040). Distinct from "unreachable": there is no historical
+   * result, no failed attempt — just an owner action outstanding.
+   */
+  | "unverified-host";
 
 export interface ServerFixture {
   id: string;
   name: string;
+  /** Data source for this card; drives the FIXTURE / LIVE badge. */
+  source: DataSource;
   /** Short role descriptor: "Database", "Web server", "Build machine", etc. */
   role: string;
   /** Whether this server is classified as production. */
@@ -71,7 +86,7 @@ export interface ServerFixture {
    * Primary action for this card's current state.
    * UX Spec §8.2: "View server / Review updates / Check connection"
    */
-  primaryAction: "view" | "review-updates" | "check-connection";
+  primaryAction: "view" | "review-updates" | "check-connection" | "verify-host";
   /** Label for the primary action button. */
   primaryActionLabel: string;
   /** Route path for the primary action link. */
@@ -135,7 +150,7 @@ const FIXTURE_NOW = "2026-11-15T09:42:00+07:00"; // Asia/Jakarta, morning
 
 export const overviewFixture: FixtureData<OverviewFixture> = asFixture({
   lastObservedAt: "2026-11-15T09:39:00+07:00",
-  serversChecked: 2,
+  serversChecked: 3,
   nextCheckAt: "2026-11-15T09:54:00+07:00",
   nextCheckRelative: "in 12 minutes",
 
@@ -144,6 +159,7 @@ export const overviewFixture: FixtureData<OverviewFixture> = asFixture({
     {
       // Timika — fresh, all checks passed
       id: "srv_timika_fixture",
+      source: "fixture",
       name: "Timika",
       role: "Web server",
       isProduction: true,
@@ -162,6 +178,7 @@ export const overviewFixture: FixtureData<OverviewFixture> = asFixture({
     {
       // Nabire — needs attention, pending package updates
       id: "srv_nabire_fixture",
+      source: "fixture",
       name: "Nabire",
       role: "Database server",
       isProduction: true,
@@ -180,6 +197,7 @@ export const overviewFixture: FixtureData<OverviewFixture> = asFixture({
     {
       // Sentani — unreachable, checks stale
       id: "srv_sentani_fixture",
+      source: "fixture",
       name: "Sentani",
       role: "Build machine",
       isProduction: false,
@@ -194,6 +212,25 @@ export const overviewFixture: FixtureData<OverviewFixture> = asFixture({
       primaryAction: "check-connection",
       primaryActionLabel: "Check connection",
       primaryActionHref: "/servers/srv_sentani_fixture",
+    },
+    {
+      // Merauke — fresh, non-production dev host (T-040)
+      id: "srv_merauke_fixture",
+      source: "fixture",
+      name: "Merauke",
+      role: "Dev host",
+      isProduction: false,
+      emblemVariant: "bubblegum",
+      cardState: "fresh",
+      statusLabel: "All checks passed",
+      statusSemanticKey: "passed",
+      primaryFinding: "No pending updates · 3 services healthy",
+      lastHealthCheckAt: "2026-11-15T09:39:15+07:00",
+      lastHealthCheckRelative: "3 minutes ago",
+      isFresh: true,
+      primaryAction: "view",
+      primaryActionLabel: "View server",
+      primaryActionHref: "/servers/srv_merauke_fixture",
     },
   ],
 
@@ -239,3 +276,28 @@ export const overviewFixture: FixtureData<OverviewFixture> = asFixture({
 
 // Unused but exported to confirm the reference timestamp is in the file
 export { FIXTURE_NOW };
+
+/**
+ * [FIXTURE DATA] Example of the "unverified-host" state (T-040), not rendered
+ * on the Overview (the brief keeps 4 cards). To preview it, replace one entry
+ * in overviewFixture.data.servers with this object.
+ * No timestamps: the server has never been contacted.
+ */
+export const unverifiedHostExample: ServerFixture = {
+  id: "srv_wamena_fixture",
+  source: "fixture",
+  name: "Wamena",
+  role: "New server",
+  isProduction: false,
+  emblemVariant: "lilac",
+  cardState: "unverified-host",
+  statusLabel: "Host key not verified",
+  statusSemanticKey: "attention",
+  primaryFinding: "Not contacted: host key not verified yet",
+  lastHealthCheckAt: null,
+  lastHealthCheckRelative: "never",
+  isFresh: false,
+  primaryAction: "verify-host",
+  primaryActionLabel: "Verify host key",
+  primaryActionHref: "/servers/srv_wamena_fixture/verify",
+};

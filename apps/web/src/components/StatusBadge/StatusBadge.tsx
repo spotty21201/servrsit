@@ -12,6 +12,20 @@ import styles from "./StatusBadge.module.css";
 interface StatusBadgeProps {
   state: CheckStatus;
   label: string;
+  /** Override the default state icon, e.g. "lock" for an unverified host key. */
+  icon?: "lock";
+}
+
+function LockIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
+      <rect x="2" y="0" width="4" height="1" fill="currentColor" />
+      <rect x="1" y="1" width="1" height="3" fill="currentColor" />
+      <rect x="6" y="1" width="1" height="3" fill="currentColor" />
+      <rect x="0" y="3" width="8" height="5" fill="currentColor" />
+      <rect x="3" y="5" width="2" height="2" fill="var(--color-state-attention-bg)" />
+    </svg>
+  );
 }
 
 /** SVG icons for each semantic state — inline for accessibility (no img alt needed separately). */
@@ -58,10 +72,10 @@ function StatusIcon({ state }: { state: CheckStatus }) {
   }
 }
 
-export function StatusBadge({ state, label }: StatusBadgeProps) {
+export function StatusBadge({ state, label, icon }: StatusBadgeProps) {
   return (
     <span className={`${styles.badge} ${styles[state]}`}>
-      <StatusIcon state={state} />
+      {icon === "lock" ? <LockIcon /> : <StatusIcon state={state} />}
       <span>{label}</span>
     </span>
   );
