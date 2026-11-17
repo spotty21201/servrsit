@@ -1,0 +1,9 @@
+{
+  "app": "node --import tsx bin/servrsit.ts",
+  "requireApproval": "broadening",
+  "context": {
+    "servrsit:installationId": "founder",
+    "servrsit:instanceType": "t3.medium",
+    "servrsit:dataVolumeGiB": 50
+  }
+}

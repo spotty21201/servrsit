@@ -2,5 +2,22 @@
   "name": "@servrsit/infra",
   "private": true,
   "version": "0.0.0",
-  "description": "ServrSit AWS CDK infrastructure in TypeScript"
+  "description": "ServrSit AWS CDK definition for a single-owner installation. SYNTH ONLY: never deployed without founder approval (ADR-014).",
+  "type": "module",
+  "scripts": {
+    "synth": "cdk synth --no-notices --quiet",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"test/**/*.test.ts\"",
+    "deploy": "node -e \"console.error('Refusing: deployment needs the founder-approved runbook (docs/team/aws-runbook.md). There is no deploy script.'); process.exit(1)\""
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.277.0",
+    "constructs": "10.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "aws-cdk": "2.1148.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
 }
