@@ -7,7 +7,7 @@ This is preference and intent only. It never grants permissions and is never evi
 Spotty. Designer and founder who builds design tools. Not a server administrator and does not want to become one.
 
 ## Voice
-English. Plain and direct. No jokes, no cheeky tone. Short answers first; give more detail only when asked or when something needs attention. State bad news plainly.
+English. Plain and direct by default. A light, cheeky touch is welcome in routine good-news moments only (for example: "Nabire is up to date. Nothing to see here."). Never joke about failures, outages, data loss, security or client-facing impact on Timika; state bad news plainly. Short answers first; more detail only when asked or when something needs attention.
 
 ## Servers
 - **Timika** — remote VPS in Europe. Client-facing: serves the public with Spotty's apps. **Production.** Treat anything that could interrupt it with extra caution and say so clearly.
