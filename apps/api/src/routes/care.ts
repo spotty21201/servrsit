@@ -1,7 +1,6 @@
 /**
  * Care loop API (T-048, Technical Spec §9, §13). BUILD ONLY.
  *
- *   GET  /api/csrf                       token for the X-CSRF-Token header
  *   POST /api/plans                      {operation, serverId} -> immutable plan v1 (or typed blockers)
  *   POST /api/plans/:id/revisions        new version from current facts (material change)
  *   GET  /api/plans/:id                  latest version
@@ -14,7 +13,9 @@
  * never contacted to prepare a plan. Only simulated servers, injected in code,
  * can be approved and dispatched.
  *
- * Auth is the stub (D3). The owner is fixed until Cognito sessions (T-023).
+ * Auth (T-053): the global guard has already required a session for every
+ * route here, and an allowed Origin plus the session's CSRF token for every
+ * POST. The approving owner is taken from that session.
  */
 
 import { randomUUID } from "node:crypto";
@@ -23,7 +24,6 @@ import { ApprovalRequestSchema, PlanRequestSchema } from "@servrsit/contracts";
 import { buildPlan, type Plan } from "@servrsit/domain";
 import type { ApprovalRejection, CareStore, StoredOperation, TargetKind } from "@servrsit/store";
 import type { WriteTarget } from "@servrsit/worker";
-import { CSRF_HEADER, type CsrfGuard } from "../csrf.js";
 
 export interface CareServer {
   readonly id: string;
@@ -38,8 +38,8 @@ export interface CareRouteOptions {
   readonly store: CareStore;
   readonly servers: () => readonly CareServer[];
   readonly targets: ReadonlyMap<string, WriteTarget>;
-  readonly csrf: CsrfGuard;
-  readonly owner: () => string;
+  /** The signed-in owner for this request (from the session the guard resolved). */
+  readonly owner: (request: FastifyRequest) => string;
   readonly now?: (() => Date) | undefined;
   readonly newId?: (() => string) | undefined;
 }
@@ -105,10 +105,6 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     return plan;
   }
 
-  fastify.get("/api/csrf", async (_request, reply) =>
-    reply.header("cache-control", "no-store").send({ token: o.csrf.token, header: CSRF_HEADER }),
-  );
-
   fastify.post("/api/plans", { bodyLimit: 4096 }, async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = PlanRequestSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply);
@@ -136,7 +132,6 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
   });
 
   fastify.post("/api/plans/:id/approvals", { bodyLimit: 4096 }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
-    if (!o.csrf.check(request.headers)) return reply.code(403).send({ error: "CSRF_INVALID" });
     const parsed = ApprovalRequestSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply);
     const plan = o.store.getPlan(request.params.id);
@@ -148,7 +143,7 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
       planVersion: parsed.data.planVersion,
       planDigest: parsed.data.planDigest,
       idempotencyKey: parsed.data.idempotencyKey,
-      owner: o.owner(),
+      owner: o.owner(request),
       acknowledgements: parsed.data.acknowledgements,
       writesEnabled: server.writesEnabled,
       targetKind: server.kind,

@@ -13,7 +13,7 @@ import { MemoryIntentStore, SqliteCareStore } from "@servrsit/store";
 import { Dispatcher, SimulatedTarget, type WriteTarget } from "@servrsit/worker";
 import { buildServer } from "../server.js";
 import { FleetConfigSchema, loadFleetConfig } from "../fleet/config.js";
-import { CsrfGuard } from "../csrf.js";
+import { enrolOwner, setupTokenSink } from "../auth/testing.js";
 import { FleetService } from "../fleet/service.js";
 import { makeObservation } from "../fleet/observation.fixtures.js";
 
@@ -39,12 +39,13 @@ async function start(opts: { production?: boolean } = {}) {
     now: clock.now, runMs: 1000,
   });
   const store = new SqliteCareStore({ path: join(mkdtempSync(join(tmpdir(), "servrsit-care-")), "care.db") });
-  const csrf = new CsrfGuard();
+  const sink = setupTokenSink();
   const fleet = new FleetService({ config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }) });
   const app = await buildServer({
     config, fleetService: fleet, startChecks: false, logger: false,
+    auth: { onSetupToken: sink.onSetupToken },
     care: {
-      store, csrf, now: clock.now,
+      store, now: clock.now,
       simulated: [{ server: { id: SIM, name: "Sim One", production: opts.production ?? false, kind: "simulated", writesEnabled: true }, target: sim }],
     },
   });
@@ -52,16 +53,20 @@ async function start(opts: { production?: boolean } = {}) {
     store, intents: new MemoryIntentStore(), targets: new Map<string, WriteTarget>([[SIM, sim]]),
     writesEnabled: (id) => id === SIM, signer, installationId: "inst", workerId: "w1", now: clock.now,
   });
-  const post = (url: string, body: unknown, headers: Record<string, string> = {}) =>
-    app.inject({ method: "POST", url, headers: { "content-type": "application/json", ...headers }, payload: JSON.stringify(body) });
+  // T-053: every request here is made by a signed-in owner, through the real setup flow.
+  const owner = await enrolOwner(app, sink.token());
+  const csrf = { token: owner.csrfToken };
   const goodHeaders = { "x-csrf-token": csrf.token, origin: ORIGIN };
+  const post = (url: string, body: unknown, headers: Record<string, string> = goodHeaders) =>
+    app.inject({ method: "POST", url, headers: { "content-type": "application/json", cookie: owner.cookie, ...headers }, payload: JSON.stringify(body) });
+  const get = (url: string) => app.inject({ method: "GET", url, headers: { cookie: owner.cookie } });
   const plan = async (serverId = SIM) => (await post("/api/plans", { operation: "apply.packages.v1", serverId })).json() as {
     id: string; version: number; digest: string; blockers: Array<{ code: string }>; approvable: boolean;
     requiredAcknowledgements: string[]; target: { kind: string; simulated: boolean };
   };
   const approve = (p: { id: string; version: number; digest: string }, over: Record<string, unknown> = {}, headers: Record<string, string> = goodHeaders) =>
     post(`/api/plans/${p.id}/approvals`, { planVersion: p.version, planDigest: p.digest, idempotencyKey: "idem-key-0000000001", acknowledgements: [], ...over }, headers);
-  return { app, clock, store, sim, csrf, dispatcher, post, plan, approve, goodHeaders };
+  return { app, clock, store, sim, csrf, dispatcher, post, get, plan, approve, goodHeaders, owner };
 }
 
 // ---- the hard gate for real servers ------------------------------------------
@@ -100,7 +105,7 @@ test("no API can set writesEnabled: no such routes, and request bodies cannot ca
   const h = await start();
   try {
     for (const [method, url] of [["PATCH", `/api/servers/${NABIRE}`], ["PUT", `/api/servers/${NABIRE}`], ["POST", `/api/servers/${NABIRE}/writes`], ["PATCH", "/api/config"]] as const) {
-      const r = await h.app.inject({ method, url, headers: { "content-type": "application/json", ...h.goodHeaders }, payload: JSON.stringify({ writesEnabled: true }) });
+      const r = await h.app.inject({ method, url, headers: { "content-type": "application/json", cookie: h.owner.cookie, ...h.goodHeaders }, payload: JSON.stringify({ writesEnabled: true }) });
       assert.equal(r.statusCode, 404, `${method} ${url}`);
     }
     assert.equal((await h.post("/api/plans", { operation: "apply.packages.v1", serverId: NABIRE, writesEnabled: true })).statusCode, 400);
@@ -135,7 +140,7 @@ test("simulated: plan -> approve -> dispatch -> verified success, every step lab
     const { operationId, state } = r.json() as { operationId: string; state: string };
     assert.equal(state, "queued");
     for (let i = 0; i < 6; i++) { await h.dispatcher.runOnce(); h.clock.advance(1500); }
-    const view = (await h.app.inject({ method: "GET", url: `/api/operations/${operationId}` })).json() as {
+    const view = (await h.get(`/api/operations/${operationId}`)).json() as {
       operation: { state: string; simulated: boolean; targetKind: string }; events: Array<{ type: string; seq: number }>;
     };
     assert.equal(view.operation.state, "succeeded");
@@ -177,7 +182,7 @@ test("CSRF: a missing or wrong token, a foreign origin and a cross-site request 
       assert.deepEqual([r.statusCode, r.json()], [403, { error: "CSRF_INVALID" }], label);
     }
     assert.equal(h.store.unresolvedFor(SIM), null, "nothing was approved");
-    const token = (await h.app.inject({ method: "GET", url: "/api/csrf" })).json() as { token: string; header: string };
+    const token = (await h.get("/api/csrf")).json() as { token: string; header: string };
     assert.equal(token.token, h.csrf.token);
     assert.equal(token.header, "x-csrf-token");
     assert.equal((await h.approve(p)).statusCode, 201);
@@ -244,8 +249,8 @@ test("invariant 1: chat assent ('yes', 'do it', 'approve the plan') never approv
 test("unknown plans and operations are 404, with no detail", async () => {
   const h = await start();
   try {
-    assert.equal((await h.app.inject({ method: "GET", url: "/api/plans/nope" })).statusCode, 404);
-    assert.equal((await h.app.inject({ method: "GET", url: "/api/operations/nope" })).statusCode, 404);
+    assert.equal((await h.get("/api/plans/nope")).statusCode, 404);
+    assert.equal((await h.get("/api/operations/nope")).statusCode, 404);
     assert.equal((await h.post("/api/plans", { operation: "apply.packages.v1", serverId: "99999999-9999-4999-a999-999999999999" })).statusCode, 404);
     const r = await h.post("/api/plans/nope/approvals", { planVersion: 1, planDigest: `sha256:${"0".repeat(64)}`, idempotencyKey: "idem-key-0000000005", acknowledgements: [] }, h.goodHeaders);
     assert.equal(r.statusCode, 404);

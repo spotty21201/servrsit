@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import { AssistantResponder, CHANGE_REQUEST_ANSWER, createOpenAiProvider, SECRET_ANSWER } from "@servrsit/ai";
 import { FACT_MISMATCH_NOTICE } from "./assistant.js";
 import { AssistantErrorSchema, AssistantResponseSchema } from "@servrsit/contracts";
-import { buildServer } from "../server.js";
+import { signedInServer } from "../auth/testing.js";
 import { FleetConfigSchema } from "../fleet/config.js";
 import { FleetService } from "../fleet/service.js";
 import { makeObservation } from "../fleet/observation.fixtures.js";
@@ -87,19 +87,19 @@ async function start(opts: { ai?: Mock | null; timeoutMs?: number } = {}) {
         { knownSecrets: [FAKE_KEY] },
       )
     : undefined;
-  const app = await buildServer({
+  const { app, inject } = await signedInServer({
     config, fleetService: service, startChecks: false, redactSecrets: [FAKE_KEY],
     logStream: { write: (m: string) => { lines.push(m); } },
     ...(assistant === undefined ? {} : { assistant }),
   });
   const ask = (payload: unknown, raw?: string) =>
-    app.inject({
+    inject({
       method: "POST",
       url: "/api/assistant/messages",
       headers: { "content-type": "application/json" },
       payload: raw ?? JSON.stringify(payload),
     });
-  return { app, ask, log: () => lines.join("") };
+  return { app, inject, ask, log: () => lines.join("") };
 }
 
 // ---- contract ------------------------------------------------------------
@@ -178,8 +178,8 @@ test("exactly 2000 characters is accepted", async () => {
 });
 
 test("a non-JSON content type is rejected as INVALID_INPUT", async () => {
-  const { app } = await start();
-  const r = await app.inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "text/plain" }, payload: "hello" });
+  const { app, inject } = await start();
+  const r = await inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "text/plain" }, payload: "hello" });
   assert.equal(r.statusCode, 400);
   assert.deepEqual(r.json(), { error: "INVALID_INPUT" });
   await app.close();
@@ -388,26 +388,26 @@ test("the assistant route does not change the fleet: no collection is triggered"
   });
   await service.refreshAll();
   const before = collections;
-  const app = await buildServer({ config, fleetService: service, startChecks: false, logger: false });
-  await app.inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "How is Alpha?", scope: "all" }) });
+  const { app, inject } = await signedInServer({ config, fleetService: service, startChecks: false, logger: false });
+  await inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "How is Alpha?", scope: "all" }) });
   assert.equal(collections, before);
   await app.close();
 });
 
 test("other routes keep Fastify's normal error handling (the assistant handler is scoped)", async () => {
-  const { app } = await start();
-  const r = await app.inject({ method: "GET", url: "/does-not-exist" });
+  const { app, inject } = await start();
+  const r = await inject({ method: "GET", url: "/does-not-exist" });
   assert.equal(r.statusCode, 404);
   assert.notDeepEqual(r.json(), { error: "INVALID_INPUT" });
   await app.close();
 });
 
 test("fixture mode: evidence matches the fixture servers that have observations (T-044 / D5 consistency)", async () => {
-  const app = await buildServer({ mode: "fixture", startChecks: false, logger: false });
+  const { app, inject } = await signedInServer({ mode: "fixture", startChecks: false, logger: false });
   try {
-    const r = await app.inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "How is the fleet?", scope: "all" }) });
+    const r = await inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "How is the fleet?", scope: "all" }) });
     const body = AssistantResponseSchema.parse(r.json());
-    const fleet = (await app.inject({ method: "GET", url: "/api/fleet" })).json() as { servers: Array<{ id: string; observedAt: string | null; observation: unknown }> };
+    const fleet = (await inject({ method: "GET", url: "/api/fleet" })).json() as { servers: Array<{ id: string; observedAt: string | null; observation: unknown }> };
     // Fixture timestamps are relative to "now" for each request, so the two
     // requests differ by milliseconds. Compare servers, and times loosely.
     const expected = fleet.servers.filter((s) => s.observation !== null);
@@ -436,15 +436,15 @@ async function startAt(ai: Mock, nowIso: string) {
     createOpenAiProvider({ baseUrl: ai.baseUrl, apiKey: FAKE_KEY, model: "deepseek-v4.1-flash", timeoutMs: 1500 }),
     "not_configured",
   );
-  const app = await buildServer({ config, fleetService: service, startChecks: false, logger: false, assistant, now: () => new Date(nowIso) });
-  return app;
+  const { app, inject } = await signedInServer({ config, fleetService: service, startChecks: false, logger: false, assistant, now: () => new Date(nowIso) });
+  return { app, inject };
 }
 
 test("DEF-L1 via the route: the model gets Asia/Jakarta local times and no raw UTC; a '17:10' reply is withheld", async () => {
   const ai = await mockAi(() => reply("Alpha's last check succeeded at 17:10."));
-  const app = await startAt(ai, "2026-11-17T17:22:00.000Z");
+  const { app, inject } = await startAt(ai, "2026-11-17T17:22:00.000Z");
   try {
-    const r = await app.inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "When was Alpha checked?", scope: ALPHA }) });
+    const r = await inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "When was Alpha checked?", scope: ALPHA }) });
     const body = AssistantResponseSchema.parse(r.json());
     const user = (JSON.parse(ai.bodies[0]!) as { messages: Array<{ content: string }> }).messages[1]!.content;
     assert.equal(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(user), false, "no ISO timestamp in what the model saw");
@@ -462,9 +462,9 @@ test("DEF-L1 via the route: the model gets Asia/Jakarta local times and no raw U
 
 test("DEF-L1 via the route: a reply quoting the local time is shown", async () => {
   const ai = await mockAi(() => reply("Alpha was last checked at 00:10 (11 min ago)."));
-  const app = await startAt(ai, "2026-11-17T17:22:00.000Z");
+  const { app, inject } = await startAt(ai, "2026-11-17T17:22:00.000Z");
   try {
-    const r = await app.inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "When was Alpha checked?", scope: ALPHA }) });
+    const r = await inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "When was Alpha checked?", scope: ALPHA }) });
     const body = AssistantResponseSchema.parse(r.json());
     assert.equal(body.source, "ai");
     assert.equal(body.answer, "Alpha was last checked at 00:10 (11 min ago).");
@@ -475,9 +475,9 @@ test("DEF-L1 via the route: a reply quoting the local time is shown", async () =
 });
 
 test("DEF-L1: /api/fleet tells the UI which zone the answers use", async () => {
-  const { app } = await start();
+  const { app, inject } = await start();
   try {
-    const fleet = (await app.inject({ method: "GET", url: "/api/fleet" })).json() as { ownerTimeZone: string };
+    const fleet = (await inject({ method: "GET", url: "/api/fleet" })).json() as { ownerTimeZone: string };
     assert.equal(fleet.ownerTimeZone, "Asia/Jakarta");
   } finally {
     await app.close();
@@ -502,9 +502,9 @@ test("T-050 via the route: the model gets the fixed rules, then the owner contex
     const service = new FleetService({ config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }) });
     await service.refreshAll();
     const assistant = new AssistantResponder(createOpenAiProvider({ baseUrl: ai.baseUrl, apiKey: FAKE_KEY, model: "m", timeoutMs: 1500 }), "not_configured");
-    const app = await buildServer({ config, fleetService: service, startChecks: false, logger: false, assistant, ownerContextPath: path });
+    const { app, inject } = await signedInServer({ config, fleetService: service, startChecks: false, logger: false, assistant, ownerContextPath: path });
     try {
-      await app.inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "How is Alpha?", scope: "all" }) });
+      await inject({ method: "POST", url: "/api/assistant/messages", headers: { "content-type": "application/json" }, payload: JSON.stringify({ message: "How is Alpha?", scope: "all" }) });
       const system = (JSON.parse(ai.bodies[0]!) as { messages: Array<{ content: string }> }).messages[0]!.content;
       assert.ok(system.startsWith(ASSISTANT_SYSTEM_PROMPT), "fixed rules first");
       assert.equal(system.includes("<owner_context>"), expectOwner, path);

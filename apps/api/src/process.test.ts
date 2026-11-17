@@ -15,6 +15,8 @@ import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const apiDir = join(here, "..");
@@ -55,7 +57,8 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
     const port = await freePort();
     const child = spawn(process.execPath, ["--import", tsxLoader, "src/index.ts"], {
       cwd: apiDir,
-      env: { ...process.env, PORT: String(port), SERVRSIT_FLEET_MODE: "fixture", AI_PROVIDER: "none" },
+      // T-053: the auth database goes to a temp file, never the real apps/api/.data.
+      env: { ...process.env, PORT: String(port), SERVRSIT_FLEET_MODE: "fixture", AI_PROVIDER: "none", SERVRSIT_AUTH_DB: join(mkdtempSync(join(tmpdir(), "servrsit-proc-")), "auth.db") },
       stdio: ["ignore", "pipe", "pipe"],
     });
     // Deliberately never read stdout/stderr: the pipes fill and stall.
