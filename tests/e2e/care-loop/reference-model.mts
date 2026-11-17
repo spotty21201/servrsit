@@ -42,6 +42,7 @@ export type Mutant =
   | "leaseExpiryUnblocks" | "reconcileRedispatches" | "stopKills" | "stopCancelsQueuedWithoutQuery"
   | "writesGateMissing" | "writesGateApproveOnly" | "clientOverride" | "assistantApproves"
   | "defaultWritesTrue"
+  | "onlyPackages"
   /** Design variant, NOT a fault: planning itself refuses write-disabled servers. Spec allows both (FR-10). */
   | "planBlocksOnWrites";
 
@@ -50,6 +51,7 @@ interface Txn { packages: string[]; deps: string[]; removals: string[]; candidat
 class Sim implements TargetSim {
   partitioned = false;
   drop: null | "before-acceptance" | "after-acceptance" = null;
+  thenPartition = false;
   hold = false;
   kills = 0;
   readonly led = new Map<string, { opId: string; state: string; digest: string }>();
@@ -81,7 +83,11 @@ class Sim implements TargetSim {
       this.led.set(m.opId, { opId: m.opId, state: "done", digest: m.digest });
       this.muts.push({ opId: m.opId, kind: m.kind });
     }
-    if (this.drop === "after-acceptance") { this.drop = null; return "lost"; }
+    if (this.drop === "after-acceptance") {
+      this.drop = null;
+      if (this.thenPartition) { this.partitioned = true; this.thenPartition = false; }
+      return "lost";
+    }
     return "accepted";
   }
 
@@ -90,7 +96,9 @@ class Sim implements TargetSim {
   async ledger(): Promise<LedgerEntry[]> { return [...this.led.values()].map((e) => ({ opId: e.opId, state: e.state })); }
   async killSignals() { return this.kills; }
   async partition(on: boolean) { this.partitioned = on; }
-  async dropNextAck(when: "before-acceptance" | "after-acceptance") { this.drop = when; }
+  async dropNextAck(when: "before-acceptance" | "after-acceptance", opts?: { thenPartition?: boolean }) {
+    this.drop = when; this.thenPartition = opts?.thenPartition === true;
+  }
   async changeTransaction(how: "add-dependency" | "new-candidate-version" | "add-removal") {
     if (how === "add-dependency") this.txn.deps.push(`libnew${this.txn.deps.length}`);
     else if (how === "new-candidate-version") this.txn.candidate += 1;
@@ -122,6 +130,9 @@ const fail = <T = never,>(status: number, code: string): Res<T> => ({ ok: false,
 
 export class ReferenceModel implements Harness {
   readonly name: string;
+  get kinds(): readonly Kind[] {
+    return this.has("onlyPackages") ? ["packages"] : ["packages", "restart-service", "reboot", "prepare-directories"];
+  }
   private now = Date.parse("2026-01-01T00:00:00Z");
   private readonly servers = new Map<string, Srv>();
   private readonly sims = new Map<string, Sim>();
@@ -162,6 +173,7 @@ export class ReferenceModel implements Harness {
 
   // ---- plans ----
   async createPlan(i: { serverId: string; kind: Kind }): Promise<Res<PlanView>> {
+    if (!this.kinds.includes(i.kind)) return fail(400, "INVALID_INPUT");
     const s = this.srv(i.serverId); const t = this.sim(s);
     if (t.partitioned) return fail(503, "ROUTE_UNAVAILABLE");
     const blockers: string[] = [];

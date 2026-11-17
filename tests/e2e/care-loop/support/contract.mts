@@ -123,8 +123,11 @@ export interface TargetSim {
   /** Number of kill / force-stop signals the target received for any transaction. */
   killSignals(): Promise<number>;
   partition(on: boolean): Promise<void>;
-  /** Lose exactly the next acknowledgement (or the request itself) once. */
-  dropNextAck(when: "before-acceptance" | "after-acceptance"): Promise<void>;
+  /**
+   * Lose exactly the next acknowledgement (or the request itself) once.
+   * `thenPartition` also takes the route down right after, as when a connection dies mid-operation.
+   */
+  dropNextAck(when: "before-acceptance" | "after-acceptance", opts?: { thenPartition?: boolean }): Promise<void>;
   /** Change what the package transaction would now be (Technical Spec §10.2 step 5). */
   changeTransaction(how: "add-dependency" | "new-candidate-version" | "add-removal"): Promise<void>;
   /** While on, an accepted transaction stays open (running) until completeHeldTransaction(). */
@@ -134,6 +137,8 @@ export interface TargetSim {
 
 export interface Harness {
   readonly name: string;
+  /** Change kinds the system under test implements. The PRD requires all four for Stage A. */
+  readonly kinds: readonly Kind[];
 
   // ----- public API surface (Technical Spec §13) -----
   addServer(o: {
@@ -177,4 +182,9 @@ export interface Scenario {
   /** The spec text the assertions come from. */
   readonly spec: readonly string[];
   run(h: Harness): Promise<void>;
+}
+
+/** Thrown by a binding for a capability the system under test does not model. The runner reports NOT RUN, never a pass. */
+export class UnsupportedByBinding extends Error {
+  override readonly name = "UnsupportedByBinding";
 }

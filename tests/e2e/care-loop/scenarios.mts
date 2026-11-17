@@ -31,6 +31,9 @@ import {
 
 const KINDS: readonly Kind[] = ["packages", "restart-service", "reboot", "prepare-directories"];
 
+/** A second, different plan for the same server. Uses another kind when the system has one. */
+const altKind = (h: Harness): Kind => h.kinds.find((k) => k !== "packages") ?? "packages";
+
 async function manifests(h: Harness, serverId: string, opId?: string): Promise<number> {
   return (await h.target(serverId).interactions()).filter((i) => i.kind === "manifest" && (opId === undefined || i.opId === opId)).length;
 }
@@ -175,7 +178,7 @@ const digest: Scenario[] = [
     spec: ["execution-security 4: approval binds to one plan version, one scope"],
     async run(h) {
       const { serverId, plan } = await setup(h);
-      const other = await h.createPlan({ serverId, kind: "restart-service" });
+      const other = await h.createPlan({ serverId, kind: altKind(h) });
       assert.equal(other.ok, true);
       assert.notEqual(other.data!.digest, plan.digest, "premise: different plans have different digests");
       assertRefused(await h.approve(approvalFor(plan, { digest: other.data!.digest })), "cross-plan digest");
@@ -226,17 +229,28 @@ const digest: Scenario[] = [
   },
   {
     id: "CL-02f",
-    title: "approval needs a signed-in session and a valid CSRF token",
-    traces: ["FR-01", "FR-11", "Tech §9.2", "NF-001"],
-    spec: ["FR-01: a signed-out session cannot approve an operation", "Tech §9.2: authenticated owner context, CSRF protection"],
+    title: "approval needs a valid CSRF token: missing or wrong is refused",
+    traces: ["FR-11", "Tech §9.2"],
+    spec: ["Tech §9.2: the approval endpoint requires CSRF protection"],
     async run(h) {
       const { serverId, plan } = await setup(h);
-      assertRefused(await h.approve(approvalFor(plan, { session: "none" })), "no session");
       assertRefused(await h.approve(approvalFor(plan, { csrf: "omit" })), "no csrf token");
       assertRefused(await h.approve(approvalFor(plan, { csrf: "wrong" })), "wrong csrf token");
       await h.settle();
-      await assertNoWork(h, serverId, "unauthenticated or CSRF-less approval");
+      await assertNoWork(h, serverId, "CSRF-less approval");
       await approveOk(h, plan);
+    },
+  },
+  {
+    id: "CL-02g",
+    title: "approval needs a signed-in owner: a request with no session is refused",
+    traces: ["FR-01", "FR-11", "NF-001", "Tech §9.2"],
+    spec: ["FR-01: a signed-out session cannot approve an operation", "Tech §9.2: authenticated owner context"],
+    async run(h) {
+      const { serverId, plan } = await setup(h);
+      assertRefused(await h.approve(approvalFor(plan, { session: "none" })), "no session");
+      await h.settle();
+      await assertNoWork(h, serverId, "unauthenticated approval");
     },
   },
 ];
@@ -302,7 +316,7 @@ const dupes: Scenario[] = [
     spec: ["FR-14: two different requests cannot change the same machine simultaneously", "Tech §9.4: one unresolved mutation per canonical server"],
     async run(h) {
       const { serverId, plan: a } = await setup(h);
-      const b = (await h.createPlan({ serverId, kind: "restart-service" })).data!;
+      const b = (await h.createPlan({ serverId, kind: altKind(h) })).data!;
       const [ra, rb] = await Promise.all([h.approve(approvalFor(a)), h.approve(approvalFor(b))]);
       assert.equal([ra, rb].filter((r) => r.ok).length, 1, "exactly one of two conflicting approvals may succeed");
       assertRefused(ra.ok ? rb : ra, "the loser", ["TARGET_BUSY"]);
@@ -320,7 +334,7 @@ const dupes: Scenario[] = [
       const s1 = await h.addServer({ name: uid("srv"), writesEnabled: true });
       const s2 = await h.addServer({ name: uid("alias"), writesEnabled: true, aliasOf: s1.id });
       const pa = (await h.createPlan({ serverId: s1.id, kind: "packages" })).data!;
-      const pb = (await h.createPlan({ serverId: s2.id, kind: "restart-service" })).data!;
+      const pb = (await h.createPlan({ serverId: s2.id, kind: altKind(h) })).data!;
       await approveOk(h, pa);
       assertRefused(await h.approve(approvalFor(pb)), "approval via the alias", ["TARGET_BUSY"]);
       await h.settle();
@@ -488,9 +502,9 @@ const lostAck: Scenario[] = [
       await h.target(serverId).dropNextAck("before-acceptance");
       const id = await approveOk(h, plan);
       await h.settle();
-      assert.deepEqual(await h.target(serverId).ledger(), [], "premise: the target never accepted");
       await h.advance(2 * MIN);
       await h.settle();
+      // If the drop had not happened, the target's first contact would be the mutation request, not a query.
       const tag = await assertQueryThenNoReissue(h, serverId, "before-acceptance");
       assert.ok(tag.endsWith(":query-first"), "the target's first contact for this id must be a query");
       assert.equal((await h.target(serverId).ledger()).length, 1);
@@ -506,10 +520,11 @@ const lostAck: Scenario[] = [
     spec: ["FR-17: reconcile real machine state before retrying after an executor restart", "Tech §9.4: a replacement worker reconciles the existing operation"],
     async run(h) {
       const { serverId, plan } = await setup(h);
-      await h.target(serverId).dropNextAck("after-acceptance");
+      await h.target(serverId).dropNextAck("after-acceptance", { thenPartition: true });
       await approveOk(h, plan);
       await h.settle();
       await h.restartController();
+      await h.target(serverId).partition(false);
       await h.advance(MIN);
       await h.settle();
       await assertQueryThenNoReissue(h, serverId, "restart");
@@ -525,10 +540,9 @@ const lostAck: Scenario[] = [
 async function makeUnknown(h: Harness): Promise<{ serverId: string; opId: string }> {
   const { serverId, plan } = await setup(h);
   const t = h.target(serverId);
-  await t.dropNextAck("after-acceptance");
+  await t.dropNextAck("after-acceptance", { thenPartition: true });
   const opId = await approveOk(h, plan);
   await h.settle();
-  await t.partition(true);
   await h.advance(30 * MIN);
   await h.settle();
   const o = await op(h, opId);
@@ -547,7 +561,7 @@ const unknown: Scenario[] = [
     async run(h) {
       const { serverId } = await makeUnknown(h);
       const before = await manifests(h, serverId);
-      const b = await h.createPlan({ serverId, kind: "restart-service" });
+      const b = await h.createPlan({ serverId, kind: altKind(h) });
       assert.equal(b.ok, true, "premise: a new plan can be drawn up");
       assertRefused(await h.approve(approvalFor(b.data!)), "conflicting approval", ["TARGET_BUSY", "OUTCOME_UNKNOWN"]);
       assert.equal(await opCount(h, [serverId]), 1, "no second operation may be created");
@@ -562,10 +576,13 @@ const unknown: Scenario[] = [
     async run(h) {
       const { serverId } = await makeUnknown(h);
       const before = await manifests(h, serverId);
+      const t = h.target(serverId);
       for (const wait of [10 * MIN, 60 * MIN, 24 * 60 * MIN]) {
+        await t.partition(true);
         await h.advance(wait);
-        await h.settle();
-        const p = await h.createPlan({ serverId, kind: "restart-service" });
+        await h.settle(); // the worker keeps trying to reconcile and keeps failing
+        await t.partition(false); // reachable again, but no reconcile has succeeded
+        const p = await h.createPlan({ serverId, kind: altKind(h) });
         assert.equal(p.ok, true);
         assertRefused(await h.approve(approvalFor(p.data!)), `after ${wait / MIN} more minutes`, ["TARGET_BUSY", "OUTCOME_UNKNOWN"]);
       }
@@ -627,7 +644,9 @@ const unknown: Scenario[] = [
       assert.equal(new Set(seqs).size, seqs.length, "sequence numbers must be unique");
       assert.ok(after.events.some((e) => e.type === "outcome_unknown"), "the earlier uncertainty must remain visible");
       assert.equal(await manifests(h, serverId), sentBefore, "resolving must not send another mutation");
-      const next = await h.createPlan({ serverId, kind: "restart-service" });
+      // The first operation applied everything pending, so a new update must appear before there is anything to plan.
+      await h.target(serverId).changeTransaction("add-dependency");
+      const next = await h.createPlan({ serverId, kind: altKind(h) });
       assert.equal(next.ok, true);
       await approveOk(h, next.data!);
     },
@@ -725,7 +744,7 @@ const writesOff: Scenario[] = [
     traces: ["ZT-01", "FR-12", "FR-13", "FR-15"],
     spec: ["ADR-014: writes may be fully built and tested against simulated targets"],
     async run(h) {
-      for (const kind of KINDS) {
+      for (const kind of h.kinds) {
         const { serverId, plan } = await setup(h, { production: true, kind });
         await approveOk(h, plan, { production: true });
         await h.settle();
@@ -740,7 +759,7 @@ const writesOff: Scenario[] = [
     spec: ["ADR-014: stay disabled for real servers behind a per-server writesEnabled=false flag", "absent must behave as false"],
     async run(h) {
       for (const flag of FLAGS) {
-        for (const kind of KINDS) {
+        for (const kind of h.kinds) {
           const server = await h.addServer({ name: uid("real"), production: true, writesEnabled: flag });
           const { plan } = await planOrFake(h, server.id, kind);
           assertRefused(await h.approve(approvalFor(plan, { production: true })), `${kind}, writesEnabled ${label(flag)}`);
@@ -849,8 +868,24 @@ const writesOff: Scenario[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// CL-09  Stage A scope: every change kind the PRD requires exists  (FR-12, FR-13, FR-15)
+// ---------------------------------------------------------------------------
+const scope: Scenario[] = [
+  {
+    id: "CL-09a",
+    title: "every Stage A change kind is implemented: packages, service restart, reboot, directory preparation",
+    traces: ["FR-12", "FR-13", "FR-15"],
+    spec: ["PRD §7.3 FR-12, FR-13, FR-15 are all priority A (required for founder alpha)"],
+    async run(h) {
+      const missing = KINDS.filter((k) => !h.kinds.includes(k));
+      assert.deepEqual(missing, [], `not implemented: ${missing.join(", ")}`);
+    },
+  },
+];
+
 export const scenarios: readonly Scenario[] = [
-  ...expiry, ...digest, ...dupes, ...changed, ...lostAck, ...unknown, ...stop, ...writesOff,
+  ...expiry, ...digest, ...dupes, ...changed, ...lostAck, ...unknown, ...stop, ...writesOff, ...scope,
 ];
 
 export { PROD_ACKS };
