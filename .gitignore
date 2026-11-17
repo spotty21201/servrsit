@@ -36,3 +36,6 @@ coverage/
 
 # CDK synthesis output (infra/)
 cdk.out/
+
+# agent git worktrees
+.worktrees/
