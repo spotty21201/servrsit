@@ -111,6 +111,8 @@ export const AiServerInputSchema = z
         memoryUsedPercent: z.number().int().min(0).max(100).nullable(),
         uptimeDays: z.number().int().nonnegative().nullable(),
         filesystems: z.array(z.object({ mount: text(64), usedPercent: z.number().int().min(0).max(100) })).max(8).nullable(),
+        /** Inode use per filesystem (T-051: so inode claims can be checked). */
+        inodes: z.array(z.object({ mount: text(64), usedPercent: z.number().int().min(0).max(100) })).max(8).nullable(),
         pendingUpdates: z.number().int().nonnegative().nullable(),
         /**
          * When the HOST last refreshed its package lists (DEF-L2), owner-local.
@@ -173,6 +175,13 @@ function metricsFrom(
     filesystems:
       h.filesystems.status === "ok"
         ? h.filesystems.value.entries.slice(0, 8).map((e) => ({
+            mount: isSafeMountPath(e.mount) && e.mount.length <= 64 ? e.mount : UNRECOGNISED_MOUNT,
+            usedPercent: e.usedPercent,
+          }))
+        : null,
+    inodes:
+      h.inodes.status === "ok"
+        ? h.inodes.value.entries.slice(0, 8).map((e) => ({
             mount: isSafeMountPath(e.mount) && e.mount.length <= 64 ? e.mount : UNRECOGNISED_MOUNT,
             usedPercent: e.usedPercent,
           }))

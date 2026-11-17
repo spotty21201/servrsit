@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { AssistantResponder, CHANGE_REQUEST_ANSWER, createOpenAiProvider, SECRET_ANSWER } from "@servrsit/ai";
+import { FACT_MISMATCH_NOTICE } from "./assistant.js";
 import { AssistantErrorSchema, AssistantResponseSchema } from "@servrsit/contracts";
 import { buildServer } from "../server.js";
 import { FleetConfigSchema } from "../fleet/config.js";
@@ -104,14 +105,14 @@ async function start(opts: { ai?: Mock | null; timeoutMs?: number } = {}) {
 // ---- contract ------------------------------------------------------------
 
 test("a question with a working AI: 200, source ai, returned model, evidence, notice", async () => {
-  const ai = await mockAi(() => reply("Alpha is fresh with two pending updates. Beta is not being collected."));
+  const ai = await mockAi(() => reply("Alpha has no pending updates. Beta is not being collected."));
   const { app, ask } = await start({ ai });
   const r = await ask({ message: "Which servers have pending updates?", scope: "all" });
   assert.equal(r.statusCode, 200);
   const body = AssistantResponseSchema.parse(r.json());
   assert.equal(body.source, "ai");
   assert.equal(body.model, "cb/deepseek-v4.1-flash");
-  assert.equal(body.answer, "Alpha is fresh with two pending updates. Beta is not being collected.");
+  assert.equal(body.answer, "Alpha has no pending updates. Beta is not being collected.");
   assert.deepEqual(body.evidence, [{ serverId: ALPHA, observedAt: "2026-11-17T08:00:00.000Z" }], "only servers with an observation are evidence");
   assert.match(body.notice ?? "", /AI-generated explanation/);
   assert.equal(r.headers["cache-control"], "no-store");
@@ -513,5 +514,41 @@ test("T-050 via the route: the model gets the fixed rules, then the owner contex
       await app.close();
       await ai.close();
     }
+  }
+});
+
+// ---- T-051: the reply is fact-checked before it is shown --------------------------
+
+test("T-051 via the route: a reply that does not match the checks is withheld with the exact notice; only the mismatch type is logged", async () => {
+  const wrong = "Alpha has 5 pending updates and needs a reboot.";
+  const ai = await mockAi(() => reply(wrong));
+  const { app, ask, log } = await start({ ai });
+  try {
+    const body = AssistantResponseSchema.parse((await ask({ message: "Any updates on Alpha?", scope: "all" })).json());
+    assert.equal(body.source, "deterministic");
+    assert.equal(body.model, null);
+    assert.equal(body.notice, "The AI answer did not match the latest checks, so here are the checks directly.");
+    assert.equal(FACT_MISMATCH_NOTICE, body.notice);
+    assert.match(body.answer, /^Alpha: stale\./, "the deterministic checks are shown instead");
+    assert.equal(body.answer.includes(wrong), false);
+    assert.ok(log().includes('"reason":"fact_mismatch"'));
+    assert.ok(log().includes('"factMismatch":"pending_updates"'));
+    assert.equal(log().includes("5 pending updates"), false, "the withheld reply is not logged");
+  } finally {
+    await app.close();
+    await ai.close();
+  }
+});
+
+test("T-051 via the route: a correct reply is shown and logs no mismatch", async () => {
+  const ai = await mockAi(() => reply("Alpha has no pending updates and does not need a reboot."));
+  const { app, ask, log } = await start({ ai });
+  try {
+    const body = AssistantResponseSchema.parse((await ask({ message: "Any updates on Alpha?", scope: "all" })).json());
+    assert.equal(body.source, "ai");
+    assert.ok(log().includes('"factMismatch":null'));
+  } finally {
+    await app.close();
+    await ai.close();
   }
 });
