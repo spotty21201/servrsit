@@ -116,6 +116,13 @@ export const AiServerInputSchema = z
         inodes: z.array(z.object({ mount: text(64), usedPercent: z.number().int().min(0).max(100) })).max(8).nullable(),
         pendingUpdates: z.number().int().nonnegative().nullable(),
         /**
+         * T-062: the part of pendingUpdates that comes from outside Ubuntu's archive (for example Docker's
+         * repository). Update plans leave these out. Null when unavailable.
+         */
+        pendingOutsideUbuntu: z
+          .object({ count: z.number().int().nonnegative(), names: z.array(text(100)).max(10), origins: z.array(text(64)).max(10) })
+          .nullable(),
+        /**
          * When the HOST last refreshed its package lists (DEF-L2), owner-local.
          * pendingUpdates is only as current as this. ServrSit never refreshes them.
          */
@@ -149,6 +156,8 @@ const SERVER_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$/;
 /** Owner-written role text: plain words and light punctuation; never < > " ` $ ; or newlines. */
 const ROLE = /^[A-Za-z0-9][A-Za-z0-9 ._,()/&'+:-]{0,63}$/;
 const OS_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,63}$/;
+const DEB_PACKAGE = /^[a-z0-9][a-z0-9+.-]{0,99}$/;
+const ORIGIN = /^[A-Za-z0-9][A-Za-z0-9 ._:/,+~-]{0,63}$/;
 const KNOWN_CHECKS: ReadonlySet<string> = new Set(CHECK_NAMES);
 const UNRECOGNISED_MOUNT = "(unrecognised mount name)";
 
@@ -197,6 +206,14 @@ function metricsFrom(
           }))
         : null,
     pendingUpdates: o.packages.pendingCount.status === "ok" ? o.packages.pendingCount.value : null,
+    pendingOutsideUbuntu:
+      o.packages.pendingOutsideUbuntu.status === "ok"
+        ? {
+            count: o.packages.pendingOutsideUbuntu.value.count,
+            names: o.packages.pendingOutsideUbuntu.value.packages.map((p) => p.name).filter((n) => DEB_PACKAGE.test(n)).slice(0, 10),
+            origins: [...new Set(o.packages.pendingOutsideUbuntu.value.packages.map((p) => p.origin).filter((x) => ORIGIN.test(x)))].slice(0, 10),
+          }
+        : null,
     packageLists:
       o.packages.metadataUpdatedAt.status === "ok" ? localTime(o.packages.metadataUpdatedAt.value, ctx) : null,
     packageListsClock: o.packages.metadataClock,

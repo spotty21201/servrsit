@@ -32,6 +32,7 @@ import {
   parseUptime,
   rebootRequiredFrom,
   splitSections,
+  type AptSimulation,
   type RawSection,
 } from "./parse.js";
 import { unavailable, ok, type Field } from "./schema.js";
@@ -152,6 +153,8 @@ export function buildObservation(input: BuildInput): InspectionObservation {
         apt.status === "ok" ? ok(apt.value.pendingCount) : unavailable<number>(apt.reason),
       heldBackCount:
         apt.status === "ok" ? ok(apt.value.heldBackCount) : unavailable<number>(apt.reason),
+      pendingOutsideUbuntu:
+        apt.status === "ok" ? ok(apt.value.outsideUbuntu) : unavailable<AptSimulation["outsideUbuntu"]>(apt.reason),
       metadataUpdatedAt: aptStamp.stamp,
       metadataClock: aptStamp.basis,
       rebootRequired: rebootRequiredFrom(get("rebootreq")),

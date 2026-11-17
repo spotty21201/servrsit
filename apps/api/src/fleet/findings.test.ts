@@ -117,3 +117,16 @@ test("T-061: within 2 minutes, or a clock that could not be read, is not a skew 
   assert.equal(run(makeObservation({ clockSkewSeconds: 122 }), null).some((x) => x.id === "clock-skew"), true, "122 s - 1 s > 120 s");
   assert.equal(run(makeObservation({ clockSkewSeconds: null }), null).some((x) => x.id === "clock-skew"), false);
 });
+
+// ---- T-062: updates from outside Ubuntu's archive ---------------------------------------
+
+test("T-062: the pending-updates finding names what comes from outside Ubuntu and says plans leave it out", () => {
+  const docker = ["docker-ce-cli", "docker-ce", "docker-ce-rootless-extras"].map((name) => ({ name, origin: "Docker CE:noble" }));
+  const f = run(makeObservation({ pending: 3, outsideUbuntu: docker }), null).find((x) => x.id === "updates-pending");
+  assert.equal(
+    f?.summary,
+    "3 package updates pending, from the host's existing package information (not refreshed by ServrSit). 3 of them come from outside Ubuntu's archive (docker-ce-cli, docker-ce, docker-ce-rootless-extras from Docker CE:noble) and are left out of update plans.",
+  );
+  const plain = run(makeObservation({ pending: 2 }), null).find((x) => x.id === "updates-pending");
+  assert.doesNotMatch(plain?.summary ?? "", /outside Ubuntu/);
+});

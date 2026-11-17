@@ -41,3 +41,25 @@ test("T-061: an AI answer that states the skew in hours passes the fact check", 
   const prompt = buildAssistantPrompt(inputs, "why is the package age odd?", CTX);
   assert.deepEqual(checkFacts("Sentani's clock is about 7 hours behind, so its package-list time has been corrected.", inputs, prompt), { ok: true });
 });
+
+// ---- T-062 (kept with T-061's host-fact tests) -----------------------------------------
+
+test("T-062: the model and the owner see which pending updates come from outside Ubuntu's archive", () => {
+  const o = observation();
+  const docker: InspectionObservation = {
+    ...o,
+    packages: {
+      ...o.packages,
+      pendingCount: ok(3),
+      pendingOutsideUbuntu: ok({ count: 3, packages: ["docker-ce-cli", "docker-ce", "docker-ce-rootless-extras"].map((name) => ({ name, origin: "Docker CE:noble" })) }),
+    },
+  };
+  const s = server({ name: "Sentani" }, docker);
+  const m = buildAiInput(s, CTX).metrics!;
+  assert.deepEqual(m.pendingOutsideUbuntu, { count: 3, names: ["docker-ce-cli", "docker-ce", "docker-ce-rootless-extras"], origins: ["Docker CE:noble"] });
+  assert.match(deterministicExplanation(s, CTX), /3 of the pending updates \(docker-ce-cli, docker-ce, docker-ce-rootless-extras\) come from outside Ubuntu's archive from Docker CE:noble; update plans leave them out\./);
+  const inputs = [buildAiInput(s, CTX)];
+  const prompt = buildAssistantPrompt(inputs, "updates?", CTX);
+  assert.deepEqual(checkFacts("Sentani has 3 pending updates, all 3 from Docker's repository, and 0 from Ubuntu.", inputs, prompt), { ok: true });
+  assert.equal(checkFacts("Sentani has 3 pending updates, 2 from Docker's repository.", inputs, prompt).ok, false);
+});

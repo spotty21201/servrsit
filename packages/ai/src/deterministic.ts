@@ -57,6 +57,12 @@ export function deterministicExplanation(server: ExplainableServer, ctx: TimeCon
     if (m.pendingUpdates !== null) parts.push(`${m.pendingUpdates} pending ${m.pendingUpdates === 1 ? "update" : "updates"}`);
     if (m.rebootRequired !== null) parts.push(m.rebootRequired ? "reboot required" : "no reboot required");
     if (parts.length > 0) lines.push(`${parts.join("; ")}.`);
+    if (m.pendingOutsideUbuntu !== null && m.pendingOutsideUbuntu.count > 0) {
+      const o = m.pendingOutsideUbuntu;
+      const names = o.names.length > 0 ? ` (${o.names.slice(0, 5).join(", ")}${o.count > 5 ? ", ..." : ""})` : "";
+      const from = o.origins.length > 0 ? ` from ${o.origins.join(", ")}` : "";
+      lines.push(`${o.count} of the pending updates${names} come from outside Ubuntu's archive${from}; update plans leave them out.`);
+    }
     if (m.packageLists !== null) {
       lines.push(`Package information was last refreshed by the host at ${when(m.packageLists)}. ${NOT_REFRESHED_BY_SERVRSIT}${clockNote(m)}`);
     } else if (m.pendingUpdates !== null) {

@@ -11,7 +11,11 @@ import {
   unavailable,
   LIMITS,
   clockSkewed,
+  isUbuntuArchiveOrigin,
+  MAX_LISTED_OUTSIDE_UBUNTU,
+  UNRECOGNISED_NAME,
   type Clock,
+  type PendingOutsideUbuntu,
   type Field,
   type FailedUnit,
   type FilesystemEntry,
@@ -340,6 +344,25 @@ const APT_SUMMARY =
 export interface AptSimulation {
   readonly pendingCount: number;
   readonly heldBackCount: number;
+  /** T-062: pending updates from outside Ubuntu's archive (count, and the first 50 by name). */
+  readonly outsideUbuntu: { readonly count: number; readonly packages: PendingOutsideUbuntu[] };
+}
+
+/** `Inst name [old] (new ORIGIN [arch])`; the origin may contain spaces ("Docker CE:noble"). */
+const APT_INST = /^Inst\s+(\S+)\s+(?:\[[^\]]*\]\s+)?\((\S+)\s+(.+?)\s+\[[^\]]+\]\)/;
+const DEB_PACKAGE_NAME = /^[a-z0-9][a-z0-9+.-]{0,99}$/;
+const ORIGIN_LABEL = /^[A-Za-z0-9][A-Za-z0-9 ._:\/,+~-]{0,63}$/;
+
+/** Classify one `Inst` line. Anything not clearly from Ubuntu's archive counts as outside it. */
+function instOrigin(line: string): { inUbuntu: boolean; entry: PendingOutsideUbuntu } {
+  const m = APT_INST.exec(line);
+  const rawName = m?.[1] ?? "";
+  const rawOrigin = m === null || m[3] === undefined ? "" : sanitizeText(m[3], 64);
+  const name = DEB_PACKAGE_NAME.test(rawName) ? rawName : UNRECOGNISED_NAME;
+  const origin = ORIGIN_LABEL.test(rawOrigin) ? rawOrigin : UNRECOGNISED_NAME;
+  // A line that does not fully parse is not clearly from Ubuntu, whatever origin it claims.
+  const inUbuntu = name !== UNRECOGNISED_NAME && origin !== UNRECOGNISED_NAME && isUbuntuArchiveOrigin(origin);
+  return { inUbuntu, entry: { name, origin } };
 }
 
 /**
@@ -349,9 +372,18 @@ export interface AptSimulation {
  */
 export function parseAptSimulation(lines: string[]): Field<AptSimulation> {
   let inst = 0;
+  let outsideCount = 0;
+  const outside: PendingOutsideUbuntu[] = [];
   let summary: RegExpExecArray | null = null;
   for (const line of lines) {
-    if (/^Inst\s+\S+/.test(line)) inst += 1;
+    if (/^Inst\s+\S+/.test(line)) {
+      inst += 1;
+      const o = instOrigin(line);
+      if (!o.inUbuntu) {
+        outsideCount += 1;
+        if (outside.length < MAX_LISTED_OUTSIDE_UBUNTU) outside.push(o.entry);
+      }
+    }
     const s = APT_SUMMARY.exec(line);
     if (s !== null) summary = s;
   }
@@ -361,7 +393,7 @@ export function parseAptSimulation(lines: string[]): Field<AptSimulation> {
   const upgraded = Number(summary[1]);
   const added = Number(summary[2]);
   if (upgraded + added !== inst) return unavailable("apt output inconsistent with its summary");
-  return ok({ pendingCount: inst, heldBackCount: Number(summary[4]) });
+  return ok({ pendingCount: inst, heldBackCount: Number(summary[4]), outsideUbuntu: { count: outsideCount, packages: outside } });
 }
 
 /**

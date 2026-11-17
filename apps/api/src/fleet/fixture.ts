@@ -83,6 +83,7 @@ function syntheticObservation(o: ObservationShape): InspectionObservation {
       collector: "inspect.packages.v1",
       pendingCount: ok(o.pending),
       heldBackCount: ok(0),
+      pendingOutsideUbuntu: ok({ count: 0, packages: [] }),
       metadataUpdatedAt: ok(new Date(o.at.getTime() - 6 * 60 * MIN).toISOString()),
       rebootRequired: ok(false),
       metadataClock: "in-sync",

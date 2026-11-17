@@ -92,6 +92,14 @@ function usageFindings(
   return out;
 }
 
+/** "docker-ce, docker-ce-cli from Docker CE:noble", at most 5 names. */
+function outsideList(v: { count: number; packages: ReadonlyArray<{ name: string; origin: string }> }): string {
+  const byOrigin = new Map<string, string[]>();
+  for (const p of v.packages.slice(0, 5)) byOrigin.set(p.origin, [...(byOrigin.get(p.origin) ?? []), p.name]);
+  const text = [...byOrigin.entries()].map(([origin, names]) => `${names.join(", ")} from ${origin}`).join("; ");
+  return v.count > 5 ? `${text}; and ${v.count - 5} more` : text;
+}
+
 export interface FindingsInput {
   readonly current: InspectionObservation | null;
   readonly previous: InspectionObservation | null;
@@ -155,9 +163,15 @@ export function evaluateFindings(input: FindingsInput): Finding[] {
 
     if (current.packages.pendingCount.status === "ok" && current.packages.pendingCount.value > 0) {
       const n = current.packages.pendingCount.value;
+      const outside = current.packages.pendingOutsideUbuntu;
+      // T-062: name what comes from outside Ubuntu's archive; names were validated by the parser.
+      const outsideText =
+        outside.status === "ok" && outside.value.count > 0
+          ? ` ${outside.value.count} of them come from outside Ubuntu's archive (${outsideList(outside.value)}) and are left out of update plans.`
+          : "";
       findings.push({
         id: "updates-pending", rule: "packages.pending.v1", severity: "advisory",
-        summary: `${n} package update${n === 1 ? "" : "s"} pending, from the host's existing package information (not refreshed by ServrSit).`,
+        summary: `${n} package update${n === 1 ? "" : "s"} pending, from the host's existing package information (not refreshed by ServrSit).${outsideText}`,
       });
     }
 

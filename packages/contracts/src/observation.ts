@@ -87,6 +87,35 @@ export function describeClockSkew(clock: Pick<Clock, "skewSeconds">): string {
   return `about ${span} ${clock.skewSeconds < 0 ? "behind" : "ahead of"} ServrSit's clock`;
 }
 
+// ---------------------------------------------------------------------------
+// Package origins (T-062, Tech Spec §10.2 step 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ubuntu's own archive, as `apt-get -s` prints it: "Ubuntu:24.04/noble",
+ * "Ubuntu:24.04/noble-updates" or "Ubuntu:24.04/noble-security", possibly
+ * several joined by ", ". Backports, proposed, PPAs, ESM and every other
+ * repository are outside it.
+ */
+const UBUNTU_ARCHIVE = /^Ubuntu:\d{2}\.\d{2}\/[a-z]+(?:-(?:updates|security))?$/;
+
+export function isUbuntuArchiveOrigin(origin: string): boolean {
+  const parts = origin.split(", ");
+  return parts.length > 0 && parts.every((p) => UBUNTU_ARCHIVE.test(p));
+}
+
+export const MAX_LISTED_OUTSIDE_UBUNTU = 50;
+/** Shown in place of a package name or origin that failed validation. */
+export const UNRECOGNISED_NAME = "(unrecognised)";
+
+export const PendingOutsideUbuntuSchema = z.object({
+  /** A well-formed Debian package name, or "(unrecognised)". */
+  name: z.string().max(100),
+  /** The origin label apt printed (for example "Docker CE:noble"), or "(unrecognised)". */
+  origin: z.string().max(64),
+});
+export type PendingOutsideUbuntu = z.infer<typeof PendingOutsideUbuntuSchema>;
+
 export const FailedUnitSchema = z.object({
   unit: z.string().max(256),
   /** True only when `unit` is a well-formed systemd unit name. */
@@ -161,6 +190,17 @@ export const InspectionObservationSchema = z.object({
     /** From a read-only simulation against the existing APT state. No refresh. */
     pendingCount: fieldSchema(z.number().int().nonnegative()),
     heldBackCount: fieldSchema(z.number().int().nonnegative()),
+    /**
+     * T-062: the pending updates that do NOT come from Ubuntu's own archive
+     * (for example Docker's repository). They are listed separately and are
+     * excluded from update plans by default. Included in pendingCount.
+     */
+    pendingOutsideUbuntu: fieldSchema(
+      z.object({
+        count: z.number().int().nonnegative(),
+        packages: z.array(PendingOutsideUbuntuSchema).max(MAX_LISTED_OUTSIDE_UBUNTU),
+      }),
+    ),
     /**
      * When APT metadata was last refreshed on the target (not by us), in
      * ServrSit's time. The target writes this stamp with its own clock, so it is

@@ -16,6 +16,8 @@ export interface ObservationOptions {
   unavailableChecks?: boolean;
   /** T-061: target clock minus ServrSit's, in seconds. null = the clock could not be read. Default 0. */
   clockSkewSeconds?: number | null;
+  /** T-062: pending updates from outside Ubuntu's archive (included in `pending`). Default none. */
+  outsideUbuntu?: Array<{ name: string; origin: string }>;
 }
 
 export function makeObservation(o: ObservationOptions = {}): InspectionObservation {
@@ -72,6 +74,7 @@ export function makeObservation(o: ObservationOptions = {}): InspectionObservati
       collector: "inspect.packages.v1",
       pendingCount: ok(o.pending ?? 0),
       heldBackCount: ok(0),
+      pendingOutsideUbuntu: ok({ count: o.outsideUbuntu?.length ?? 0, packages: o.outsideUbuntu ?? [] }),
       metadataUpdatedAt: ok("2026-11-16T02:00:00.000Z"),
       rebootRequired: ok(o.rebootRequired ?? false),
       metadataClock:

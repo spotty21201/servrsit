@@ -17,6 +17,9 @@ export {
   ClockSchema,
   clockSkewed,
   describeClockSkew,
+  isUbuntuArchiveOrigin,
+  MAX_LISTED_OUTSIDE_UBUNTU,
+  UNRECOGNISED_NAME,
   FailedUnitSchema,
   FilesystemEntrySchema,
   InodeEntrySchema,
@@ -27,6 +30,7 @@ export {
 export type {
   CheckName,
   Clock,
+  PendingOutsideUbuntu,
   FailedUnit,
   Field,
   FilesystemEntry,
