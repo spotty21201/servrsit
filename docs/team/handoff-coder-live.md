@@ -612,3 +612,90 @@ Both of my servers were stopped afterwards (`Server closed cleanly`). Designer's
 - **Bundle size:** zod adds about 140 KB to the browser bundle once a component imports the client. No component does yet.
 - `PORT=0` is rejected on purpose, since a random port would be unknown to the proxy.
 - The API's bind address is still fixed at `127.0.0.1`. Auth is still the stub.
+
+---
+
+# T-043 — OpenAI-compatible AI provider (default), redaction (ADR-013)
+
+**Branch:** `feat/coder/live-inspection` (worktree `/projects/servrsit-coder`), after T-042.
+
+## Result
+
+`AI_PROVIDER=openai_compatible` is now the default provider. Kiro stays as `AI_PROVIDER=kiro`; `none` is deterministic text only. Anything missing, malformed or still a placeholder fails closed to `none` with a log line naming the variable (never a value).
+
+### The one real smoke call (harmless labelled fixture data, one request)
+
+```
+provider selected: openai_compatible
+[info] AI provider: openai_compatible (model deepseek-v4.1-flash, host vip-api.mind-aku.my.id, timeout 20000 ms)
+provider calls made: 1
+result status: ok
+source: openai_compatible
+HTTP status: 200
+latency: 3053 ms
+requested model: deepseek-v4.1-flash
+returned model:  cb/deepseek-v4.1-flash
+reply length: 617 chars
+key present in this output: false
+```
+
+The reply was a plain explanation of the fixture server ("14 of 15 checks passed; the inodes check was unavailable ... no change has been made or approved"). Latency was 3.1 s against Kiro's 11 to 22 s, so the 20 s timeout fits this provider.
+
+The adapter records both ids in `meta`: `requestedModel: "deepseek-v4.1-flash"` and `returnedModel: "cb/deepseek-v4.1-flash"`. The upstream model is chosen by the proxy and is not verified (ADR-013 risk 3).
+
+## How it works
+
+- **Config** comes only from the environment, with `apps/api/.env` filling in what the real environment does not set. The loader takes only `AI_*` keys from the file (`util.parseEnv`) and does not copy the rest into `process.env`. Real environment variables win. A group- or world-readable file produces a `chmod 600` warning.
+- **Fail closed:** missing variable, `AI_BASE_URL` that is plain `http` to a remote host or has userinfo, query or fragment or points at a link-local address or `*.invalid`, a key that is a placeholder (`replace-me`, `xxxx...`) or has spaces or control characters, a bad `AI_TIMEOUT_MS` (1000 to 120000, default 20000), an unknown `AI_PROVIDER`. Loopback `http` is allowed so local mock servers work. The `.env.example` values are rejected as placeholders.
+- **Request:** `POST {AI_BASE_URL}/chat/completions`, `Authorization: Bearer`, body fields exactly `model, messages, temperature, max_tokens, stream`. No tools, functions, tool_choice or response_format. Messages are the fixed system prompt plus the same sanitized, fenced input as the Kiro adapter. `redirect: "error"`, so the token can never be forwarded.
+- **Reply:** only `choices[0].message.content` is read. `tool_calls` and `function_call` are ignored. Text is control-stripped, capped at 1200 chars, refused if it contains a code block or command-looking text (`unsafe_output`), and never executed or parsed into actions. Body read is capped at 256 KiB.
+- **Failures** become deterministic text plus `ai_unavailable` with a reason: `timeout`, `quota_or_auth` (401, 403, 429), `provider_error` (5xx, network, redirect), `malformed_response`, `empty_output`, `unsafe_output`, `rate_limited` (local guard), `not_configured`, `provider_disabled`. Provider error bodies, URLs and request details are dropped, never copied into results.
+- **Guards kept:** same cache and one call per server per 10 minutes. A failed call still uses the window.
+- **Refactor:** the cache, guard, output handling and fallback moved from the Kiro adapter into a shared `GuardedExplainer`. All 21 original Kiro tests pass unchanged. `ExplainResult` gained `meta` (`provider, requestedModel, returnedModel, latencyMs, httpStatus`), and `source` can now be `openai_compatible`.
+- **Prompt parity:** a test asserts the Kiro agent's prompt is identical to `SYSTEM_PROMPT`.
+
+### Redaction
+
+- **Logger:** header and credential fields censored by path; every logged string and plain object scrubbed for the known key value (and its URL-encoded form) and for any bearer-shaped credential; request URLs scrubbed (a key in a query string is caught); custom `req`/`res`/`err` serializers.
+- **Errors:** 5xx responses return a fixed `Internal Server Error`; 4xx messages are scrubbed.
+- **Responses:** every string payload is scrubbed on the way out when a secret is configured.
+- **The key is redacted even when the config is rejected** (for example a bad URL), as long as one is present.
+- **Test proof (fake key `sk-test-FAKE-...`):** across normal, 404, 400, 500 and a deliberately leaky route, with the key in an `Authorization` header and in query strings, it appears in no log line, response body or response header. The test also asserts `[REDACTED]` appears in the log, so it proves the scrubber ran and not that nothing was logged. A negative control with redaction off showed the key leaking into both the log and the response.
+- **Repo scan:** the real key value was searched for in every tracked and untracked-not-ignored file and in my scratch files and logs: 0 matches. `apps/api/.env` is ignored, untracked and mode 600.
+
+## Checks run (real output)
+
+```
+packages/contracts tsc ok   packages/ssh tsc ok   packages/ai tsc ok   apps/api tsc ok   apps/web tsc ok
+packages/ssh   ℹ tests 40 ℹ pass 40 ℹ fail 0
+packages/ai    ℹ tests 73 ℹ pass 73 ℹ fail 0     (was 21; +52)
+apps/api       ℹ tests 54 ℹ pass 54 ℹ fail 0     (was 42; +12)
+apps/web       ℹ tests 23 ℹ pass 23 ℹ fail 0
+```
+
+Provider tests run against a real local HTTP server on loopback: success and exact request shape, timeout, 401/403/429, 500/502/503, malformed JSON, HTML, wrong shapes, empty choices, an oversize body, empty and null content, redirect refused (target never contacted), tool calls ignored, control-character and length handling, command-looking replies refused, the prompt-injection fixture (no injection text sent; obedient reply refused), cache, rate limit, failed-call window, and a provider that echoes the key back in its error body.
+
+## Files
+
+| Path | Change |
+|---|---|
+| `packages/ai/src/explainer.ts` | New: shared `GuardedExplainer`, `DisabledExplainer`, result and meta types |
+| `packages/ai/src/openai.ts` | New: provider |
+| `packages/ai/src/config.ts` | New: env resolution, `.env` loader, `describeAiConfig` |
+| `packages/ai/src/factory.ts` | New: `createExplainer(config)` |
+| `packages/ai/src/redact.ts` | New: scrubber |
+| `packages/ai/src/prompt.ts` | New: `SYSTEM_PROMPT`, `buildPrompt` (moved out of `kiro.ts`) |
+| `packages/ai/src/kiro.ts` | Now a provider on the shared core; exports unchanged |
+| `packages/ai/src/*.test.ts`, `mock-server.fixtures.ts`, `ai.fixtures.ts` | New and extended tests; fixtures labelled `[FIXTURE DATA]` |
+| `apps/api/src/ai-runtime.ts`, `redaction.ts` | New: runtime loader, logger/error/response redaction |
+| `apps/api/src/server.ts`, `index.ts`, `package.json` | Wired in; `predev`/`prebuild` now also build `@servrsit/ai` |
+
+## Known gaps and notes
+
+- **No API route uses the explainer yet.** This task added the provider, config, redaction and tests. Nothing in `/api/*` calls `createExplainer`, so AI text is not shown anywhere. A route (and a card to show it) is the next step.
+- **Third-party proxy** (ADR-013): retention and onward routing are unknown. Founder's own sanitized server facts only. The key was shared in chat and should be rotated before any wider use.
+- **The API key is held in process memory** for the life of the process and is read from the file at startup. A rotation needs a restart.
+- **Prompt injection cannot be fully prevented by filtering.** A well-formed hostile unit name is still sent as data. The defences are the fenced input, the system prompt, no tools, and refusing command-looking replies. A reply like "PWNED" with no command would be shown as plain text. It is never executed or trusted.
+- **Redaction is value- and shape-based.** It catches the configured key, its URL-encoded form and bearer-shaped strings. A transformed key (for example base64 or split across fields) would not be caught.
+- **Kiro latency note** from the previous handoff still applies if `AI_PROVIDER=kiro` is chosen.
+- `apps/api/.env` is read from `apps/api/.env` relative to the source file, not the working directory.
