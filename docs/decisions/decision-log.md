@@ -220,6 +220,17 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 
 **Consequences:** Feasibility checkpoint and alpha exit remain open: Merauke is both controller and managed host (PRD D-04 requires independence). Nabire still uses the founder's existing key; moving it to a dedicated ServrSit key is recommended before revocation tests. If the controller's address changes (AWS), the `from=` restriction must be updated on each server.
 
+## ADR-015 — Assistant voice: plain English, no cheeky tone; server roles
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-15 |
+| **Status** | [FOUNDER DECISION] |
+
+**Decision:** The assistant answers in plain English with no jokes or cheeky tone. This overrides the manifesto/UX Spec voice ("a little cheeky") for the assistant. Server roles: Timika = remote client-facing VPS in Europe (production); Sentani = personal server, planned home of Hermes, limited resources (non-production); Nabire and Merauke = development servers in the home studio (non-production; Merauke is also the dev host). No important services selected yet. Source: docs/team/assistant-context-draft.md.
+
+**Open:** whether the plain voice also applies to UI copy (cards, empty states). Asked of the founder.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
