@@ -9,10 +9,11 @@
       "address": "timika",
       "port": 22,
       "user": "spotty",
+      "identityFile": "~/.ssh/servrsit/id_ed25519_timika",
       "role": null,
       "production": true,
       "collect": false,
-      "collectDisabledReason": "No usable SSH key is configured for this host on the controller yet."
+      "collectDisabledReason": "Dedicated ServrSit key configured; waiting for the owner to install it on the server (ADR-014)."
     },
     {
       "id": "22222222-2222-4222-a222-222222222222",
@@ -33,10 +34,11 @@
       "address": "sentani",
       "port": 22,
       "user": "spotty",
+      "identityFile": "~/.ssh/servrsit/id_ed25519_sentani",
       "role": null,
       "production": true,
       "collect": false,
-      "collectDisabledReason": "No usable SSH key is configured for this host on the controller yet."
+      "collectDisabledReason": "Dedicated ServrSit key configured; waiting for the owner to install it on the server (ADR-014)."
     },
     {
       "id": "44444444-4444-4444-a444-444444444444",
