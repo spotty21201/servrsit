@@ -40,3 +40,4 @@ cdk.out/
 # agent git worktrees
 .worktrees/
 apps/web/public/review-001/
+apps/web/public/review-002/
