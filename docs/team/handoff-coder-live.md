@@ -1232,3 +1232,53 @@ coverage-probe 6/6 (was 0/6)      real-replay 10/10 (was 7/10: RC3, RC6 and RE2 
 
 - **The checker is still lexical.** The out-of-scope check relies on capitalised names and a stop list. A sentence-initial capital is flagged only when its sentence names no known server.
 - **F6 is not addressed.** "Next check is due in 10 min" (minutes are exempt) is not checked.
+
+## T-054 .. T-059: care-loop gaps (branch `feat/coder/care-gaps`, from `integration/live-v1` at `6b789c7`)
+
+All build only. Real hosts keep `writesEnabled=false` and are never contacted for a preview or a check.
+
+| Task | Commit | What changed |
+|---|---|---|
+| **T-054** F2 | `8a10d9d` | Approval re-checks the target's state digest for that kind of work and refuses `409 PLAN_CHANGED` if it moved. A repeat of an existing approval stays an idempotent replay (new `CareStore.hasApproval`). |
+| **T-055** F3/F6 | `0195036` | **`POST /api/operations/:id/stop-request`**: the flag is set once, and it never kills anything. An operation that was never sent becomes `cancelled_before_start` in the same store transaction. Anything that may be on the target keeps going, and the ledger decides. A stop after it finished is accepted and changes nothing (`stop: "already-final"`). **`POST /api/operations/:id/reconcile`**: a read-only `Reconciler` extracted from the Dispatcher. It never submits, retries or stops anything, and returns `409 RECONCILE_UNAVAILABLE` for real or write-disabled servers. |
+| **T-056** F5 | `6539ee3` | Canonical identity is host key **and** machine id. Both equal means an alias, with a shared lock (new `canonical_id` column, unique index, migration). Exactly one equal means `IDENTITY_AMBIGUOUS`; either unknown means `IDENTITY_UNVERIFIED`; both block write enablement. The collector reads `cat /etc/machine-id` (read-only; optional field). The fleet raises `identity.duplicate.v1` for a shared machine id. A simulated target without an explicit `machineId` counts as its own machine. |
+| **T-057** O1 | `e3d8a29` | Production approval needs **both** `recovery-route-confirmed` and `interruption-risk-understood`; the exact UI text is in `PRODUCTION_ACKNOWLEDGEMENT_TEXT` (contracts). `PRODUCTION_ACK` is a deprecated alias, kept so older imports load, and is not enough alone. |
+| **T-058** O2/O3 | `fb73a6c` | An unreachable target while planning or at the approval re-check returns `503 ROUTE_UNAVAILABLE` and stores nothing. The worker backs off 2 s, doubling to 5 min (outbox `backoff_level`, migrated). A run of identical transport errors is recorded once. |
+| **T-059** F4 | `02aea8c` | Adds `restart.service.v1`, `reboot.host.v1` and `prepare.directories.v1`, each its own plan and approval; details below. Package plans, manifests and digests are unchanged. |
+
+**T-059 details:**
+
+- **`restart.service.v1`:** only an owner-selected, well-formed unit. Verified by the unit being active with a **new** start time; a unit left inactive is failed.
+- **`reboot.host.v1`:** verified by a **new** boot id; the same boot id afterwards is failed.
+- **`prepare.directories.v1`** (Tech Spec §8.3):
+  - only under `/srv` or `/home/<user>`, with plain path components: no `..`, nothing hidden, never `~/.ssh`;
+  - no setuid, setgid or sticky bits, and nothing world-writable;
+  - existing paths are listed and never overwritten or reowned;
+  - verified per path by owner, group and mode.
+- **Request contract:** the plan request is a strict discriminated union per operation (`unit`, `directories`).
+
+**Checks run (real output, at `02aea8c`):**
+
+```
+pnpm -r test -> exit 0: domain 22, ssh 51, store 12, worker 19, ai 156, api 161, web 78, others pass; typecheck all 10 exit 0; key scan clean on every commit
+Throwaway merge of this branch with feat/coder/owner-auth, Tester's current files (1c9d5a7), unchanged:
+  zt01-real-hosts 13/13 (route inventory includes the reviewed T-055 routes)
+  care-loop 41 pass / 1 fail (CL-09a) / 0 not run      auth 37/37      routes-401 7/7      static-config 3/3
+```
+
+- **CL-09a:** the Tester's binding still lists only the `packages` kind and sends `operation: <kind>` with no parameters. It should send `restart.service.v1` with `unit`, `reboot.host.v1`, and `prepare.directories.v1` with `directories`, and give its simulated servers `services`, `bootId`, `directories`, `selectedServices` and `user`.
+- **Patch removed:** the Tester had already bound T-054 to T-058 themselves, so I deleted `docs/team/t056-t057-tester-binding.patch`.
+
+**Merge note for the Orchestrator:** merging `feat/coder/owner-auth` with this branch conflicts in `apps/api/src/routes/care.ts`:
+
+- keep this branch's code (`Reconciler`, `TransportError`, `requestOf`, `currentDigest`);
+- drop the pre-login `CsrfGuard` import, the care route's `/api/csrf`, and the `o.csrf.check` lines in the stop-request and reconcile routes, because the global guard does CSRF;
+- keep `owner: o.owner(request)`.
+
+The new tests in `care.test.ts` use the pre-login harness (`CsrfGuard`, `care.csrf`). On the merged tree they need the T-053 sign-in harness (`enrolOwner`, `owner.headers(true)`). I will do that adaptation when I next merge `integration/live-v1` into `feat/coder/owner-auth`, as I did for T-063.
+
+**Limits:**
+
+- The real SSH write target still implements nothing; that is T-012 helper work.
+- Directory creation in the simulated target makes the leaf only and does not model parent creation or symlink checks. The real helper must use directory-fd operations (Tech Spec §8.3).
+- A stop request is recorded but not delivered to a running target, because `WriteTarget` has no stop channel.
