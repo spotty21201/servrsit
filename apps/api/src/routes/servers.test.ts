@@ -10,7 +10,7 @@ import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SqliteServerStore } from "@servrsit/store";
-import type { CollectionResult } from "@servrsit/ssh";
+import { classifySudo, type CollectionResult, type PrivilegeProbeResult } from "@servrsit/ssh";
 import { buildServer } from "../server.js";
 import { FleetConfigSchema, type FleetConfig } from "../fleet/config.js";
 import { enrolOwner, setupTokenSink } from "../auth/testing.js";
@@ -49,11 +49,12 @@ interface Harness {
   readonly dns: Record<string, string[]>;
   scan: (address: string, port: number) => Promise<ScanResult>;
   collect: () => Promise<CollectionResult>;
+  privilege: () => Promise<PrivilegeProbeResult>;
   readonly contacted: string[];
   req(method: "GET" | "POST" | "PATCH" | "DELETE", url: string, body?: unknown, headers?: Record<string, string>): Promise<{ status: number; json: any; text: string }>;
 }
 
-async function start(opts: { config?: FleetConfig; store?: SqliteServerStore } = {}): Promise<Harness> {
+async function start(opts: { config?: FleetConfig; store?: SqliteServerStore; sweepIntervalMs?: number } = {}): Promise<Harness> {
   const clock = new Clock();
   const keysDir = join(mkdtempSync(join(tmpdir(), "servrsit-reg-")), "server-keys");
   const store = opts.store ?? new SqliteServerStore({ path: ":memory:" });
@@ -68,6 +69,7 @@ async function start(opts: { config?: FleetConfig; store?: SqliteServerStore } =
       return { ok: true, key: { algorithm: "ED25519", keyType: "ssh-ed25519", keyBase64: hostKey, fingerprint: fingerprintOf(hostKey) } };
     },
     collect: async (): Promise<CollectionResult> => ({ ok: true, observation: makeObservation() }),
+    privilege: async (): Promise<PrivilegeProbeResult> => ({ ok: true, privilege: { level: "no-sudo-rules", broad: false, summary: "This account has no sudo rules." } }),
   } as unknown as Harness;
   const app = await buildServer({
     config: opts.config ?? config(),
@@ -80,9 +82,11 @@ async function start(opts: { config?: FleetConfig; store?: SqliteServerStore } =
       scanner: (a, p) => h.scan(a, p),
       probe: async (a) => { contacted.push(`probe ${a}`); return true; },
       collector: async (t) => { contacted.push(`collect ${t.host}`); return h.collect(); },
+      privilegeProbe: async (t) => { contacted.push(`privilege ${t.host}`); return h.privilege(); },
       resolver: async (name) => { const r = dns[name]; if (r === undefined) throw new Error("ENOTFOUND"); return r; },
       selfAddresses: () => [],
       now: clock.now,
+      ...(opts.sweepIntervalMs === undefined ? {} : { sweepIntervalMs: opts.sweepIntervalMs }),
     },
   });
   const owner = await enrolOwner(app as never, sink.token());
@@ -170,8 +174,10 @@ test("full flow: draft, scan, confirm, a key for this server, first check, activ
     assert.equal(started.json.finished, false);
     const fc = await waitFinished(h, id);
     assert.deepEqual(fc.steps.map((s: { id: string; state: string }) => [s.id, s.state]), [
-      ["connect", "done"], ["auth", "done"], ["host", "done"], ["services", "done"], ["clock", "done"], ["packages", "done"],
+      ["connect", "done"], ["auth", "done"], ["host", "done"], ["services", "done"], ["clock", "done"], ["packages", "done"], ["privilege", "done"],
     ]);
+    assert.deepEqual(fc.privilege, { level: "no-sudo-rules", broad: false, summary: "This account has no sudo rules." });
+    assert.equal(fc.steps.at(-1).label, "Checking sudo rules (sudo -n -l)");
     assert.deepEqual(fc.platform, { supported: true, name: "Ubuntu 24.04.5 LTS" });
     assert.equal(fc.coverage.total, 16);
     assert.equal((await h.req("GET", `/api/servers/drafts/${id}`)).json.state, "checked");
@@ -190,7 +196,7 @@ test("full flow: draft, scan, confirm, a key for this server, first check, activ
     assert.deepEqual(plan.json.blockers.map((b: { code: string }) => b.code), ["WRITES_DISABLED"], "a registered server has writes disabled");
 
     const renamed = await h.req("PATCH", `/api/servers/${id}`, { name: "Web One", role: null, production: false });
-    assert.deepEqual(renamed.json, { id, name: "Web One", role: null, production: false });
+    assert.deepEqual(renamed.json, { id, name: "Web One", role: null, production: false, productionStatus: "no" });
     assert.equal((await h.req("PATCH", `/api/servers/${id}`, { writesEnabled: true })).status, 400);
     assert.equal((await h.req("PATCH", `/api/servers/${id}`, {})).status, 400);
 
@@ -319,8 +325,9 @@ test("a failed first check says which step failed, runs nothing after it, and ca
     const fc = await waitFinished(h, id);
     assert.equal(fc.failureCode, "AUTH_FAILED");
     assert.deepEqual(fc.steps.map((s: { id: string; state: string }) => [s.id, s.state]), [
-      ["connect", "done"], ["auth", "failed"], ["host", "unavailable"], ["services", "unavailable"], ["clock", "unavailable"], ["packages", "unavailable"],
+      ["connect", "done"], ["auth", "failed"], ["host", "unavailable"], ["services", "unavailable"], ["clock", "unavailable"], ["packages", "unavailable"], ["privilege", "unavailable"],
     ]);
+    assert.equal(h.contacted.some((c) => c.startsWith("privilege")), false, "no sudo listing after a failed sign-in");
     assert.equal(fc.steps[1].reason, "The host rejected the configured credentials.");
     assert.equal((await h.req("GET", `/api/servers/drafts/${id}`)).json.state, "check-failed");
     assert.equal((await h.req("POST", `/api/servers/drafts/${id}/activate`)).status, 409);
@@ -397,4 +404,72 @@ test("hosts.json is a one-time import: a restart with a changed file keeps the r
     const names = (await b.req("GET", "/api/fleet")).json.servers.map((s: { name: string }) => s.name).sort();
     assert.deepEqual(names, ["Local", "Renamed In App"]);
   } finally { await b.app.close(); }
+});
+
+test("T-081 R-2: broad passwordless sudo is reported with a warning; a failed probe is unavailable, never 'no rules'", async () => {
+  const h = await start();
+  try {
+    // Recorded-style output, classified by the product's own parser.
+    const recorded = "User fixture may run the following commands on fixture-host:\n    (ALL) NOPASSWD: ALL";
+    h.privilege = async () => ({ ok: true, privilege: classifySudo(recorded, 0) });
+    const { id } = await toKeyIssued(h);
+    await h.req("POST", `/api/servers/drafts/${id}/first-check`);
+    const fc = await waitFinished(h, id);
+    assert.deepEqual([fc.privilege.level, fc.privilege.broad], ["passwordless-sudo", true]);
+    assert.match(fc.steps.at(-1).reason, /^Warning:/);
+
+    h.privilege = async () => ({ ok: false, code: "TIMEOUT", message: "x" });
+    await h.req("POST", `/api/servers/drafts/${id}/first-check`);
+    const again = await waitFinished(h, id);
+    assert.equal(again.privilege, null);
+    assert.equal(again.steps.at(-1).state, "unavailable");
+    assert.equal(again.finished, true);
+    assert.equal((await h.req("GET", `/api/servers/drafts/${id}`)).json.state, "checked", "the privilege check never blocks the server");
+  } finally { await h.app.close(); }
+});
+
+test("T-081 R-1: 'not sure' is accepted and treated as production; it can be changed later", async () => {
+  const h = await start();
+  try {
+    const d = await h.req("POST", "/api/servers/drafts", { ...DRAFT, production: true, productionStatus: "not_sure" });
+    assert.deepEqual([d.json.production, d.json.productionStatus], [true, "not_sure"]);
+    const id = await toChecked(h, { ...DRAFT, name: "Unsure", address: "100.101.102.110", production: true, productionStatus: "not_sure" });
+    await h.req("POST", `/api/servers/drafts/${id}/activate`);
+    const fleet = (await h.req("GET", "/api/fleet")).json.servers.find((s: { id: string }) => s.id === id);
+    assert.equal(fleet.production, true, "the fleet treats it as production");
+    const plan = await h.req("POST", "/api/plans", { operation: "apply.packages.v1", serverId: id });
+    assert.ok(plan.json.requiredAcknowledgements.length > 0, "plans ask for the production acknowledgements");
+    const upd = await h.req("PATCH", `/api/servers/${id}`, { production: false });
+    assert.deepEqual([upd.json.production, upd.json.productionStatus], [false, "no"]);
+    assert.equal((await h.req("POST", "/api/servers/drafts", { ...DRAFT, production: "maybe" })).status, 400);
+    assert.equal((await h.req("POST", "/api/servers/drafts", { ...DRAFT, production: false, productionStatus: "not_sure" })).status, 400, "they must agree");
+  } finally { await h.app.close(); }
+});
+
+test("T-081 D-R2: re-registering a server under its own name points to it; D-R1: a very long id gets the contract's error, no echo", async () => {
+  const h = await start();
+  try {
+    const d = await h.req("POST", "/api/servers/drafts", { ...DRAFT, name: "Imported One", address: "203.0.113.20" });
+    assert.equal(d.status, 201);
+    assert.deepEqual(d.json.duplicateOf, { id: IMPORTED, name: "Imported One" });
+    const long = "a".repeat(500);
+    for (const url of [`/api/servers/${long}/disconnect`, `/api/servers/drafts/${long}`]) {
+      const r = await h.req(url.endsWith("disconnect") ? "POST" : "GET", url);
+      assert.equal(r.status, 404, url);
+      assert.ok(!r.text.includes(long), "the path is not echoed");
+      assert.match(r.json.error, /^(SERVER_NOT_FOUND|DRAFT_NOT_FOUND)$/);
+    }
+  } finally { await h.app.close(); }
+});
+
+test("T-081 D-R3: the sweeper removes an abandoned draft's key without waiting for another registration", async () => {
+  const h = await start({ sweepIntervalMs: 20 });
+  try {
+    const { id } = await toKeyIssued(h);
+    assert.equal(existsSync(join(h.keysDir, id, "id_ed25519")), true);
+    h.clock.advance(24 * 3600_000 + 1);
+    await new Promise((r) => setTimeout(r, 120));
+    assert.equal(existsSync(join(h.keysDir, id)), false, "the key is gone");
+    assert.equal((await h.req("GET", `/api/servers/drafts/${id}`)).status, 404);
+  } finally { await h.app.close(); }
 });

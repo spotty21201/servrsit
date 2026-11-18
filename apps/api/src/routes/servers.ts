@@ -139,7 +139,7 @@ export async function serverRoutes(fastify: FastifyInstance, o: ServerRouteOptio
     const parsed = ServerUpdateRequestSchema.safeParse(request.body);
     if (!parsed.success) return error(reply, 400, "INVALID_INPUT");
     return send(reply, o.registry.update(o.owner(request), request.params.id, parsed.data), 200, (s) =>
-      ServerUpdateResponseSchema.parse({ id: s.id, name: s.name, role: s.role, production: s.production }),
+      ServerUpdateResponseSchema.parse({ id: s.id, name: s.name, role: s.role, production: s.production, productionStatus: s.productionStatus }),
     );
   });
 

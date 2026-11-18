@@ -45,6 +45,24 @@ export const SSH_FINGERPRINT = /^SHA256:[A-Za-z0-9+/]{43}$/;
  */
 const Address = z.string().min(1).max(253).regex(/^[A-Za-z0-9.:[\]-]+$/);
 
+/**
+ * T-081 (R-1, FR-02): whether a server is production. "not_sure" is a real
+ * answer, and it is treated as production everywhere (extra precautions)
+ * until the owner decides. Requests send `production` (true/false) and may
+ * add `productionStatus`; when both are sent they must agree ("not_sure"
+ * goes with production: true).
+ */
+export const ProductionStatusSchema = z.enum(["yes", "no", "not_sure"]);
+export type ProductionStatus = z.infer<typeof ProductionStatusSchema>;
+/** The status a request means: its productionStatus, or yes/no from production. */
+export function productionStatusOf(production: boolean, status?: ProductionStatus | undefined): ProductionStatus {
+  return status ?? (production ? "yes" : "no");
+}
+/** Production precautions apply to "yes" and to "not_sure". */
+export function treatedAsProduction(status: ProductionStatus): boolean {
+  return status !== "no";
+}
+
 export const ServerDraftRequestSchema = z
   .object({
     address: Address,
@@ -53,8 +71,12 @@ export const ServerDraftRequestSchema = z
     name: z.string().regex(SERVER_DISPLAY_NAME),
     role: z.string().regex(SERVER_ROLE).nullable().default(null),
     production: z.boolean(),
+    productionStatus: ProductionStatusSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine((v) => v.productionStatus === undefined || treatedAsProduction(v.productionStatus) === v.production, {
+    message: "production must be true for productionStatus yes or not_sure, and false for no",
+  });
 export type ServerDraftRequest = z.infer<typeof ServerDraftRequestSchema>;
 
 export const ReachabilitySchema = z.discriminatedUnion("reachable", [
@@ -119,7 +141,10 @@ export const ServerDraftSchema = z
     user: z.string().regex(SSH_USER),
     name: z.string().regex(SERVER_DISPLAY_NAME),
     role: z.string().regex(SERVER_ROLE).nullable(),
+    /** True for "yes" and for "not_sure": production precautions apply. */
     production: z.boolean(),
+    /** T-081. Always sent by the API; optional only so older fixtures still parse. */
+    productionStatus: ProductionStatusSchema.optional(),
     /** An existing server with the same address and port (FR-02). Activation is refused while set. */
     duplicateOf: z.object({ id: z.string().uuid(), name: z.string().max(64) }).nullable(),
     reachability: ReachabilitySchema,
@@ -141,9 +166,44 @@ export const HostKeyConfirmRequestSchema = z
 export type HostKeyConfirmRequest = z.infer<typeof HostKeyConfirmRequestSchema>;
 
 export const FirstCheckStepStateSchema = z.enum(["waiting", "running", "done", "unavailable", "failed"]);
+
+/**
+ * T-081 (R-2, FR-02/03): the privilege check, disclosed to the owner before
+ * the first check runs. ServrSit runs exactly `sudo -n -l` as the login user:
+ * it lists the sudo rules, runs nothing as root, and never asks for or uses a
+ * password. Only the classification below is reported, never the output.
+ */
+export const PRIVILEGE_CHECK = {
+  id: "privilege",
+  label: "Checking sudo rules (sudo -n -l)",
+  command: "sudo -n -l",
+  disclosure:
+    "ServrSit runs `sudo -n -l` once as the login account. It lists that account's sudo rules, runs nothing as root and never asks for a password. The server may record the request in its auth log, and may email its administrator if the account has no sudo rights.",
+} as const;
+
+export const PrivilegeLevelSchema = z.enum([
+  /** sudo is absent, or the account has no sudo rules. */
+  "no-sudo-rules",
+  /** The account can run at least one command with sudo without a password. */
+  "passwordless-sudo",
+  /** Listing needed a password (which ServrSit never gives), or the answer could not be read. */
+  "unknown",
+]);
+export type PrivilegeLevel = z.infer<typeof PrivilegeLevelSchema>;
+
+export const PrivilegeSchema = z
+  .object({
+    level: PrivilegeLevelSchema,
+    /** Passwordless sudo for every command: the account is a full administrator. */
+    broad: z.boolean(),
+    /** Our own text; a warning when `broad`. */
+    summary: z.string().max(300),
+  })
+  .strict();
+export type Privilege = z.infer<typeof PrivilegeSchema>;
 export const FirstCheckStepSchema = z
   .object({
-    id: z.enum(["connect", "auth", "host", "services", "packages", "clock"]),
+    id: z.enum(["connect", "auth", "host", "services", "packages", "clock", "privilege"]),
     label: z.string().max(100),
     state: FirstCheckStepStateSchema,
     /** Our own text: why a step is unavailable or failed. Never raw server output. */
@@ -162,6 +222,8 @@ export const FirstCheckSchema = z
     platform: z.object({ supported: z.boolean(), name: z.string().max(64) }).nullable(),
     /** Null until finished. */
     coverage: z.object({ passed: z.number().int().nonnegative(), total: z.number().int().positive() }).nullable(),
+    /** T-081: the sudo-rules classification; null (or absent) until that step ran. */
+    privilege: PrivilegeSchema.nullable().optional(),
     /** Set when the check failed, from the collector's fixed failure codes. */
     failureCode: z
       .enum(["HOST_UNTRUSTED", "HOST_KEY_CHANGED", "ROUTE_UNAVAILABLE", "AUTH_FAILED", "TIMEOUT", "TARGET_REJECTED", "OUTPUT_INVALID", "COLLECTION_FAILED"])
@@ -179,9 +241,13 @@ export const ServerUpdateRequestSchema = z
     name: z.string().regex(SERVER_DISPLAY_NAME).optional(),
     role: z.string().regex(SERVER_ROLE).nullable().optional(),
     production: z.boolean().optional(),
+    productionStatus: ProductionStatusSchema.optional(),
   })
   .strict()
-  .refine((v) => Object.keys(v).length > 0, { message: "nothing to change" });
+  .refine((v) => Object.keys(v).length > 0, { message: "nothing to change" })
+  .refine((v) => v.productionStatus === undefined || v.production === undefined || treatedAsProduction(v.productionStatus) === v.production, {
+    message: "production and productionStatus disagree",
+  });
 export type ServerUpdateRequest = z.infer<typeof ServerUpdateRequestSchema>;
 
 /** PATCH /api/servers/:id response: the fields that can change, after the change. */
@@ -191,6 +257,8 @@ export const ServerUpdateResponseSchema = z
     name: z.string().regex(SERVER_DISPLAY_NAME),
     role: z.string().regex(SERVER_ROLE).nullable(),
     production: z.boolean(),
+    /** T-081. Always sent by the API. */
+    productionStatus: ProductionStatusSchema.optional(),
   })
   .strict();
 export type ServerUpdateResponse = z.infer<typeof ServerUpdateResponseSchema>;

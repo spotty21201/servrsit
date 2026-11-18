@@ -19,7 +19,7 @@ const server = (over: Partial<NewServer> = {}): NewServer => ({
   access: "ssh",
   name: "Fixture One",
   role: null,
-  production: false,
+  productionStatus: "no",
   address: "192.0.2.10",
   port: 22,
   user: "servrsit",
@@ -80,11 +80,13 @@ test("rename and describe record before and after; a disconnected server cannot 
   const r = store.update(server().id, { name: "Renamed", role: "Web" }, "owner", NOW);
   assert.equal(r.ok && r.server.name, "Renamed");
   assert.equal(r.ok && r.server.production, false);
+  const unsure = store.update(server().id, { productionStatus: "not_sure" }, "owner", NOW);
+  assert.deepEqual(unsure.ok && [unsure.server.production, unsure.server.productionStatus], [true, "not_sure"], "not sure is treated as production");
   store.disconnect(server().id, "owner", NOW, {});
   assert.deepEqual(store.update(server().id, { name: "Again" }, "owner", NOW), { ok: false, code: "DISCONNECTED" });
   assert.deepEqual(store.disconnect(server().id, "owner", NOW, {}), { ok: false, code: "DISCONNECTED" });
   assert.deepEqual(store.update("00000000-0000-4000-8000-0000000000ff", { name: "X" }, "owner", NOW), { ok: false, code: "SERVER_NOT_FOUND" });
-  assert.deepEqual(store.listEvents(server().id).map((e) => e.type), ["registered", "updated", "disconnected"]);
+  assert.deepEqual(store.listEvents(server().id).map((e) => e.type), ["registered", "updated", "updated", "disconnected"]);
 });
 
 test("the database refuses writesEnabled, deleting a server, editing a disconnected one, and editing events", () => {
@@ -115,4 +117,14 @@ test("expired drafts are listed so their unused keys can be removed", () => {
   assert.deepEqual(store.listExpiredDrafts(NOW).map((d) => d.id), ["old"]);
   assert.equal(store.deleteDraft("old"), true);
   assert.equal(store.deleteDraft("old"), false);
+});
+
+test("T-081: a registry made before production_status gets the column; old rows derive it from production", () => {
+  const path = join(mkdtempSync(join(tmpdir(), "servrsit-registry-old-")), "servers.db");
+  const old = new DatabaseSync(path);
+  old.exec("CREATE TABLE servers (id TEXT PRIMARY KEY, source TEXT NOT NULL, access TEXT NOT NULL, name TEXT NOT NULL, role TEXT, production INTEGER NOT NULL, address TEXT, port INTEGER, user TEXT, identity_file TEXT, known_hosts_file TEXT, important_services TEXT NOT NULL, collect INTEGER NOT NULL, collect_disabled_reason TEXT, writes_enabled INTEGER NOT NULL DEFAULT 0 CHECK (writes_enabled = 0), host_key TEXT, access_key TEXT, created_at TEXT NOT NULL, disconnected_at TEXT) STRICT");
+  old.prepare("INSERT INTO servers (id, source, access, name, production, important_services, collect, created_at) VALUES ('a', 'import', 'local', 'Old', 1, '[]', 1, 'now')").run();
+  old.close();
+  const store = new SqliteServerStore({ path });
+  assert.equal(store.get("a")?.productionStatus, "yes");
 });
