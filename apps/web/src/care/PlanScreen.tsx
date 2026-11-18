@@ -267,7 +267,8 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
                       type="button"
                       className={styles.primary}
                       onClick={() => void approve()}
-                      disabled={busy || phase.phase === "unconfirmed" || !allAcked}
+                      disabled={busy}
+                      aria-disabled={phase.phase === "unconfirmed" || !allAcked ? true : undefined}
                       aria-describedby={`${ids}-help`}
                     >
                       {vm.approveLabel}

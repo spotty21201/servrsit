@@ -76,7 +76,7 @@ function Steps({ steps }: { steps: readonly StepVM[] }) {
 
 /** Dark, read-only event log. Follows new lines only while the reader is at the end. */
 function Transcript({ lines, zoneNote }: { lines: readonly TranscriptLine[]; zoneNote: string }) {
-  const ref = useRef<HTMLUListElement | null>(null);
+  const ref = useRef<HTMLDivElement | null>(null);
   const following = useRef(true);
   const [away, setAway] = useState(false);
 
@@ -96,12 +96,15 @@ function Transcript({ lines, zoneNote }: { lines: readonly TranscriptLine[]; zon
   return (
     <div className={styles.transcriptWrap}>
       <p className={styles.small}>Event log, read-only, times in {zoneNote}. Remote command output is not captured yet, so this shows ServrSit&rsquo;s own recorded events.</p>
-      <ul ref={ref} className={styles.transcript} role="log" aria-live="off" aria-label="Operation event log, read-only" tabIndex={0} onScroll={onScroll}>
-        {lines.map((l) => (
-          <li key={l.seq}><span className={styles.tTime}>{l.time}</span><span>{l.text}</span></li>
-        ))}
-        {lines.length === 0 && <li><span className={styles.tTime}>--:--:--</span><span>No events recorded yet.</span></li>}
-      </ul>
+      {/* The log role sits on a div; the list inside keeps its own list semantics (D-U7). */}
+      <div ref={ref} className={styles.transcript} role="log" aria-live="off" aria-label="Operation event log, read-only" tabIndex={0} onScroll={onScroll}>
+        <ul className={styles.transcriptList}>
+          {lines.map((l) => (
+            <li key={l.seq}><span className={styles.tTime}>{l.time}</span><span>{l.text}</span></li>
+          ))}
+          {lines.length === 0 && <li><span className={styles.tTime}>--:--:--</span><span>No events recorded yet.</span></li>}
+        </ul>
+      </div>
       {away && (
         <button type="button" className={`${styles.secondary} ${styles.jump}`} onClick={() => {
           const el = ref.current;

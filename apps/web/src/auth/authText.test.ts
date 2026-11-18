@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { authError, formatRetry, groupSecret, isPasswordAcceptable, normaliseTotp, passwordHint, recoveryFileText } from "./authText";
+import { authError, codeStepReason, enrolReason, passwordStepReason, recoveryStepReason, setupDetailsReason, LOCKED_REASON, formatRetry, groupSecret, isPasswordAcceptable, normaliseTotp, passwordHint, recoveryFileText } from "./authText";
 import { qrMatrix, qrPath } from "./qr";
 
 const NOW = new Date("2026-11-17T07:00:00Z"); // 14:00 WIB
@@ -55,4 +55,28 @@ test("QR matrix is square, has the finder pattern, and the path is non-empty (no
   assert.ok(m.every((row) => row.length === m.length));
   assert.deepEqual(m[0]!.slice(0, 7), [true, true, true, true, true, true, true]); // top-left finder edge
   assert.match(qrPath(m), /^M\d+ 0h/);
+});
+
+test("every unusable button has a reason in words (D-U4); usable ones have none", () => {
+  assert.equal(passwordStepReason("", "x", false), "Enter your username to continue.");
+  assert.equal(passwordStepReason("owner", "", false), "Enter your password to continue.");
+  assert.equal(passwordStepReason("owner", "x", false), null);
+  assert.equal(passwordStepReason("owner", "x", true), LOCKED_REASON);
+  assert.equal(codeStepReason("12 34", false), "Enter all 6 digits of the code to sign in.");
+  assert.equal(codeStepReason("123 456", false), null);
+  assert.equal(recoveryStepReason("short", false), "Enter the whole recovery code to sign in.");
+  assert.equal(recoveryStepReason("ABCD-EFGH", false), null);
+  assert.match(setupDetailsReason("x", true, "a".repeat(20)) ?? "", /setup token/);
+  assert.match(setupDetailsReason("t".repeat(20), false, "a".repeat(20)) ?? "", /username/);
+  assert.match(setupDetailsReason("t".repeat(20), true, "short") ?? "", /more characters needed/);
+  assert.equal(setupDetailsReason("t".repeat(20), true, "correct horse battery"), null);
+  assert.equal(enrolReason("123"), "Enter the 6-digit code from your authenticator app to continue.");
+  assert.equal(enrolReason("123456"), null);
+});
+
+test("CLOCK_UNTRUSTED has plain wording and every error carries its kind", () => {
+  const e = authError({ kind: "CLOCK_UNTRUSTED" }, "enrol-confirm", NOW, TZ);
+  assert.match(e.text, /own clock is wrong/);
+  assert.equal(e.kind, "CLOCK_UNTRUSTED");
+  assert.equal(authError({ kind: "SETUP_UNAVAILABLE" }, "setup-token", NOW, TZ).kind, "SETUP_UNAVAILABLE");
 });

@@ -18,6 +18,8 @@ export type Step = "password" | "setup-token" | "totp" | "recovery" | "enrol-con
 
 export interface ErrorView {
   readonly text: string;
+  /** The error kind, so a screen can mark the right field. */
+  readonly kind: AuthClientErrorKind;
   /** Set for a lockout: the owner may retry from this moment. */
   readonly retryAt: Date | null;
   /** When true the flow must restart at the password step. */
@@ -34,7 +36,7 @@ export function formatRetry(seconds: number): string {
 
 export function authError(error: AuthClientError, step: Step, now: Date, tz: string): ErrorView {
   const kind: AuthClientErrorKind = error.kind;
-  const view = (text: string, extra: Partial<ErrorView> = {}): ErrorView => ({ text, retryAt: null, restart: false, ...extra });
+  const view = (text: string, extra: Partial<ErrorView> = {}): ErrorView => ({ text, kind, retryAt: null, restart: false, ...extra });
   switch (kind) {
     case "LOCKED_OUT": {
       const secs = error.retryAfterSeconds ?? 30;
@@ -93,6 +95,40 @@ export function passwordHint(pw: string): { level: PasswordLevel; text: string }
   if (n >= 16 || classes >= 3) return { level: "good", text: "Good. Longer is stronger." };
   return { level: "ok", text: "Long enough. Adding more words or characters makes it stronger." };
 }
+
+// ── Why a button cannot be used yet (D-U4): visible text next to the button ──
+
+export const LOCKED_REASON = "Sign-in is paused after too many attempts. Try again at the time given above.";
+
+export function passwordStepReason(username: string, password: string, locked: boolean): string | null {
+  if (locked) return LOCKED_REASON;
+  if (username.trim() === "") return "Enter your username to continue.";
+  if (password === "") return "Enter your password to continue.";
+  return null;
+}
+
+export function codeStepReason(code: string, locked: boolean): string | null {
+  if (locked) return LOCKED_REASON;
+  return normaliseTotp(code).length === 6 ? null : "Enter all 6 digits of the code to sign in.";
+}
+
+export function recoveryStepReason(code: string, locked: boolean): string | null {
+  if (locked) return LOCKED_REASON;
+  return code.trim().length >= 8 ? null : "Enter the whole recovery code to sign in.";
+}
+
+export function setupDetailsReason(token: string, usernameOk: boolean, password: string): string | null {
+  if (token.trim().length < 16) return "Paste the setup token from the API console to continue.";
+  if (!usernameOk) return "Use letters, digits, dots, dashes or underscores for the username.";
+  if (!isPasswordAcceptable(password)) return `${passwordHint(password).text} The password needs ${PASSWORD_MIN_CHARS}–${PASSWORD_MAX_CHARS} characters.`;
+  return null;
+}
+
+export function enrolReason(code: string): string | null {
+  return normaliseTotp(code).length === 6 ? null : "Enter the 6-digit code from your authenticator app to continue.";
+}
+
+export const RECOVERY_ACK_REASON = "Tick \"I saved these recovery codes\" to continue. They cannot be shown again.";
 
 export function isPasswordAcceptable(pw: string): boolean {
   const n = [...pw].length;

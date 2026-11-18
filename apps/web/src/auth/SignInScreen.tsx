@@ -14,8 +14,8 @@ import { login, verifySecondFactor, type AuthResult } from "../api/auth";
 import type { SessionInfo } from "@servrsit/contracts";
 import { DEFAULT_OWNER_TIME_ZONE } from "../lib/time";
 import { usePageTitle } from "../lib/pageTitle";
-import { AuthFrame, Notice } from "./AuthFrame";
-import { authError, isTotpComplete, normaliseRecovery, normaliseTotp, type ErrorView, type Step } from "./authText";
+import { AuthFrame, Notice, ReasonButton } from "./AuthFrame";
+import { authError, codeStepReason, isTotpComplete, normaliseRecovery, normaliseTotp, passwordStepReason, recoveryStepReason, type ErrorView, type Step } from "./authText";
 import styles from "./auth.module.css";
 
 export type SignInNotice = "signed-out" | "expired" | null;
@@ -37,12 +37,14 @@ export function SignInScreen({ notice, onSignedIn, onSetup }: Props) {
   const [error, setError] = useState<ErrorView | null>(null);
   const [lockedUntil, setLockedUntil] = useState<Date | null>(null);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
-  const changed = useRef(false);
+  const shownStep = useRef(step); // compares with the previous value, so a StrictMode double run never focuses on load
 
   useEffect(() => {
-    if (changed.current) titleRef.current?.focus();
-    changed.current = true;
-  }, [step]);
+    // Focus moves to the heading on every step change, and on arrival after sign-out or an ended session (D-U5),
+    // so keyboard focus is not left on <body> and the notice is read first. A cold load takes no focus.
+    if (shownStep.current !== step || notice !== null) titleRef.current?.focus();
+    shownStep.current = step;
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!lockedUntil) return;
@@ -111,17 +113,17 @@ export function SignInScreen({ notice, onSignedIn, onSetup }: Props) {
         <form className={styles.form} onSubmit={(e) => void submitPassword(e)} noValidate>
           <div className={styles.field}>
             <label htmlFor="si-user">Username</label>
-            <input id="si-user" name="username" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} aria-invalid={error ? true : undefined} />
+            <input id="si-user" name="username" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} aria-invalid={error ? true : undefined} aria-describedby={error ? "si-error" : undefined} />
           </div>
           <div className={styles.field}>
             <label htmlFor="si-pass">Password</label>
             <div className={styles.inputRow}>
-              <input id="si-pass" name="password" type={showPw ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={error ? true : undefined} />
-              <button type="button" className={styles.toggle} aria-pressed={showPw} onClick={() => setShowPw((v) => !v)}>{showPw ? "Hide" : "Show"}</button>
+              <input id="si-pass" name="password" type={showPw ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} aria-invalid={error ? true : undefined} aria-describedby={error ? "si-error" : undefined} />
+              <button type="button" className={styles.toggle} aria-pressed={showPw} aria-label="Show password" onClick={() => setShowPw((v) => !v)}>Show</button>
             </div>
           </div>
-          {error && <Notice tone="failed" alert>{error.text}</Notice>}
-          <button type="submit" className={styles.primary} disabled={busy || locked || username.trim() === "" || password === ""}>{busy ? "Signing in" : "Continue"}</button>
+          {error && <Notice id="si-error" tone="failed" alert>{error.text}</Notice>}
+          <ReasonButton id="si-go" type="submit" className={styles.primary} busy={busy} reason={passwordStepReason(username, password, locked)}>{busy ? "Signing in" : "Continue"}</ReasonButton>
           <p className={styles.help}>Next you&rsquo;ll enter a code from your authenticator app.</p>
           <p className={styles.altRow}>First time here? <button type="button" className={styles.link} onClick={onSetup}>Set up the owner account</button></p>
         </form>
@@ -132,10 +134,10 @@ export function SignInScreen({ notice, onSignedIn, onSetup }: Props) {
           <p className={styles.p}>Password accepted. Open your authenticator app and enter the 6-digit code for ServrSit.</p>
           <div className={styles.field}>
             <label htmlFor="si-code">6-digit code</label>
-            <input id="si-code" name="code" className={styles.codeInput} type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]*" maxLength={7} spellCheck={false} value={code} onChange={(e) => setCode(e.target.value)} aria-invalid={error ? true : undefined} />
+            <input id="si-code" name="code" className={styles.codeInput} type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]*" maxLength={7} spellCheck={false} value={code} onChange={(e) => setCode(e.target.value)} aria-invalid={error ? true : undefined} aria-describedby={error ? "si-error" : undefined} />
           </div>
-          {error && <Notice tone="failed" alert>{error.text}</Notice>}
-          <button type="submit" className={styles.primary} disabled={busy || locked || !isTotpComplete(code)}>{busy ? "Signing in" : "Sign in"}</button>
+          {error && <Notice id="si-error" tone="failed" alert>{error.text}</Notice>}
+          <ReasonButton id="si-go2" type="submit" className={styles.primary} busy={busy} reason={codeStepReason(code, locked)}>{busy ? "Signing in" : "Sign in"}</ReasonButton>
           <p className={styles.altRow}>
             <button type="button" className={styles.link} onClick={() => { setCode(""); go("recovery"); }}>Use a recovery code instead</button>
             {" · "}
@@ -149,10 +151,10 @@ export function SignInScreen({ notice, onSignedIn, onSetup }: Props) {
           <p className={styles.p}>Enter one of the recovery codes you saved when you set up. Each code works once.</p>
           <div className={styles.field}>
             <label htmlFor="si-rec">Recovery code</label>
-            <input id="si-rec" name="recovery" className={styles.codeInput} type="text" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={recovery} onChange={(e) => setRecovery(e.target.value)} aria-invalid={error ? true : undefined} />
+            <input id="si-rec" name="recovery" className={styles.codeInput} type="text" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={recovery} onChange={(e) => setRecovery(e.target.value)} aria-invalid={error ? true : undefined} aria-describedby={error ? "si-error" : undefined} />
           </div>
-          {error && <Notice tone="failed" alert>{error.text}</Notice>}
-          <button type="submit" className={styles.primary} disabled={busy || locked || normaliseRecovery(recovery).length < 8}>{busy ? "Signing in" : "Sign in with recovery code"}</button>
+          {error && <Notice id="si-error" tone="failed" alert>{error.text}</Notice>}
+          <ReasonButton id="si-go3" type="submit" className={styles.primary} busy={busy} reason={recoveryStepReason(recovery, locked)}>{busy ? "Signing in" : "Sign in with recovery code"}</ReasonButton>
           <p className={styles.altRow}>
             <button type="button" className={styles.link} onClick={() => { setRecovery(""); go("totp"); }}>Use the authenticator code instead</button>
           </p>

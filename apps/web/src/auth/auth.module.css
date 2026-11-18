@@ -112,7 +112,7 @@
 .primary:hover:not(:disabled) { background-color: var(--color-citron); }
 .secondary, .secondaryLink { background-color: var(--color-surface); }
 .secondary:hover:not(:disabled), .secondaryLink:hover { background-color: var(--color-canvas); text-decoration: none; }
-.primary:disabled, .secondary:disabled {
+.primary:disabled, .secondary:disabled, .primary[aria-disabled="true"], .secondary[aria-disabled="true"] {
   cursor: not-allowed;
   background-color: var(--color-state-unknown-bg);
   color: var(--color-state-unknown-fg);

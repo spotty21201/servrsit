@@ -16,8 +16,8 @@ import { USERNAME_PATTERN, type SessionInfo, type SetupStartResponse } from "@se
 import { confirmSetup, startSetup, type AuthResult } from "../api/auth";
 import { DEFAULT_OWNER_TIME_ZONE } from "../lib/time";
 import { usePageTitle } from "../lib/pageTitle";
-import { AuthFrame, Notice } from "./AuthFrame";
-import { authError, groupSecret, isPasswordAcceptable, isTotpComplete, normaliseTotp, passwordHint, recoveryFileText, type ErrorView, type Step } from "./authText";
+import { AuthFrame, Notice, ReasonButton } from "./AuthFrame";
+import { authError, enrolReason, groupSecret, isPasswordAcceptable, normaliseTotp, passwordHint, RECOVERY_ACK_REASON, recoveryFileText, setupDetailsReason, type ErrorView, type Step } from "./authText";
 import { copyText, downloadText } from "./copy";
 import { QrCode } from "./QrCode";
 import styles from "./auth.module.css";
@@ -45,11 +45,11 @@ export function SetupScreen({ onDone, onBack }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ErrorView | null>(null);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
-  const first = useRef(true);
+  const shownPhase = useRef(phase); // compares with the previous value, so a StrictMode double run never focuses on load
 
   useEffect(() => {
-    if (!first.current) titleRef.current?.focus();
-    first.current = false;
+    if (shownPhase.current !== phase) titleRef.current?.focus();
+    shownPhase.current = phase;
   }, [phase]);
 
   // The recovery codes cannot be shown again: ask before the page is left.
@@ -86,7 +86,7 @@ export function SetupScreen({ onDone, onBack }: Props) {
 
   async function submitCode(e: FormEvent): Promise<void> {
     e.preventDefault();
-    if (busy || !isTotpComplete(code)) return;
+    if (busy || enrolReason(code) !== null) return;
     setBusy(true);
     setError(null);
     const r = await confirmSetup(normaliseTotp(code));
@@ -126,25 +126,25 @@ export function SetupScreen({ onDone, onBack }: Props) {
           <p className={styles.p}>Create the single owner account. Two-step sign-in is required, so you&rsquo;ll add an authenticator next.</p>
           <div className={styles.field}>
             <label htmlFor="su-token">Setup token</label>
-            <input id="su-token" name="setup-token" className={styles.mono} type="text" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} aria-describedby="su-token-help" />
+            <input id="su-token" name="setup-token" className={styles.mono} type="text" autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} aria-invalid={error?.kind === "SETUP_UNAVAILABLE" || error?.kind === "CLOCK_UNTRUSTED" ? true : undefined} aria-describedby={`su-token-help${error ? " su-error" : ""}`} />
             <p id="su-token-help" className={styles.help}>The API prints it in its console (stderr) when it starts. It works once; restarting the API prints a new one.</p>
           </div>
           <div className={styles.field}>
             <label htmlFor="su-user">Username</label>
-            <input id="su-user" name="username" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} aria-describedby="su-user-help" aria-invalid={username !== "" && !usernameOk ? true : undefined} />
+            <input id="su-user" name="username" type="text" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={username} onChange={(e) => setUsername(e.target.value)} aria-describedby={`su-user-help${error ? " su-error" : ""}`} aria-invalid={(username !== "" && !usernameOk) || error?.kind === "INVALID_INPUT" ? true : undefined} />
             <p id="su-user-help" className={styles.help}>Letters, digits, dots, dashes and underscores.</p>
           </div>
           <div className={styles.field}>
             <label htmlFor="su-pass">Password</label>
             <div className={styles.inputRow}>
-              <input id="su-pass" name="new-password" type={showPw ? "text" : "password"} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} aria-describedby="su-pass-hint" />
-              <button type="button" className={styles.toggle} aria-pressed={showPw} onClick={() => setShowPw((v) => !v)}>{showPw ? "Hide" : "Show"}</button>
+              <input id="su-pass" name="new-password" type={showPw ? "text" : "password"} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} aria-describedby={`su-pass-hint${error ? " su-error" : ""}`} aria-invalid={error?.kind === "INVALID_INPUT" ? true : undefined} />
+              <button type="button" className={styles.toggle} aria-pressed={showPw} aria-label="Show password" onClick={() => setShowPw((v) => !v)}>Show</button>
             </div>
             <div className={styles.meter} data-level={hint.level} aria-hidden="true"><span /><span /><span /></div>
             <p id="su-pass-hint" className={styles.help}>{hint.text} Pasting and password managers work.</p>
           </div>
-          {error && <Notice tone="failed" alert>{error.text}</Notice>}
-          <button type="submit" className={styles.primary} disabled={busy || !detailsOk}>{busy ? "Checking" : "Continue to authenticator"}</button>
+          {error && <Notice id="su-error" tone="failed" alert>{error.text}</Notice>}
+          <ReasonButton id="su-go" type="submit" className={styles.primary} busy={busy} reason={setupDetailsReason(token, usernameOk, password)}>{busy ? "Checking" : "Continue to authenticator"}</ReasonButton>
           <p className={styles.altRow}><button type="button" className={styles.link} onClick={onBack}>Back to sign in</button></p>
         </form>
       )}
@@ -170,11 +170,11 @@ export function SetupScreen({ onDone, onBack }: Props) {
           </div>
           <div className={styles.field}>
             <label htmlFor="su-code">6-digit code from the app</label>
-            <input id="su-code" name="code" className={styles.codeInput} type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]*" maxLength={7} spellCheck={false} value={code} onChange={(e) => setCode(e.target.value)} aria-invalid={error ? true : undefined} />
-            <p className={styles.help}>This setup stays open for about {Math.max(1, Math.round(enrol.expiresInSeconds / 60))} minutes.</p>
+            <input id="su-code" name="code" className={styles.codeInput} type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]*" maxLength={7} spellCheck={false} value={code} onChange={(e) => setCode(e.target.value)} aria-invalid={error ? true : undefined} aria-describedby={`su-code-help${error ? " su-error" : ""}`} />
+            <p id="su-code-help" className={styles.help}>This setup stays open for about {Math.max(1, Math.round(enrol.expiresInSeconds / 60))} minutes.</p>
           </div>
-          {error && <Notice tone="failed" alert>{error.text}</Notice>}
-          <button type="submit" className={styles.primary} disabled={busy || !isTotpComplete(code)}>{busy ? "Confirming" : "Confirm and create account"}</button>
+          {error && <Notice id="su-error" tone="failed" alert>{error.text}</Notice>}
+          <ReasonButton id="su-confirm" type="submit" className={styles.primary} busy={busy} reason={enrolReason(code)}>{busy ? "Confirming" : "Confirm and create account"}</ReasonButton>
         </form>
       )}
 
@@ -193,7 +193,7 @@ export function SetupScreen({ onDone, onBack }: Props) {
             <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
             <span>I saved these recovery codes</span>
           </label>
-          <button type="button" className={styles.primary} disabled={!saved} onClick={() => onDone(session)}>Continue to ServrSit</button>
+          <ReasonButton id="su-done" className={styles.primary} reason={saved ? null : RECOVERY_ACK_REASON} onClick={() => onDone(session)}>Continue to ServrSit</ReasonButton>
         </div>
       )}
     </AuthFrame>

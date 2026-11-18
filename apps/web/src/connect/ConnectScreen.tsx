@@ -21,6 +21,7 @@ import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "rea
 import type { ServerDraft, FirstCheck } from "@servrsit/contracts";
 import { copyText } from "../auth/copy";
 import { CareShell } from "../care/CareShell";
+import { ReasonButton } from "../auth/AuthFrame";
 import { createFixtureServersClient, type ServersClient, type ServersResult } from "../api/stubs/servers";
 import { serverPath } from "../lib/router";
 import { usePageTitle } from "../lib/pageTitle";
@@ -66,15 +67,15 @@ export function ConnectScreen({ client: injected }: { client?: ServersClient }) 
   const [checking, setChecking] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
-  const first = useRef(true);
+  const shownStep = useRef(0);
   const alive = useRef(true);
   const ids = useId();
 
   useEffect(() => () => { alive.current = false; }, []);
   useEffect(() => { store.set(DRAFT_KEY, serializeDraft(form)); }, [form]);
   useEffect(() => {
-    if (!first.current) titleRef.current?.focus();
-    first.current = false;
+    if (shownStep.current !== step) titleRef.current?.focus();
+    shownStep.current = step;
   }, [step]);
 
   // Resume a server-side draft (it holds no secret and expires after 24 hours).
@@ -94,6 +95,13 @@ export function ConnectScreen({ client: injected }: { client?: ServersClient }) 
   const comparison = draft?.hostKey ? compareFingerprint(draft.hostKey.fingerprint, entered) : "empty";
   const confirmed = draft?.hostKeyConfirmedAt != null;
   const production = draft ? draft.production : treatedAsProduction(form.classification);
+
+  function trustReason(cmp: string, independent: boolean, scanned: boolean): string | null {
+    if (!scanned || cmp === "empty") return "Enter your fingerprint and compare it with what ServrSit sees first.";
+    if (cmp === "malformed") return "Enter a valid fingerprint that starts with SHA256:.";
+    if (cmp === "mismatch") return "The fingerprints do not match, so you cannot continue.";
+    return independent ? null : "Tick the confirmation above to continue.";
+  }
 
   function go(n: number): void { setProblem(null); setStep(n); }
 
@@ -290,7 +298,7 @@ export function ConnectScreen({ client: injected }: { client?: ServersClient }) 
                   <input id={`${ids}-fp`} type="text" className={c.mono} value={entered} onChange={(e) => { setEntered(e.target.value); setIndependent(false); }} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-describedby={`${ids}-fp-h`} />
                   <p id={`${ids}-fp-h`} className={c.small}>Type or paste it. ServrSit shows what it sees only after you enter yours, so the comparison is real.</p>
                 </div>
-                <button type="button" className={c.secondary} onClick={() => void scan()} disabled={busy || entered.trim() === ""}>{busy ? "Reading the host key" : "3. Compare with what ServrSit sees"}</button>
+                <ReasonButton id={`${ids}-scan`} className={c.secondary} busy={busy} reason={entered.trim() === "" ? "Enter the fingerprint from the server console first." : null} onClick={() => void scan()}>{busy ? "Reading the host key" : "3. Compare with what ServrSit sees"}</ReasonButton>
                 {draft.hostKey && (
                   <div role="status" aria-live="polite" className={s.form}>
                     <p className={c.small}>ServrSit sees ({draft.hostKey.algorithm}):</p>
@@ -318,7 +326,7 @@ export function ConnectScreen({ client: injected }: { client?: ServersClient }) 
               <button type="button" className={c.secondary} onClick={() => go(0)}>Back</button>
               {confirmed
                 ? <button type="button" className={c.primary} onClick={() => go(2)}>Continue</button>
-                : <button type="button" className={c.primary} onClick={() => void trust()} disabled={busy || comparison !== "match" || !independent}>{busy ? "Confirming" : "Trust this host key and continue"}</button>}
+                : <ReasonButton id={`${ids}-trust`} className={c.primary} busy={busy} reason={trustReason(comparison, independent, draft.hostKey !== null)} onClick={() => void trust()}>{busy ? "Confirming" : "Trust this host key and continue"}</ReasonButton>}
             </div>
           </div>
         )}
@@ -365,7 +373,7 @@ export function ConnectScreen({ client: injected }: { client?: ServersClient }) 
             ) : <p className={c.p} role="status">The key has not been made yet. Go back and confirm the host key.</p>}
             <div className={s.nav}>
               <button type="button" className={c.secondary} onClick={() => go(1)}>Back</button>
-              <button type="button" className={c.primary} onClick={() => go(3)} disabled={!draft.accessKey}>I added the key. Continue</button>
+              <ReasonButton id={`${ids}-added`} className={c.primary} reason={draft.accessKey ? null : "The key has not been made yet. Go back and confirm the host key."} onClick={() => go(3)}>I added the key. Continue</ReasonButton>
             </div>
           </div>
         )}
