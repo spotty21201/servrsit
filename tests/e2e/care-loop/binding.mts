@@ -35,6 +35,20 @@ import { buildServer } from "../../../apps/api/src/server.ts";
 type App = Awaited<ReturnType<typeof buildServer>>;
 import { Dispatcher, SimulatedTarget, TransportError, type WriteTarget } from "../../../apps/worker/src/index.ts";
 import { createSigner, PRODUCTION_ACK } from "../../../packages/domain/src/index.ts";
+import * as careContracts from "../../../packages/contracts/src/care.ts";
+
+/**
+ * T-057 replaced the one production acknowledgement with two named ones. Map each abstract acknowledgement to
+ * its own product token by NAME, so a partial set really is sent as a partial set. On code without T-057 the
+ * old single token is sent only when both are given (the previous mapping).
+ */
+const named = careContracts as unknown as { ACK_RECOVERY_ROUTE?: string; ACK_INTERRUPTION_RISK?: string };
+export function productAcks(acks: readonly string[]): string[] {
+  if (named.ACK_RECOVERY_ROUTE && named.ACK_INTERRUPTION_RISK) {
+    return [...(acks.includes(ACK_RECOVERY) ? [named.ACK_RECOVERY_ROUTE] : []), ...(acks.includes(ACK_RISK) ? [named.ACK_INTERRUPTION_RISK] : [])];
+  }
+  return acks.includes(ACK_RECOVERY) && acks.includes(ACK_RISK) ? [PRODUCTION_ACK] : [];
+}
 import { MemoryIntentStore, SqliteAuthStore, SqliteCareStore, type OperationEvent, type StoredOperation } from "../../../packages/store/src/index.ts";
 import {
   ACK_RECOVERY,
@@ -289,7 +303,7 @@ export class InProcessHarness implements Harness {
       planVersion: i.version,
       ...(i.digest === undefined ? {} : { planDigest: i.digest }),
       idempotencyKey: sha(i.idempotencyKey).slice(0, 32),
-      acknowledgements: acks.includes(ACK_RECOVERY) && acks.includes(ACK_RISK) ? [PRODUCTION_ACK] : [],
+      acknowledgements: productAcks(acks),
       ...(i.extra ?? {}),
     };
     const r = await this.http("POST", `/api/plans/${i.planId}/approvals`, body, headers, { session: i.session !== "none", csrf: false });

@@ -24,6 +24,8 @@ import { DatabaseSync } from "node:sqlite";
 import { enrolOwner, setupTokenSink, type SignedInOwner } from "../../../apps/api/src/auth/testing.ts";
 import { FleetConfigSchema, loadFleetConfig } from "../../../apps/api/src/fleet/config.ts";
 import { buildServer } from "../../../apps/api/src/server.ts";
+import { productAcks } from "./binding.mts";
+import { ACK_RECOVERY, ACK_RISK } from "./support/contract.mts";
 import { SshWriteTarget, WritesDisabledError } from "../../../apps/worker/src/index.ts";
 import { PRODUCTION_ACK } from "../../../packages/domain/src/index.ts";
 import { SqliteCareStore } from "../../../packages/store/src/index.ts";
@@ -110,7 +112,7 @@ test("ZT-01: for every real host, approval is refused and creates no operation",
     const plan = (await post("/api/plans", { operation: "apply.packages.v1", serverId: h.id })).body;
     const r = await post(`/api/plans/${plan["id"]}/approvals`, {
       planVersion: plan["version"], planDigest: plan["digest"], idempotencyKey: `zt01-${h.name}-`.padEnd(24, "x"),
-      acknowledgements: h.production ? [PRODUCTION_ACK] : [],
+      acknowledgements: h.production ? productAcks([ACK_RECOVERY, ACK_RISK]) : [],
     }, withCsrf);
     assert.ok(r.status >= 400 && r.status < 500, `${h.name}: expected a 4xx refusal, got ${r.status}`);
     assert.ok(["PLAN_BLOCKED", "WRITES_DISABLED"].includes(String(r.body["error"])), `${h.name}: unexpected refusal ${JSON.stringify(r.body)}`);
@@ -125,7 +127,7 @@ test("ZT-01: a revised plan for a real host is still blocked, and a client canno
   const rev = await post(`/api/plans/${plan["id"]}/revisions`);
   assert.equal(rev.status, 201);
   assert.ok((rev.body["blockers"] as { code: string }[]).some((b: { code: string }) => b.code === "WRITES_DISABLED"));
-  const baseBody = { planVersion: rev.body["version"], planDigest: rev.body["digest"], idempotencyKey: "zt01-override-attempt-0001", acknowledgements: [PRODUCTION_ACK] };
+  const baseBody = { planVersion: rev.body["version"], planDigest: rev.body["digest"], idempotencyKey: "zt01-override-attempt-0001", acknowledgements: productAcks([ACK_RECOVERY, ACK_RISK]) };
   for (const extra of [{ writesEnabled: true }, { writes_enabled: true }, { force: true }, { override: { writesEnabled: true } }]) {
     const r = await post(`/api/plans/${plan["id"]}/approvals`, { ...baseBody, ...extra }, withCsrf);
     assert.ok(r.status >= 400 && r.status < 500, `override ${JSON.stringify(extra)}: ${r.status}`);
