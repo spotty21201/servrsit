@@ -220,6 +220,13 @@ export class SqliteCareStore implements CareStore {
     return row === undefined ? null : toOperation(row);
   }
 
+  listOperations(since: string, limit: number): StoredOperation[] {
+    const rows = this.db
+      .prepare("SELECT * FROM operations WHERE updated_at >= ? ORDER BY updated_at DESC, rowid DESC LIMIT ?")
+      .all(since, limit) as unknown as OperationRow[];
+    return rows.map(toOperation);
+  }
+
   getOperation(id: string): StoredOperation | null {
     const row = this.db.prepare("SELECT * FROM operations WHERE id = ?").get(id) as OperationRow | undefined;
     return row === undefined ? null : toOperation(row);

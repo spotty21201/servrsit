@@ -108,6 +108,8 @@ export interface CareStore {
   /** Whether this plan version already has an approval (a repeat request is then an idempotent replay). */
   hasApproval(planId: string, planVersion: number): boolean;
   getOperation(id: string): StoredOperation | null;
+  /** T-077: operations updated at or after `since`, newest first (history). */
+  listOperations(since: string, limit: number): StoredOperation[];
   listEvents(operationId: string): OperationEvent[];
   /** Validated state change plus its event, atomically. Throws TransitionError. */
   transition(
