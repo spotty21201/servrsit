@@ -63,7 +63,8 @@ export type MessageKind = "question" | "change_request" | "secret";
 const SECRET_PATTERNS: readonly RegExp[] = [
   /-----BEGIN [A-Z0-9 ]*PRIVATE KEY( BLOCK)?-----/,
   /\bsk-[A-Za-z0-9_-]{16,}/,
-  /\b(password|passwd|passphrase|pwd)\s*(=|:|\bis\b)\s*\S{3,}/i,
+  // "is" is handled by the natural-phrasing pattern below, which ignores ordinary words ("is required").
+  /\b(password|passwd|passphrase|pwd)\s*(=|:)\s*\S{3,}/i,
   /\b(secret|api[_ -]?key|access[_ -]?key|auth[_ -]?token|token)\s*[=:]\s*\S{6,}/i,
   /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}/i,
   /\b(AKIA|ASIA)[0-9A-Z]{16}\b/,
@@ -73,6 +74,18 @@ const SECRET_PATTERNS: readonly RegExp[] = [
   /\bxox[abprs]-[A-Za-z0-9-]{10,}/,
   /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/,
   /\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:[^\s/@]+@/i,
+  // T-064 F1: env-style names. `_` is a word character, so `\b` never fires inside DB_PASSWORD or GITHUB_TOKEN.
+  /(?:^|[^A-Za-z0-9])[A-Za-z0-9_]*(?:password|passwd|passphrase|pwd|token|secret|api_?key|access_?key|private_?key|auth_?key|credentials?)[A-Za-z0-9_]*\s*[=:]\s*["']?[^\s"']{3,}/i,
+  // T-064 F1: natural phrasing, "the sudo password for Sentani is Tr0ub4dor99". Ordinary words after "is" do not count.
+  /\b(?:password|passphrase|passcode|secret)\b[^.\n]{0,40}?\b(?:is|was)\s+(?!(?:not|required|needed|set|wrong|correct|expired|stored|missing|changed|strong|weak|the|a|an|too|still|being|empty|blank|in|on|from|for|of|my|your|our|their|unknown|different|same|saved|managed|kept|rotated)\b)["']?\S{6,}/i,
+  // T-064 F1: more key shapes.
+  /\btskey-[a-z]+-[A-Za-z0-9-]{10,}/,
+  /\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{10,}/,
+  /\bwhsec_[A-Za-z0-9]{16,}/,
+  /\bAIza[0-9A-Za-z_-]{35}/,
+  /\bnpm_[A-Za-z0-9]{30,}/,
+  /\bglpat-[A-Za-z0-9_-]{20,}/,
+  /\bhf_[A-Za-z0-9]{30,}/,
 ];
 
 const VERB =
