@@ -20,17 +20,23 @@ import {
   type InspectionObservation,
   type PinState,
 } from "@servrsit/ssh";
-import type { HostConfig, FleetConfig } from "./config.js";
+import type { FleetConfig, FleetHost } from "./config.js";
 import { evaluateFindings } from "./findings.js";
 import type { FleetResponse, FleetServer } from "./schema.js";
 import { coverageOf, deriveStatus, freshUntil, type Attempt } from "./status.js";
 
-export type Collector = (host: HostConfig) => Promise<CollectionResult>;
-export type PinChecker = (host: HostConfig) => Promise<PinState>;
+export type Collector = (host: FleetHost) => Promise<CollectionResult>;
+export type PinChecker = (host: FleetHost) => Promise<PinState>;
 
 export interface FleetServiceOptions {
   readonly config: FleetConfig;
   readonly knownHostsFile: string;
+  /**
+   * T-069: the servers to check, read on every pass and snapshot (the server
+   * registry). Default: config.hosts. A server that leaves this list is no
+   * longer checked.
+   */
+  readonly hosts?: (() => readonly FleetHost[]) | undefined;
   readonly collector?: Collector | undefined;
   readonly pinChecker?: PinChecker | undefined;
   readonly now?: (() => Date) | undefined;
@@ -73,47 +79,87 @@ export class FleetService {
                 user: host.user,
                 ...(host.identityFile === undefined ? {} : { identityFile: host.identityFile }),
               },
-              { knownHostsFile: options.knownHostsFile },
+              { knownHostsFile: host.knownHostsFile ?? options.knownHostsFile },
             ));
     this.pinChecker =
       options.pinChecker ??
       (async (host) =>
-        host.access === "local" ? "pinned" : pinStateFor(options.knownHostsFile, host.address, host.port));
-    for (const host of options.config.hosts) {
-      this.states.set(host.id, {
+        host.access === "local"
+          ? "pinned"
+          : pinStateFor(host.knownHostsFile ?? options.knownHostsFile, host.address, host.port));
+    this.hosts = options.hosts ?? (() => options.config.hosts);
+  }
+
+  private readonly hosts: () => readonly FleetHost[];
+
+  private stateFor(host: FleetHost): ServerState {
+    let state = this.states.get(host.id);
+    if (state === undefined) {
+      state = {
         pin: host.access === "local" ? "pinned" : "unknown",
         latestAttempt: null,
         lastSuccess: null,
         previousSuccess: null,
         consecutiveFailures: 0,
         retryBlocked: false,
-      });
+      };
+      this.states.set(host.id, state);
     }
+    return state;
+  }
+
+  /** Forget servers that left the list (disconnected), so nothing about them lingers. */
+  private prune(hosts: readonly FleetHost[]): void {
+    const ids = new Set(hosts.map((h) => h.id));
+    for (const id of this.states.keys()) if (!ids.has(id)) this.states.delete(id);
   }
 
   private get intervalMs(): number {
     return this.options.config.healthIntervalMinutes * 60_000;
   }
 
+  /** Every check runs through this chain, so no two collections overlap. */
+  private chain: Promise<void> = Promise.resolve();
+
+  private serial(fn: () => Promise<void>): Promise<void> {
+    const next = this.chain.then(fn);
+    this.chain = next.catch(() => undefined);
+    return next;
+  }
+
   /** Run one pass over all hosts, serially. Concurrent calls share one run. */
   refreshAll(): Promise<void> {
     if (this.running !== null) return this.running;
-    this.running = this.runPass().finally(() => {
+    this.running = this.serial(() => this.runPass()).finally(() => {
       this.running = null;
     });
     return this.running;
   }
 
   private async runPass(): Promise<void> {
-    for (const host of this.options.config.hosts) {
+    const hosts = this.hosts();
+    this.prune(hosts);
+    for (const host of hosts) {
+      // A server disconnected during the pass is skipped.
+      if (!this.hosts().some((h) => h.id === host.id)) continue;
       await this.refreshOne(host);
     }
     this.lastRunAt = this.now();
   }
 
-  private async refreshOne(host: HostConfig): Promise<void> {
-    const state = this.states.get(host.id);
-    if (state === undefined) return;
+  /**
+   * T-069: check one server now (just after it was added), without touching
+   * any other server. It queues behind a running pass, so checks stay serial.
+   */
+  refreshHost(id: string): Promise<void> {
+    return this.serial(async () => {
+      const host = this.hosts().find((h) => h.id === id);
+      if (host !== undefined) await this.refreshOne(host);
+    });
+  }
+
+  private async refreshOne(host: FleetHost): Promise<void> {
+    const state = this.stateFor(host);
     state.pin = await this.pinChecker(host);
     if (state.pin !== "pinned" || !host.collect || state.retryBlocked) return;
 
@@ -148,6 +194,7 @@ export class FleetService {
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
     if (this.running !== null) await this.running;
+    await this.chain;
   }
 
   /** T-063: the controller clock, with skew attributed to it when most targets agree. */
@@ -164,7 +211,9 @@ export class FleetService {
   snapshot(): FleetResponse {
     const now = this.now();
     const controlPlane = this.controlPlane();
-    const servers = this.options.config.hosts.map((host) => this.serverView(host, now, controlPlane.clock));
+    const hosts = this.hosts();
+    this.prune(hosts);
+    const servers = hosts.map((host) => this.serverView(host, now, controlPlane.clock));
     const next =
       this.timer === null
         ? null
@@ -180,9 +229,8 @@ export class FleetService {
     };
   }
 
-  private serverView(host: HostConfig, now: Date, controllerClock: ControllerClock): FleetServer {
-    const state = this.states.get(host.id);
-    if (state === undefined) throw new Error(`no state for ${host.id}`);
+  private serverView(host: FleetHost, now: Date, controllerClock: ControllerClock): FleetServer {
+    const state = this.stateFor(host);
     const success = state.lastSuccess;
     const coverage = success === null ? null : coverageOf(success.observation);
     const derived = deriveStatus({

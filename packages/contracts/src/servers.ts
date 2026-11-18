@@ -1,6 +1,6 @@
 /**
- * Server registration API (T-069, PRD FR-02/03/04, Tech Spec §6.2). CONTRACT ONLY:
- * the endpoints below are not implemented yet.
+ * Server registration API (T-069, PRD FR-02/03/04, Tech Spec §6.2). Implemented
+ * in apps/api/src/routes/servers.ts.
  *
  * Every endpoint needs a signed-in owner (session), and every state-changing
  * one also needs the session's CSRF token and an allowed Origin (T-053).
@@ -15,7 +15,7 @@
  *   POST   /api/servers/drafts/:id/first-check                               -> 202 FirstCheck (read-only collection)
  *   GET    /api/servers/drafts/:id/first-check                               -> 200 FirstCheck (poll)
  *   POST   /api/servers/drafts/:id/activate                                  -> 201 ActivateResponse
- *   PATCH  /api/servers/:id                          ServerUpdateRequest     -> 200 (name, role, production only)
+ *   PATCH  /api/servers/:id                          ServerUpdateRequest     -> 200 ServerUpdateResponse (name, role, production only)
  *   POST   /api/servers/:id/disconnect                                       -> 200 DisconnectResponse
  *
  * Order is enforced by the API: host key -> owner confirms the fingerprint ->
@@ -183,6 +183,17 @@ export const ServerUpdateRequestSchema = z
   .strict()
   .refine((v) => Object.keys(v).length > 0, { message: "nothing to change" });
 export type ServerUpdateRequest = z.infer<typeof ServerUpdateRequestSchema>;
+
+/** PATCH /api/servers/:id response: the fields that can change, after the change. */
+export const ServerUpdateResponseSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: z.string().regex(SERVER_DISPLAY_NAME),
+    role: z.string().regex(SERVER_ROLE).nullable(),
+    production: z.boolean(),
+  })
+  .strict();
+export type ServerUpdateResponse = z.infer<typeof ServerUpdateResponseSchema>;
 
 export const DisconnectResponseSchema = z
   .object({

@@ -15,13 +15,24 @@ import { authStub } from "./auth/stub.js";
 import healthPlugin from "./routes/health.js";
 import fleetPlugin from "./routes/fleet.js";
 import { FleetService } from "./fleet/service.js";
-import { knownHostsPath, loadFleetConfig, type FleetConfig } from "./fleet/config.js";
+import {
+  DEFAULT_SERVER_KEYS_DIR,
+  knownHostsPath,
+  loadFleetConfig,
+  type FleetConfig,
+  type FleetHost,
+  type HostConfig,
+} from "./fleet/config.js";
 import { createAssistant, createScrubber, resolveAiConfig, type AssistantResponder } from "@servrsit/ai";
 import assistantRoutes from "./routes/assistant.js";
 import careRoutes, { type CareServer } from "./routes/care.js";
+import serverRoutes from "./routes/servers.js";
+import { AddressPolicy, type Resolver } from "./servers/address.js";
+import { ServerRegistry, type FirstCheckCollector } from "./servers/registry.js";
+import { createHostKeyScanner, createKeyVault, probeTcp, type HostKeyScanner, type KeyVault } from "./servers/ssh-tools.js";
 import { CsrfGuard } from "./csrf.js";
 import { DEFAULT_OWNER_CONTEXT_PATH, OwnerContextFile } from "./owner-context-file.js";
-import { SqliteCareStore, type CareStore } from "@servrsit/store";
+import { SqliteCareStore, SqliteServerStore, type CareStore, type NewServer, type StoredServer } from "@servrsit/store";
 import { SshWriteTarget, type WriteTarget } from "@servrsit/worker";
 import { buildFixtureFleet } from "./fleet/fixture.js";
 import { ControllerClockMonitor, NOT_CHECKED_CLOCK } from "./clock/controller-clock.js";
@@ -61,6 +72,22 @@ export interface BuildServerOptions {
    * the clock is reported "not-checked".
    */
   readonly controllerClock?: ControllerClockMonitor | null | undefined;
+  /** T-069 server registry wiring. Defaults: in-memory registry, real OpenSSH tools. */
+  readonly servers?: ServerRegistryWiring | undefined;
+}
+
+export interface ServerRegistryWiring {
+  /** Default ":memory:" (tests). The entry point passes the persistent file. */
+  readonly store?: SqliteServerStore | undefined;
+  readonly keysDir?: string | undefined;
+  readonly vault?: KeyVault | undefined;
+  readonly scanner?: HostKeyScanner | undefined;
+  readonly probe?: ((address: string, port: number) => Promise<boolean>) | undefined;
+  readonly collector?: FirstCheckCollector | undefined;
+  readonly resolver?: Resolver | undefined;
+  readonly selfAddresses?: (() => readonly string[]) | undefined;
+  readonly now?: (() => Date) | undefined;
+  readonly newId?: (() => string) | undefined;
 }
 
 /** A simulated server, injectable only in code (tests and local demos), never via config or API. */
@@ -88,18 +115,77 @@ function ownerContextSource(
   return () => file.get();
 }
 
-function careWiring(config: FleetConfig, care: CareOptions | undefined) {
-  const real: CareServer[] = config.hosts.map((h) => ({
+/** hosts.json entry -> registry row (T-069 one-time import). */
+function importedServer(h: HostConfig, at: Date): NewServer {
+  return {
     id: h.id,
+    source: "import",
+    access: h.access,
     name: h.name,
+    role: h.role,
     production: h.production,
-    kind: "ssh",
-    writesEnabled: h.writesEnabled,
-  }));
-  if (real.some((s) => s.writesEnabled)) throw new Error("writesEnabled must be false for real servers (ADR-014)");
-  const targets = new Map<string, WriteTarget>(real.map((s) => [s.id, new SshWriteTarget(s.id)]));
-  const realIds = new Set(real.map((s) => s.id));
-  const realNames = new Set(real.map((s) => s.name.toLowerCase()));
+    address: h.access === "ssh" ? h.address : null,
+    port: h.access === "ssh" ? h.port : null,
+    user: h.access === "ssh" ? h.user : null,
+    identityFile: h.access === "ssh" ? (h.identityFile ?? null) : null,
+    knownHostsFile: null,
+    importantServices: [...h.importantServices],
+    collect: h.collect,
+    collectDisabledReason: h.collectDisabledReason ?? null,
+    hostKey: null,
+    accessKey: null,
+    createdAt: at.toISOString(),
+  };
+}
+
+/** Registry row -> the host the fleet service checks. */
+function fleetHost(s: StoredServer): FleetHost {
+  const base = {
+    id: s.id,
+    name: s.name,
+    role: s.role,
+    production: s.production,
+    importantServices: [...s.importantServices],
+    collect: s.collect,
+    ...(s.collectDisabledReason === null ? {} : { collectDisabledReason: s.collectDisabledReason }),
+    writesEnabled: false as const,
+  };
+  if (s.access === "local" || s.address === null || s.port === null || s.user === null) return { ...base, access: "local" };
+  return {
+    ...base,
+    access: "ssh",
+    address: s.address,
+    port: s.port,
+    user: s.user,
+    ...(s.identityFile === null ? {} : { identityFile: s.identityFile }),
+    ...(s.knownHostsFile === null ? {} : { knownHostsFile: s.knownHostsFile }),
+  };
+}
+
+/**
+ * Real servers come from the registry on every call, so a server added or
+ * disconnected through the API is seen at once. Simulated servers are fixed.
+ */
+class CareTargets extends Map<string, WriteTarget> {
+  constructor(private readonly isReal: (id: string) => boolean) {
+    super();
+  }
+
+  override get(id: string): WriteTarget | undefined {
+    const known = super.get(id);
+    if (known !== undefined) return known;
+    if (!this.isReal(id)) return undefined;
+    const target = new SshWriteTarget(id);
+    super.set(id, target);
+    return target;
+  }
+}
+
+function careWiring(realServers: () => readonly CareServer[], care: CareOptions | undefined) {
+  const initial = realServers();
+  const targets = new CareTargets((id) => realServers().some((s) => s.id === id));
+  const realIds = new Set(initial.map((s) => s.id));
+  const realNames = new Set(initial.map((s) => s.name.toLowerCase()));
   const simulated: CareServer[] = [];
   for (const sim of care?.simulated ?? []) {
     const s = sim.server;
@@ -110,8 +196,13 @@ function careWiring(config: FleetConfig, care: CareOptions | undefined) {
     simulated.push(s);
     targets.set(s.id, sim.target);
   }
-  const servers = [...real, ...simulated];
-  return { servers: () => servers, targets };
+  const simulatedIds = new Set(simulated.map((s) => s.id));
+  const servers = (): CareServer[] => {
+    const real = realServers().filter((s) => !simulatedIds.has(s.id));
+    if (real.some((s) => s.writesEnabled)) throw new Error("writesEnabled must be false for real servers (ADR-014)");
+    return [...real, ...simulated];
+  };
+  return { servers, targets };
 }
 
 export async function buildServer(options: BuildServerOptions = {}) {
@@ -142,7 +233,7 @@ export async function buildServer(options: BuildServerOptions = {}) {
     await fastify.register(fastifyCors, {
       origin: "http://localhost:5173",
       credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     });
   }
 
@@ -209,10 +300,22 @@ export async function buildServer(options: BuildServerOptions = {}) {
       : mode === "live" && options.startChecks !== false
         ? new ControllerClockMonitor({ intervalMs: config.healthIntervalMinutes * 60_000, log: fastify.log })
         : null;
+  // T-069: the server registry. hosts.json is imported once; after that the
+  // registry is the source of truth for which servers exist.
+  const registryStore = options.servers?.store ?? new SqliteServerStore({ path: ":memory:" });
+  const registryNow = options.servers?.now ?? (() => new Date());
+  const imported = registryStore.importOnce(config.hosts.map((h) => importedServer(h, registryNow())), registryNow());
+  fastify.log.info(
+    imported.kind === "imported" ? { imported: imported.count } : { importedAt: imported.at },
+    imported.kind === "imported" ? "servers: hosts.json imported into the registry" : "servers: hosts.json was imported before; its host list is not read",
+  );
+  const registryHosts = () => registryStore.listActive().map(fleetHost);
+
   const service =
     options.fleetService ??
     new FleetService({
       config,
+      hosts: registryHosts,
       knownHostsFile: knownHostsPath(),
       log: fastify.log,
       ...(clockMonitor === null ? {} : { controllerClock: () => clockMonitor.current() }),
@@ -227,17 +330,47 @@ export async function buildServer(options: BuildServerOptions = {}) {
     controllerClock,
     ownerContext: ownerContextSource(options, fastify.log),
   });
-  const care = careWiring(config, options.care);
+  const care = careWiring(
+    () => registryHosts().map((h) => ({ id: h.id, name: h.name, production: h.production, kind: "ssh", writesEnabled: h.writesEnabled })),
+    options.care,
+  );
   const careStore = options.care?.store ?? new SqliteCareStore({ path: ":memory:" });
+  const csrf = options.care?.csrf ?? new CsrfGuard();
   await fastify.register(careRoutes, {
     store: careStore,
     servers: care.servers,
     targets: care.targets,
-    csrf: options.care?.csrf ?? new CsrfGuard(),
+    csrf,
     // AUTH STUB (D3): a fixed owner until Cognito sessions (T-023).
     owner: () => "owner-dev-stub",
     now: options.care?.now,
     controllerClock,
+  });
+
+  const reg = config.registration;
+  const policy = new AddressPolicy(reg, { resolver: options.servers?.resolver, selfAddresses: options.servers?.selfAddresses });
+  const registry = new ServerRegistry({
+    store: registryStore,
+    policy,
+    controllerAddress: reg.controllerAddress,
+    scanner: options.servers?.scanner ?? createHostKeyScanner(),
+    vault: options.servers?.vault ?? createKeyVault(options.servers?.keysDir ?? DEFAULT_SERVER_KEYS_DIR.pathname),
+    probe: options.servers?.probe ?? probeTcp,
+    collector: options.servers?.collector,
+    now: options.servers?.now,
+    newId: options.servers?.newId,
+    hasUnresolvedOperation: (id) => careStore.unresolvedFor(id) !== null,
+    // Check a new server right away, but only where background checks run at all.
+    onActivated: (id) => {
+      if (mode === "live" && options.startChecks !== false) void service.refreshHost(id);
+    },
+    log: fastify.log,
+  });
+  await fastify.register(serverRoutes, {
+    registry,
+    csrf,
+    // AUTH STUB (D3): a fixed owner until sessions (T-053 replaces this with the session's owner).
+    owner: () => "owner-dev-stub",
   });
 
   // Fixture mode never contacts any server.

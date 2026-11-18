@@ -7,11 +7,15 @@
  * its output (D4).
  */
 
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { createAssistant } from "@servrsit/ai";
+import { SqliteServerStore } from "@servrsit/store";
 import { loadAiRuntime } from "./ai-runtime.js";
 import { createAsyncLogStream } from "./log-stream.js";
 import { resolvePort } from "./port.js";
 import { buildServer } from "./server.js";
+import { DEFAULT_REGISTRY_PATH } from "./fleet/config.js";
 import { createShutdownHandler } from "./shutdown.js";
 
 const PORT = resolvePort();
@@ -19,7 +23,11 @@ const HOST = "127.0.0.1";
 
 async function start(): Promise<void> {
   const ai = loadAiRuntime();
+  // T-069: the server registry persists across restarts (gitignored .data/).
+  const registryPath = process.env["SERVRSIT_REGISTRY_DB"] ?? DEFAULT_REGISTRY_PATH.pathname;
+  mkdirSync(dirname(registryPath), { recursive: true, mode: 0o700 });
   const fastify = await buildServer({
+    servers: { store: new SqliteServerStore({ path: registryPath }) },
     redactSecrets: ai.redactSecrets,
     assistant: createAssistant(ai.config),
     logStream: createAsyncLogStream({ fd: 1 }),

@@ -4,6 +4,9 @@ import type { CollectionResult } from "@servrsit/ssh";
 import { FleetConfigSchema, type HostConfig } from "./config.js";
 import { FleetService, type Collector, type PinChecker } from "./service.js";
 import { makeObservation } from "./observation.fixtures.js";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const MIN = 60_000;
 const config = FleetConfigSchema.parse({
@@ -204,4 +207,44 @@ test("T-063: three servers agree they are 7 h behind ServrSit, and ServrSit has 
 test("T-063: without a controller clock source the control plane says not checked, with no finding", () => {
   const { service } = setup(() => success(new Date()));
   assert.deepEqual([service.snapshot().controlPlane.clock.status, service.snapshot().controlPlane.findings], ["not-checked", []]);
+});
+
+test("T-069: the host list is read on every pass; a removed server is no longer checked or shown, and refreshHost checks only one", async () => {
+  const clock = new Clock();
+  const calls: string[] = [];
+  let hosts = [...config.hosts];
+  const svc = new FleetService({
+    config,
+    hosts: () => hosts,
+    knownHostsFile: "/x/known_hosts",
+    collector: async (h) => { calls.push(h.name); return success(clock.now()); },
+    pinChecker: async () => "pinned",
+    now: clock.now,
+  });
+  await svc.refreshAll();
+  assert.deepEqual(calls, ["Alpha", "Local"]);
+  hosts = hosts.filter((h) => h.name !== "Alpha");
+  assert.deepEqual(svc.snapshot().servers.map((s) => s.name), ["Beta", "Local"]);
+  calls.length = 0;
+  await svc.refreshAll();
+  assert.deepEqual(calls, ["Local"]);
+  calls.length = 0;
+  await svc.refreshHost("33333333-3333-4333-a333-333333333333");
+  await svc.refreshHost("11111111-1111-4111-a111-111111111111");
+  assert.deepEqual(calls, ["Local"], "only the named, still-listed server is checked");
+});
+
+test("T-069: a registered server's own known_hosts file is used for its pin check and its collection", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "servrsit-kh-"));
+  const own = join(dir, "known_hosts");
+  writeFileSync(own, "alpha ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixture\n");
+  const seen: string[] = [];
+  const svc = new FleetService({
+    config,
+    hosts: () => [{ ...config.hosts[0]!, knownHostsFile: own }],
+    knownHostsFile: join(dir, "missing_shared_known_hosts"),
+    collector: async (h) => { seen.push(h.knownHostsFile ?? "shared"); return success(new Date()); },
+  });
+  await svc.refreshAll();
+  assert.deepEqual(seen, [own], "pinned through its own file, then collected with it");
 });
