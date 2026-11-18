@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { buildManifest, buildPlan, createSigner, PRODUCTION_ACK, signManifest, type Plan } from "@servrsit/domain";
+import { buildManifest, buildPlan, createSigner, PRODUCTION_ACKS, signManifest, type Plan } from "@servrsit/domain";
 import { MemoryIntentStore, SqliteCareStore, type StoredOperation } from "@servrsit/store";
 import { Dispatcher, SimulatedTarget, SshWriteTarget, WritesDisabledError, type WriteTarget } from "./index.js";
 
@@ -50,7 +50,7 @@ async function harness(opts: { writesEnabled?: boolean; production?: boolean; ta
   store.insertPlan(plan);
   const approved = store.approve({
     planId: plan.id, planVersion: 1, planDigest: plan.digest, idempotencyKey: "k1", owner: "owner",
-    acknowledgements: opts.production ? [PRODUCTION_ACK] : [], writesEnabled: true,
+    acknowledgements: opts.production ? [...PRODUCTION_ACKS] : [], writesEnabled: true,
     targetKind: opts.target === "ssh" ? "ssh" : "simulated", now: clock.now(), newId: () => randomUUID(),
   });
   if (approved.kind !== "created") throw new Error(`approval failed: ${JSON.stringify(approved)}`);
@@ -64,10 +64,13 @@ async function harness(opts: { writesEnabled?: boolean; production?: boolean; ta
 
 /** Advance simulated time and run the dispatcher to a final state. */
 async function settle(h: Awaited<ReturnType<typeof harness>>, d = h.dispatcher) {
-  for (let i = 0; i < 10; i++) {
+  let idle = 0;
+  for (let i = 0; i < 20; i++) {
     const r = await d.runOnce();
-    if (r.status === "final" || r.status === "idle") return;
-    h.clock.advance(1500);
+    if (r.status === "final") return;
+    // T-058: "idle" can mean an entry is waiting out a backoff; wait it out a few times before giving up.
+    if (r.status === "idle" && ++idle > 3) return;
+    h.clock.advance(r.status === "idle" ? 5_000 : 1500);
   }
 }
 
@@ -280,4 +283,26 @@ test("invariant 5: a package manifest carries only package changes, never a rest
   const p: Plan = h.plan;
   assert.equal(p.scope.includesServiceRestart, false);
   assert.equal(p.scope.includesReboot, false);
+});
+
+
+// ---- T-058: backoff and de-duplication after transport errors ---------------------------
+
+test("T-058: while the target is unreachable, the entry backs off (2 s doubling) and repeats add no new events", async () => {
+  const { backoffMs } = await import("./dispatcher.js");
+  assert.deepEqual([0, 1, 2, 3, 10].map(backoffMs), [2_000, 4_000, 8_000, 16_000, 300_000]);
+  const h = await harness();
+  await h.dispatcher.runOnce(); // sent and accepted: running
+  h.sim.faults.failQueries = 50;
+  const r1 = await h.dispatcher.runOnce();
+  assert.equal(r1.status, "progress");
+  assert.equal(h.state(), "outcome_unknown");
+  assert.equal((await h.dispatcher.runOnce()).status, "idle", "deferred: not retried at once");
+  for (let i = 0; i < 6; i++) { h.clock.advance(400_000); await h.dispatcher.runOnce(); }
+  const errors = h.events().filter((t) => t === "transport_error").length;
+  assert.equal(errors, 1, `one transport_error for one run of identical failures, got ${errors}`);
+  h.sim.faults.failQueries = 0;
+  h.clock.advance(300_000); // past the longest backoff
+  await settle(h);
+  assert.equal(h.state(), "succeeded", "when the target is back, the ledger resolves it");
 });

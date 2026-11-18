@@ -259,3 +259,10 @@ test("T-062: at most 50 are listed by name; the count stays exact; no apt output
   assert.equal(v.status === "ok" && v.value.packages.length, 50);
   assert.equal(build(DEGRADED).packages.pendingOutsideUbuntu.status, "unavailable");
 });
+
+test("T-056: the machine id is read when well-formed and unavailable otherwise", () => {
+  assert.deepEqual(build().host.machineId, { status: "ok", value: "0123456789abcdef0123456789abcdef" });
+  for (const body of ["", "not-a-machine-id", "0123456789ABCDEF0123456789ABCDEF", "$(id)"]) {
+    assert.equal(build({ ...NORMAL, machineid: { rc: 0, body } }).host.machineId?.status, "unavailable", body);
+  }
+});

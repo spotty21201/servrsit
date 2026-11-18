@@ -54,6 +54,8 @@ const DFI = `Filesystem       Inodes  IUsed    IFree IUse% Mounted on
 /** A healthy-looking snapshot with one failed unit and pending updates. */
 export const NORMAL: SectionFixtures = {
   hostname: { rc: 0, body: "fixture-host" },
+  /** [FIXTURE] a synthetic machine id (not from any real machine). */
+  machineid: { rc: 0, body: "0123456789abcdef0123456789abcdef" },
   os: { rc: 0, body: OS_RELEASE },
   arch: { rc: 0, body: "x86_64" },
   bootid: { rc: 0, body: "fdd6f28c-ae5c-44e1-8d26-0ed581678682" },

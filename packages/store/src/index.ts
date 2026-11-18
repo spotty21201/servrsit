@@ -6,6 +6,7 @@ export type {
   IntentStore,
   OperationEvent,
   OutboxEntry,
+  RequestStopResult,
   StoredOperation,
   TargetKind,
 } from "./store.js";

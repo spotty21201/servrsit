@@ -205,3 +205,21 @@ test("T-063: without a controller clock source the control plane says not checke
   const { service } = setup(() => success(new Date()));
   assert.deepEqual([service.snapshot().controlPlane.clock.status, service.snapshot().controlPlane.findings], ["not-checked", []]);
 });
+
+test("T-056: two configured hosts reporting the same machine id both get a duplicate-identity warning", async () => {
+  const two = FleetConfigSchema.parse({
+    healthIntervalMinutes: 15,
+    hosts: [
+      { id: "11111111-1111-4111-a111-111111111111", name: "Alpha", access: "ssh", address: "alpha", port: 22, user: "spotty", role: null, production: false, collect: true },
+      { id: "22222222-2222-4222-a222-222222222222", name: "Alpha again", access: "ssh", address: "alpha-alias", port: 22, user: "spotty", role: null, production: false, collect: true },
+    ],
+  });
+  const obs = makeObservation();
+  const same = { ...obs, host: { ...obs.host, machineId: { status: "ok" as const, value: "0123456789abcdef0123456789abcdef" } } };
+  const service = new FleetService({ config: two, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: same }) });
+  await service.refreshAll();
+  const snap = service.snapshot();
+  const summaries = snap.servers.map((s) => s.findings.find((f) => f.rule === "identity.duplicate.v1")?.summary ?? "");
+  assert.ok(summaries[0]!.startsWith("This server reports the same machine id as Alpha again."), summaries[0]);
+  assert.ok(summaries[1]!.startsWith("This server reports the same machine id as Alpha."), summaries[1]);
+});

@@ -27,6 +27,7 @@ import {
   type Signer,
 } from "@servrsit/domain";
 import type { CareStore, IntentStore, StoredOperation } from "@servrsit/store";
+import { Reconciler } from "./reconciler.js";
 import { TransportError, type RemoteRecord, type WriteTarget } from "./target.js";
 
 export interface DispatcherOptions {
@@ -48,22 +49,43 @@ export type StepResult =
 
 const ACTOR = (id: string) => `worker:${id}`;
 
+export const BACKOFF_BASE_MS = 2_000;
+export const BACKOFF_MAX_MS = 5 * 60_000;
+/** T-058: delay before the next attempt after `level` earlier transport-error steps. */
+export function backoffMs(level: number): number {
+  return Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** Math.max(0, level));
+}
+
 export class Dispatcher {
   private readonly leaseMs: number;
+  private readonly reconciler: Reconciler;
 
   constructor(private readonly o: DispatcherOptions) {
     this.leaseMs = o.leaseMs ?? 30_000;
+    this.reconciler = new Reconciler({
+      store: o.store, targets: o.targets, actor: ACTOR(o.workerId), now: o.now,
+      onTransportError: () => { this.unreachable = true; },
+    });
   }
+
+  /** T-058: set during a step that could not reach the target. */
+  private unreachable = false;
 
   /** Lease one outbox entry, advance its operation one step, and release or complete it. */
   async runOnce(): Promise<StepResult> {
     const now = this.o.now();
     const entry = this.o.store.leaseOutbox(this.o.workerId, now, this.leaseMs);
     if (entry === null) return { status: "idle" };
+    this.unreachable = false;
     const op = await this.step(entry.operationId);
     if (op.state === "succeeded" || op.state === "partially_succeeded" || op.state === "failed" || op.state === "cancelled_before_start") {
       this.o.store.completeOutbox(entry.id, this.o.workerId);
       return { status: "final", operationId: op.id, state: op.state };
+    }
+    if (this.unreachable) {
+      // T-058: back off before trying this target again: 2 s doubling to 5 min.
+      this.o.store.deferOutbox(entry.id, this.o.workerId, new Date(now.getTime() + backoffMs(entry.backoffLevel)));
+      return { status: "progress", operationId: op.id, state: op.state };
     }
     this.o.store.releaseOutbox(entry.id, this.o.workerId);
     return { status: "progress", operationId: op.id, state: op.state };
@@ -107,9 +129,9 @@ export class Dispatcher {
         return this.dispatch(op, plan);
       case "running":
       case "outcome_unknown":
-        return this.observe(op);
+        return this.reconciler.observe(op);
       case "verifying":
-        return this.verify(op, plan);
+        return this.reconciler.verify(op, plan);
       default:
         return op;
     }
@@ -134,13 +156,23 @@ export class Dispatcher {
       });
     }
 
+    // T-055: a stop requested before anything was sent is honoured here, at the safe boundary.
+    if (!attempted && op.stopRequested) {
+      return this.transition(op, "cancelled_before_start", "cancelled", { code: "STOP_REQUESTED", effects: "none: nothing was sent" });
+    }
+
     // A previous attempt may have reached the target: ask the ledger first.
     if (attempted) {
       try {
         const q = await target.query(op.id);
         if (q.found) return this.accepted(op, q.record, "reconciled-before-retry");
+        // T-055: the ledger says it never accepted this id, and the owner asked to stop: do not resubmit.
+        if (op.stopRequested) {
+          return this.transition(op, "cancelled_before_start", "cancelled", { code: "STOP_REQUESTED", effects: "none: the target never accepted it" });
+        }
       } catch (error) {
         if (!(error instanceof TransportError)) throw error;
+        this.unreachable = true;
         return this.transition(op, "outcome_unknown", "outcome_unknown", {
           reason: "a previous attempt may have reached the target and the ledger cannot be queried",
         });
@@ -170,14 +202,17 @@ export class Dispatcher {
       result = await target.submit(signed);
     } catch (error) {
       if (!(error instanceof TransportError)) throw error;
-      this.event(op, "transport_error", { during: "submit" });
+      this.reconciler.transportError(op, "submit");
       // The send may or may not have arrived. Query the same id now.
       try {
         const q = await target.query(op.id);
+        // The target answered: it is reachable, so this step does not back off.
+        this.unreachable = false;
         if (q.found) return this.accepted(op, q.record, "lost-ack");
         return this.o.store.getOperation(op.id) as StoredOperation;
       } catch (queryError) {
         if (!(queryError instanceof TransportError)) throw queryError;
+        this.unreachable = true;
         return this.transition(op, "outcome_unknown", "outcome_unknown", { reason: "submit and query both failed" });
       }
     }
@@ -189,75 +224,6 @@ export class Dispatcher {
   }
 
   private accepted(op: StoredOperation, record: RemoteRecord, how: string): StoredOperation {
-    this.o.store.setRemoteOperationId(op.id, record.operationId, this.o.now());
-    const current = this.o.store.getOperation(op.id) as StoredOperation;
-    if (current.state === "queued") {
-      return this.transition(current, "running", "remote_accepted", { how, remoteState: record.state });
-    }
-    return current;
-  }
-
-  private async observe(op: StoredOperation): Promise<StoredOperation> {
-    const target = this.o.targets.get(op.serverId);
-    if (target === undefined) return op;
-    let q;
-    try {
-      q = await target.query(op.id);
-    } catch (error) {
-      if (!(error instanceof TransportError)) throw error;
-      // Invariant 6: a lost connection is not evidence the work stopped.
-      if (op.state === "running") {
-        return this.transition(op, "outcome_unknown", "outcome_unknown", { reason: "the ledger could not be queried" });
-      }
-      this.event(op, "transport_error", { during: "reconcile" });
-      return op;
-    }
-
-    if (!q.found) {
-      if (op.state === "running") {
-        return this.transition(op, "outcome_unknown", "outcome_unknown", { reason: "the ledger has no record of an accepted operation" });
-      }
-      return op;
-    }
-
-    const record = q.record;
-    if (record.state === "running") {
-      if (op.state === "outcome_unknown") return this.transition(op, "running", "reconciled", { remoteState: "running" });
-      this.event(op, "remote_progress", { remoteState: "running" });
-      return op;
-    }
-    const via = op.state === "outcome_unknown" ? "reconciled" : "remote_finished";
-    return this.transition(op, "verifying", via, { remoteState: "finished", exitCode: record.exitCode });
-  }
-
-  private async verify(op: StoredOperation, plan: Plan): Promise<StoredOperation> {
-    const target = this.o.targets.get(op.serverId);
-    if (target === undefined) return op;
-    const expected = plan.verification.expectInstalled;
-    const keys = Object.keys(expected);
-    let actual;
-    try {
-      actual = await target.inspectInstalled(keys);
-    } catch (error) {
-      if (!(error instanceof TransportError)) throw error;
-      this.event(op, "transport_error", { during: "verification" });
-      return op;
-    }
-    const verified = keys.filter((k) => actual[k] === expected[k]);
-    const notVerified = keys.filter((k) => actual[k] !== expected[k]);
-    const exitCode = this.lastExitCode(op);
-    const payload = { verified, notVerified, exitCode };
-    if (notVerified.length === 0 && exitCode === 0) return this.transition(op, "succeeded", "verification_recorded", payload);
-    if (verified.length === 0) return this.transition(op, "failed", "verification_recorded", payload);
-    return this.transition(op, "partially_succeeded", "verification_recorded", payload);
-  }
-
-  private lastExitCode(op: StoredOperation): number | null {
-    const events = this.o.store.listEvents(op.id);
-    for (let i = events.length - 1; i >= 0; i--) {
-      const code = events[i]?.payload["exitCode"];
-      if (typeof code === "number") return code;
-    }
-    return null;
+    return this.reconciler.accepted(op, record, how);
   }
 }

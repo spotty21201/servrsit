@@ -19,10 +19,19 @@
 
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { ApprovalRequestSchema, PlanRequestSchema, type ControllerClock } from "@servrsit/contracts";
-import { buildPlan, type Plan } from "@servrsit/domain";
+import { ApprovalRequestSchema, PlanRequestSchema, type ControllerClock, type PlanRequest } from "@servrsit/contracts";
+import {
+  buildDirectoriesPlan,
+  buildPlan,
+  buildRebootPlan,
+  buildRestartPlan,
+  directoryAllowed,
+  isRestartableUnitName,
+  resolveIdentities,
+  type Plan,
+} from "@servrsit/domain";
 import type { ApprovalRejection, CareStore, StoredOperation, TargetKind } from "@servrsit/store";
-import type { WriteTarget } from "@servrsit/worker";
+import { Reconciler, TransportError, type WriteTarget } from "@servrsit/worker";
 import { CSRF_HEADER, type CsrfGuard } from "../csrf.js";
 
 export interface CareServer {
@@ -32,6 +41,10 @@ export interface CareServer {
   readonly kind: TargetKind;
   /** From configuration only. Always false for real servers. */
   readonly writesEnabled: boolean;
+  /** T-059: units the owner selected for this server; only these can be restarted. */
+  readonly selectedServices?: readonly string[] | undefined;
+  /** T-059: the login user, for directories under /home/<user>. */
+  readonly user?: string | undefined;
 }
 
 export interface CareRouteOptions {
@@ -78,12 +91,24 @@ function operationView(op: StoredOperation, store: CareStore) {
 
 const invalid = (reply: FastifyReply) => reply.code(400).send({ error: "INVALID_INPUT" });
 const notFound = (reply: FastifyReply) => reply.code(404).send({ error: "NOT_FOUND" });
+/** T-058 (O2, Tech Spec §13): the target could not be reached while preparing or checking a plan. Nothing is stored. */
+const routeUnavailable = (reply: FastifyReply) => reply.code(503).header("retry-after", "30").send({ error: "ROUTE_UNAVAILABLE" });
 
 export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions): Promise<void> {
   const now = o.now ?? (() => new Date());
   const newId = o.newId ?? (() => randomUUID());
   const serverById = (id: string) => o.servers().find((s) => s.id === id);
   const clockStatus = () => o.controllerClock?.().status ?? "not-checked";
+  // T-056: identities across every record, from what each target reports (host key + machine id).
+  const identities = () =>
+    resolveIdentities(
+      o.servers().map((s) => {
+        // A target that does not report an identity (for example a test double) is unverified.
+        const t = o.targets.get(s.id);
+        const seen = t !== undefined && typeof t.identity === "function" ? t.identity() : null;
+        return { id: s.id, hostKeyFingerprint: seen?.hostKeyFingerprint ?? null, machineId: seen?.machineId ?? null };
+      }),
+    );
 
   fastify.setErrorHandler((error, request, reply) => {
     const status = (error as { statusCode?: number }).statusCode ?? 500;
@@ -92,24 +117,81 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     return reply.code(500).send({ statusCode: 500, error: "Internal Server Error", message: "Internal Server Error" });
   });
 
-  async function makePlan(id: string, version: number, server: CareServer): Promise<Plan> {
+  async function makePlan(id: string, version: number, server: CareServer, request: PlanRequest): Promise<Plan> {
     // Never contact a server whose writes are disabled, and never a real one.
     const target = o.targets.get(server.id);
-    const preview =
-      server.writesEnabled && server.kind === "simulated" && target !== undefined ? await target.previewPackages() : null;
-    const unresolved = o.store.unresolvedFor(server.id);
-    const plan = buildPlan({
+    const mayPreview = server.writesEnabled && server.kind === "simulated" && target !== undefined;
+    const identity = identities().get(server.id);
+    // T-056: busy if this record, or another record of the same machine, has unresolved work.
+    const busy =
+      o.store.unresolvedFor(server.id) ??
+      (identity?.status === "verified" ? o.store.unresolvedForMachine(identity.canonicalId) : null);
+    const common = {
       id,
       version,
-      operation: "apply.packages.v1",
       server: { id: server.id, production: server.production, writesEnabled: server.writesEnabled },
-      preview,
-      unresolved: unresolved === null ? null : (unresolved.state as "queued" | "running" | "verifying" | "outcome_unknown"),
+      unresolved: busy === null ? null : (busy.state as "queued" | "running" | "verifying" | "outcome_unknown"),
       now: now(),
       controllerClockTrusted: clockStatus() !== "untrusted",
-    });
+      identity,
+    };
+    let plan: Plan;
+    switch (request.operation) {
+      case "apply.packages.v1":
+        plan = buildPlan({ ...common, operation: "apply.packages.v1", preview: mayPreview ? await target.previewPackages() : null });
+        break;
+      case "restart.service.v1": {
+        const selected = server.selectedServices ?? [];
+        // Only a selected, well-formed unit is ever named to the target.
+        const ask = mayPreview && selected.includes(request.unit) && isRestartableUnitName(request.unit);
+        plan = buildRestartPlan({ ...common, unit: request.unit, selectedUnits: selected, preview: ask ? await target.previewService(request.unit) : null });
+        break;
+      }
+      case "reboot.host.v1":
+        plan = buildRebootPlan({ ...common, preview: mayPreview ? await target.previewBoot() : null });
+        break;
+      case "prepare.directories.v1": {
+        const user = server.user ?? "";
+        const ask = mayPreview && request.directories.every((d) => directoryAllowed(d, user));
+        plan = buildDirectoriesPlan({
+          ...common,
+          requested: request.directories,
+          user,
+          preview: ask ? await target.previewDirectories(request.directories.map((d) => d.path)) : null,
+        });
+        break;
+      }
+    }
     o.store.insertPlan(plan);
     return plan;
+  }
+
+  /** The request a plan was made from, for a revision (same operation, same parameters). */
+  function requestOf(p: Plan): PlanRequest {
+    switch (p.operation) {
+      case "apply.packages.v1":
+        return { operation: p.operation, serverId: p.serverId };
+      case "restart.service.v1":
+        return { operation: p.operation, serverId: p.serverId, unit: p.scope.unit };
+      case "reboot.host.v1":
+        return { operation: p.operation, serverId: p.serverId };
+      case "prepare.directories.v1":
+        return { operation: p.operation, serverId: p.serverId, directories: [...p.scope.requested] };
+    }
+  }
+
+  /** The target's current state digest for the kind of work a plan describes (T-054 re-check). */
+  async function currentDigest(p: Plan, target: WriteTarget): Promise<string | null> {
+    switch (p.operation) {
+      case "apply.packages.v1":
+        return (await target.previewPackages())?.stateDigest ?? null;
+      case "restart.service.v1":
+        return (await target.previewService(p.scope.unit))?.stateDigest ?? null;
+      case "reboot.host.v1":
+        return (await target.previewBoot())?.stateDigest ?? null;
+      case "prepare.directories.v1":
+        return (await target.previewDirectories(p.scope.requested.map((d) => d.path)))?.stateDigest ?? null;
+    }
   }
 
   fastify.get("/api/csrf", async (_request, reply) =>
@@ -121,7 +203,13 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     if (!parsed.success) return invalid(reply);
     const server = serverById(parsed.data.serverId);
     if (server === undefined) return notFound(reply);
-    const plan = await makePlan(newId(), 1, server);
+    let plan: Plan;
+    try {
+      plan = await makePlan(newId(), 1, server, parsed.data);
+    } catch (error) {
+      if (error instanceof TransportError) return routeUnavailable(reply);
+      throw error;
+    }
     request.log.info({ planId: plan.id, blockers: plan.blockers.map((b) => b.code), kind: server.kind }, "care: plan created");
     return reply.code(201).send(planView(plan, server));
   });
@@ -131,7 +219,13 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     if (current === null) return notFound(reply);
     const server = serverById(current.serverId);
     if (server === undefined) return notFound(reply);
-    const plan = await makePlan(current.id, current.version + 1, server);
+    let plan: Plan;
+    try {
+      plan = await makePlan(current.id, current.version + 1, server, requestOf(current));
+    } catch (error) {
+      if (error instanceof TransportError) return routeUnavailable(reply);
+      throw error;
+    }
     return reply.code(201).send(planView(plan, server));
   });
 
@@ -154,6 +248,33 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
       request.log.info({ planId: plan.id, result: "rejected", code: "CONTROLLER_CLOCK_UNTRUSTED" }, "care: approval");
       return reply.code(409).send({ error: "PLAN_BLOCKED", blockers: ["CONTROLLER_CLOCK_UNTRUSTED"] });
     }
+    // T-056: re-check identity at approval time; only a confirmed identity can be approved, and its
+    // canonical id carries the per-machine lock.
+    const identity = server.writesEnabled ? identities().get(server.id) : undefined;
+    if (identity !== undefined && identity.status !== "verified") {
+      const code = identity.status === "ambiguous" ? "IDENTITY_AMBIGUOUS" : "IDENTITY_UNVERIFIED";
+      return reply.code(409).send({ error: "PLAN_BLOCKED", blockers: [code] });
+    }
+    // T-054 (F2, Tech Spec §9.2): re-check the target at approval time. If its package state is no
+    // longer the state the plan was prepared from, the plan is stale. Same rule as planning: a
+    // server whose writes are disabled, or a real one, is never contacted. A repeat of an approval
+    // that already exists is an idempotent replay (the state has moved on because it ran).
+    const target = o.targets.get(server.id);
+    const replay = o.store.hasApproval(plan.id, parsed.data.planVersion);
+    if (!replay && server.writesEnabled && server.kind === "simulated" && target !== undefined) {
+      const latest = o.store.getPlan(plan.id);
+      let current: string | null = null;
+      try {
+        current = latest === null ? null : await currentDigest(latest, target);
+      } catch (error) {
+        if (error instanceof TransportError) return routeUnavailable(reply);
+        throw error;
+      }
+      if (latest !== null && (current === null || current !== latest.preconditions.previewDigest)) {
+        request.log.info({ planId: plan.id, result: "rejected", code: "PLAN_CHANGED" }, "care: approval");
+        return reply.code(409).send({ error: "PLAN_CHANGED" });
+      }
+    }
 
     const result = o.store.approve({
       planId: plan.id,
@@ -164,6 +285,7 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
       acknowledgements: parsed.data.acknowledgements,
       writesEnabled: server.writesEnabled,
       targetKind: server.kind,
+      canonicalId: identity?.status === "verified" ? identity.canonicalId : null,
       now: now(),
       newId,
     });
@@ -175,6 +297,35 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     return reply
       .code(result.kind === "created" ? 201 : 200)
       .send({ operationId: result.operation.id, state: result.operation.state, replayed: result.kind === "replayed" });
+  });
+
+  // T-055 (FR-16, Tech Spec §11): a stop REQUEST. A flag and an event; never a kill. Something never
+  // sent is cancelled before start; anything that may be on the target keeps going and the ledger
+  // decides. Repeating it, or asking after the operation finished, is harmless.
+  fastify.post("/api/operations/:id/stop-request", { bodyLimit: 1024 }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
+    if (!o.csrf.check(request.headers)) return reply.code(403).send({ error: "CSRF_INVALID" });
+    const r = o.store.requestStop(request.params.id, "owner", now());
+    request.log.info({ operationId: request.params.id, result: r.kind }, "care: stop request");
+    if (r.kind === "not_found") return notFound(reply);
+    // Already finished: nothing to stop. Accepted and harmless; a final record is never changed.
+    const stop = r.kind === "final" ? "already-final" : r.operation.state === "cancelled_before_start" ? "cancelled" : "requested";
+    return reply.header("cache-control", "no-store").send({ ...operationView(r.operation, o.store), stop });
+  });
+
+  // T-055 (FR-17, Tech Spec §13): reconcile against the target's ledger and installed state. Read-only
+  // toward the target: it can never start, retry or stop a mutation. A server whose writes are
+  // disabled, or a real one, is never contacted.
+  fastify.post("/api/operations/:id/reconcile", { bodyLimit: 1024 }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
+    if (!o.csrf.check(request.headers)) return reply.code(403).send({ error: "CSRF_INVALID" });
+    const op = o.store.getOperation(request.params.id);
+    if (op === null) return notFound(reply);
+    const server = serverById(op.serverId);
+    if (server === undefined || server.kind !== "simulated" || !server.writesEnabled) {
+      return reply.code(409).send({ error: "RECONCILE_UNAVAILABLE" });
+    }
+    const reconciled = await new Reconciler({ store: o.store, targets: o.targets, actor: "owner", now }).reconcile(op.id);
+    request.log.info({ operationId: op.id, from: op.state, to: reconciled.state }, "care: reconcile");
+    return reply.header("cache-control", "no-store").send(operationView(reconciled, o.store));
   });
 
   fastify.get("/api/operations/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {

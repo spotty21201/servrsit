@@ -16,6 +16,8 @@ export const COLLECTOR_SECTIONS: readonly CollectorSection[] = [
   { name: "os", command: "cat /etc/os-release" },
   { name: "arch", command: "uname -m" },
   { name: "bootid", command: "cat /proc/sys/kernel/random/boot_id" },
+  // T-056: part of the machine's identity (with the host key). Read-only.
+  { name: "machineid", command: "cat /etc/machine-id" },
   { name: "uptime", command: "cat /proc/uptime" },
   { name: "load", command: "cat /proc/loadavg" },
   { name: "nproc", command: "nproc" },

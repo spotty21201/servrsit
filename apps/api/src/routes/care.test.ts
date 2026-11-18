@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createSigner, PRODUCTION_ACK } from "@servrsit/domain";
+import { createSigner, PRODUCTION_ACK, PRODUCTION_ACKS } from "@servrsit/domain";
 import { MemoryIntentStore, SqliteCareStore } from "@servrsit/store";
 import { Dispatcher, SimulatedTarget, type WriteTarget } from "@servrsit/worker";
 import { buildServer } from "../server.js";
@@ -202,14 +202,20 @@ test("invariant 4 via the API: a stale version, a wrong digest and an expired pl
   } finally { await h.app.close(); }
 });
 
-test("production servers require the explicit production acknowledgement", async () => {
+test("T-057: production servers require both acknowledgements (recovery route and interruption risk)", async () => {
   const h = await start({ production: true });
   try {
     const p = await h.plan();
-    assert.deepEqual(p.requiredAcknowledgements, [PRODUCTION_ACK]);
+    assert.deepEqual(p.requiredAcknowledgements, [...PRODUCTION_ACKS]);
     const r = await h.approve(p);
     assert.deepEqual([r.statusCode, r.json()], [422, { error: "ACK_REQUIRED" }]);
-    assert.equal((await h.approve(p, { acknowledgements: [PRODUCTION_ACK] })).statusCode, 201);
+    // T-057: one of the two is not enough, whichever it is.
+    for (const one of PRODUCTION_ACKS) {
+      const r1 = await h.approve(p, { acknowledgements: [one] });
+      assert.deepEqual([r1.statusCode, r1.json()], [422, { error: "ACK_REQUIRED" }], one);
+    }
+    assert.deepEqual((await h.approve(p, { acknowledgements: [PRODUCTION_ACK] })).statusCode, 422, "the old single constant alone is refused");
+    assert.equal((await h.approve(p, { acknowledgements: [...PRODUCTION_ACKS] })).statusCode, 201);
   } finally { await h.app.close(); }
 });
 
@@ -224,11 +230,20 @@ test("one unresolved operation per server: a second plan is blocked TARGET_BUSY 
   } finally { await h.app.close(); }
 });
 
-test("invariant 5 via the API: restart, reboot and anything else outside the catalog cannot be planned", async () => {
+test("invariant 5 via the API: nothing outside the catalog can be planned, and each operation takes only its own parameters", async () => {
   const h = await start();
   try {
-    for (const operation of ["restart.service.v1", "reboot.host.v1", "prepare.directories.v1", "run.shell", "apply.packages.v2"]) {
+    for (const operation of ["run.shell", "apply.packages.v2", "restart.service.v2"]) {
       assert.equal((await h.post("/api/plans", { operation, serverId: SIM })).statusCode, 400, operation);
+    }
+    for (const body of [
+      { operation: "restart.service.v1", serverId: SIM },
+      { operation: "prepare.directories.v1", serverId: SIM },
+      { operation: "apply.packages.v1", serverId: SIM, unit: "nginx.service" },
+      { operation: "reboot.host.v1", serverId: SIM, unit: "nginx.service" },
+      { operation: "restart.service.v1", serverId: SIM, unit: "nginx.service", reboot: true },
+    ]) {
+      assert.equal((await h.post("/api/plans", body)).statusCode, 400, JSON.stringify(body));
     }
   } finally { await h.app.close(); }
 });
@@ -292,5 +307,284 @@ test("T-063 via the API: an untrusted controller clock blocks planning, and appr
 
     clock.value = CLOCK("trusted");
     assert.equal((await h.approve(p)).statusCode, 201);
+  } finally { await h.app.close(); }
+});
+
+// ---- T-054: approval re-checks the target ------------------------------------------
+
+test("T-054 (F2): if the target's packages change between plan and approval, approval is refused PLAN_CHANGED and nothing is queued", async () => {
+  const h = await start();
+  try {
+    const stale = await h.plan();
+    h.sim.addUpgrade({ name: "curl", arch: "amd64", from: "8.5.0-2ubuntu10.5", to: "8.5.0-2ubuntu10.6", origin: "Ubuntu:24.04/noble-security" });
+    const r = await h.approve(stale);
+    assert.deepEqual([r.statusCode, r.json()], [409, { error: "PLAN_CHANGED" }]);
+    assert.equal(h.store.unresolvedFor(SIM), null, "nothing was approved or queued");
+    const fresh = (await h.post(`/api/plans/${stale.id}/revisions`, {})).json() as typeof stale;
+    assert.equal((await h.approve(fresh, { idempotencyKey: "idem-key-0000000009" })).statusCode, 201, "a revised plan from the current state can be approved");
+  } finally { await h.app.close(); }
+});
+
+test("T-054: replaying an approval after its operation ran returns the same operation (the re-check does not apply to a replay)", async () => {
+  const h = await start();
+  try {
+    const p = await h.plan();
+    const first = await h.approve(p);
+    assert.equal(first.statusCode, 201);
+    for (let i = 0; i < 6; i++) { await h.dispatcher.runOnce(); h.clock.advance(1500); }
+    const again = await h.approve(p);
+    assert.equal(again.statusCode, 200);
+    assert.equal((again.json() as { operationId: string }).operationId, (first.json() as { operationId: string }).operationId);
+  } finally { await h.app.close(); }
+});
+
+// ---- T-055: stop request and reconcile ------------------------------------------------
+
+test("T-055: stop before anything was sent cancels before start; nothing is ever sent", async () => {
+  const h = await start();
+  try {
+    const { operationId } = (await h.approve(await h.plan())).json() as { operationId: string };
+    const r = await h.post(`/api/operations/${operationId}/stop-request`, {}, h.goodHeaders);
+    assert.equal(r.statusCode, 200);
+    const body = r.json() as { operation: { state: string; stopRequested: boolean }; stop: string; events: Array<{ type: string }> };
+    assert.deepEqual([body.operation.state, body.operation.stopRequested, body.stop], ["cancelled_before_start", true, "cancelled"]);
+    for (let i = 0; i < 3; i++) await h.dispatcher.runOnce();
+    assert.equal(h.sim.snapshot().installed["openssl:amd64"], "3.0.13-0ubuntu3.4", "nothing was applied");
+    const again = await h.post(`/api/operations/${operationId}/stop-request`, {}, h.goodHeaders);
+    assert.deepEqual([again.statusCode, (again.json() as { stop: string }).stop], [200, "already-final"], "repeating is harmless");
+  } finally { await h.app.close(); }
+});
+
+test("T-055: stop while running only records the request; the work finishes and is verified", async () => {
+  const h = await start();
+  try {
+    const { operationId } = (await h.approve(await h.plan())).json() as { operationId: string };
+    await h.dispatcher.runOnce(); // sent and accepted: running
+    const r = (await h.post(`/api/operations/${operationId}/stop-request`, {}, h.goodHeaders)).json() as { operation: { state: string; stopRequested: boolean }; events: Array<{ type: string }> };
+    assert.deepEqual([r.operation.state, r.operation.stopRequested], ["running", true]);
+    assert.equal(r.events.filter((e) => e.type === "stop_requested").length, 1);
+    await h.post(`/api/operations/${operationId}/stop-request`, {}, h.goodHeaders);
+    for (let i = 0; i < 6; i++) { await h.dispatcher.runOnce(); h.clock.advance(1500); }
+    const view = (await h.app.inject({ method: "GET", url: `/api/operations/${operationId}` })).json() as { operation: { state: string }; events: Array<{ type: string }> };
+    assert.equal(view.operation.state, "succeeded", "a stop request is not a kill");
+    assert.equal(view.events.filter((e) => e.type === "stop_requested").length, 1, "the second request added nothing");
+  } finally { await h.app.close(); }
+});
+
+test("T-055: reconcile follows the ledger and never sends anything; real servers are never contacted", async () => {
+  const h = await start();
+  try {
+    const { operationId } = (await h.approve(await h.plan())).json() as { operationId: string };
+    const queued = (await h.post(`/api/operations/${operationId}/reconcile`, {}, h.goodHeaders)).json() as { operation: { state: string } };
+    assert.equal(queued.operation.state, "queued", "a queued operation the target does not hold stays queued: reconcile does not send it");
+    assert.equal(h.sim.snapshot().installed["openssl:amd64"], "3.0.13-0ubuntu3.4");
+    await h.dispatcher.runOnce();
+    h.clock.advance(1500);
+    for (let i = 0; i < 4; i++) await h.post(`/api/operations/${operationId}/reconcile`, {}, h.goodHeaders);
+    const done = (await h.app.inject({ method: "GET", url: `/api/operations/${operationId}` })).json() as { operation: { state: string } };
+    assert.equal(done.operation.state, "succeeded", "reconcile can follow the ledger to verification");
+    assert.equal((await h.post("/api/operations/nope/reconcile", {}, h.goodHeaders)).statusCode, 404);
+    const noCsrf = await h.post(`/api/operations/${operationId}/reconcile`, {}, { origin: "http://100.104.220.8:5173" });
+    assert.equal(noCsrf.statusCode, 403);
+  } finally { await h.app.close(); }
+});
+
+// ---- T-056: canonical identity ----------------------------------------------------------
+
+async function twoRecords(kind: "alias" | "ambiguous") {
+  const clock = new Clock();
+  const config = await loadFleetConfig();
+  const signer = createSigner("key-1");
+  const mkSim = (serverId: string, machineId: string) => new SimulatedTarget({
+    serverId, installationId: "inst", hostKeyFingerprint: "SHA256:same-host-key", machineId,
+    trustedKeys: { [signer.keyId]: signer.publicKeyPem },
+    installed: { "openssl:amd64": "3.0.13-0ubuntu3.4" },
+    upgrades: [{ name: "openssl", arch: "amd64", from: "3.0.13-0ubuntu3.4", to: "3.0.13-0ubuntu3.5" }],
+    now: clock.now, runMs: 1000,
+  });
+  const A = "00000000-0000-4000-8000-0000005e0a0a";
+  const B = "00000000-0000-4000-8000-0000005e0a0b";
+  const simA = mkSim(A, "machine-1");
+  // An alias is a second record of the SAME machine: it reaches the same simulated target.
+  const simB = kind === "alias" ? simA : mkSim(B, "machine-2");
+  const store = new SqliteCareStore({ path: join(mkdtempSync(join(tmpdir(), "servrsit-care-")), "care.db") });
+  const csrf = new CsrfGuard();
+  const fleet = new FleetService({ config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }) });
+  const app = await buildServer({
+    config, fleetService: fleet, startChecks: false, logger: false,
+    care: {
+      store, csrf, now: clock.now,
+      simulated: [
+        { server: { id: A, name: "Sim A", production: false, kind: "simulated", writesEnabled: true }, target: simA },
+        { server: { id: B, name: "Sim B alias", production: false, kind: "simulated", writesEnabled: true }, target: simB },
+      ],
+    },
+  });
+  const headers = { "content-type": "application/json", "x-csrf-token": csrf.token, origin: ORIGIN };
+  const plan = async (serverId: string) => (await app.inject({ method: "POST", url: "/api/plans", headers, payload: JSON.stringify({ operation: "apply.packages.v1", serverId }) })).json() as {
+    id: string; version: number; digest: string; blockers: Array<{ code: string }>;
+  };
+  const approve = (p: { id: string; version: number; digest: string }, key: string) =>
+    app.inject({ method: "POST", url: `/api/plans/${p.id}/approvals`, headers, payload: JSON.stringify({ planVersion: p.version, planDigest: p.digest, idempotencyKey: key, acknowledgements: [] }) });
+  return { app, store, A, B, plan, approve };
+}
+
+test("T-056 (F5): a second record of the same machine cannot bypass its lock (CL-03e)", async () => {
+  const h = await twoRecords("alias");
+  try {
+    const pa = await h.plan(h.A);
+    const pb = await h.plan(h.B);
+    assert.deepEqual([pa.blockers, pb.blockers], [[], []], "both records verify: same host key and machine id");
+    assert.equal((await h.approve(pa, "idem-key-alias-0001")).statusCode, 201);
+    const r = await h.approve(pb, "idem-key-alias-0002");
+    assert.equal(r.statusCode, 409);
+    assert.equal((r.json() as { error: string }).error, "TARGET_BUSY", "the alias shares the machine's lock");
+    assert.deepEqual((await h.plan(h.B)).blockers.map((b) => b.code), ["TARGET_BUSY"], "a new plan through the alias shows the machine is busy");
+    assert.equal(h.store.unresolvedFor(h.B), null);
+  } finally { await h.app.close(); }
+});
+
+test("T-056 (F5): two records sharing only the host key are ambiguous: write enablement is blocked for both", async () => {
+  const h = await twoRecords("ambiguous");
+  try {
+    for (const id of [h.A, h.B]) {
+      const p = await h.plan(id);
+      assert.deepEqual(p.blockers.map((b) => b.code), ["IDENTITY_AMBIGUOUS"], id);
+    }
+  } finally { await h.app.close(); }
+});
+
+
+// ---- T-058 (O2): unreachable target while planning ---------------------------------------
+
+test("T-058 (O2): a target unreachable while planning or at the approval re-check is 503 ROUTE_UNAVAILABLE; nothing is stored", async () => {
+  const h = await start();
+  try {
+    h.sim.faults.failPreviews = 1;
+    const r = await h.post("/api/plans", { operation: "apply.packages.v1", serverId: SIM });
+    assert.deepEqual([r.statusCode, r.json(), r.headers["retry-after"]], [503, { error: "ROUTE_UNAVAILABLE" }, "30"]);
+    const p = await h.plan();
+    h.sim.faults.failPreviews = 1;
+    const a = await h.approve(p);
+    assert.deepEqual([a.statusCode, a.json()], [503, { error: "ROUTE_UNAVAILABLE" }]);
+    assert.equal(h.store.unresolvedFor(SIM), null, "nothing was approved");
+    assert.equal((await h.approve(p)).statusCode, 201, "once the target answers again, the same plan can be approved");
+  } finally { await h.app.close(); }
+});
+
+
+// ---- T-059: restart, reboot and directories on a simulated server -----------------------
+
+async function actionHarness(opts: { faults?: Record<string, unknown> } = {}) {
+  const clock = new Clock();
+  const config = await loadFleetConfig();
+  const signer = createSigner("key-1");
+  const sim = new SimulatedTarget({
+    serverId: SIM, installationId: "inst", hostKeyFingerprint: "SHA256:sim",
+    trustedKeys: { [signer.keyId]: signer.publicKeyPem },
+    installed: {}, upgrades: [],
+    services: { "nginx.service": { active: true }, "postgresql.service": { active: true } },
+    bootId: "boot-0",
+    directories: { "/srv/existing": { owner: "spotty", group: "spotty", mode: "0755" } },
+    now: clock.now, runMs: 1000,
+  });
+  Object.assign(sim.faults, opts.faults ?? {});
+  const store = new SqliteCareStore({ path: join(mkdtempSync(join(tmpdir(), "servrsit-care-")), "care.db") });
+  const csrf = new CsrfGuard();
+  const fleet = new FleetService({ config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }) });
+  const app = await buildServer({
+    config, fleetService: fleet, startChecks: false, logger: false,
+    care: {
+      store, csrf, now: clock.now,
+      simulated: [{ server: { id: SIM, name: "Sim One", production: false, kind: "simulated", writesEnabled: true, selectedServices: ["nginx.service"], user: "spotty" }, target: sim }],
+    },
+  });
+  const dispatcher = new Dispatcher({
+    store, intents: new MemoryIntentStore(), targets: new Map<string, WriteTarget>([[SIM, sim]]),
+    writesEnabled: (id) => id === SIM, signer, installationId: "inst", workerId: "w1", now: clock.now,
+  });
+  const headers = { "content-type": "application/json", "x-csrf-token": csrf.token, origin: ORIGIN };
+  const plan = async (body: Record<string, unknown>) =>
+    (await app.inject({ method: "POST", url: "/api/plans", headers, payload: JSON.stringify({ serverId: SIM, ...body }) })).json() as {
+      id: string; version: number; digest: string; blockers: Array<{ code: string }>; scope: Record<string, unknown>; approvable: boolean;
+    };
+  const run = async (p: { id: string; version: number; digest: string }) => {
+    const r = await app.inject({ method: "POST", url: `/api/plans/${p.id}/approvals`, headers, payload: JSON.stringify({ planVersion: p.version, planDigest: p.digest, idempotencyKey: `idem-${p.id}`.slice(0, 40).padEnd(16, "x"), acknowledgements: [] }) });
+    assert.equal(r.statusCode, 201, r.body);
+    const { operationId } = r.json() as { operationId: string };
+    for (let i = 0; i < 12; i++) { await dispatcher.runOnce(); clock.advance(2500); }
+    return (await app.inject({ method: "GET", url: `/api/operations/${operationId}` })).json() as { operation: { state: string }; events: Array<{ type: string; payload: Record<string, unknown> }> };
+  };
+  return { app, sim, plan, run };
+}
+
+test("T-059: restart.service.v1 restarts one selected unit, is verified by a new start time, and never reboots", async () => {
+  const h = await actionHarness();
+  try {
+    const p = await h.plan({ operation: "restart.service.v1", unit: "nginx.service" });
+    assert.deepEqual([p.blockers, p.scope], [[], { unit: "nginx.service", includesServiceRestart: true, includesReboot: false }]);
+    const before = await h.sim.inspectBoot();
+    const op = await h.run(p);
+    assert.equal(op.operation.state, "succeeded");
+    assert.equal((await h.sim.inspectBoot()).bootId, before.bootId, "a restart is not a reboot");
+    assert.deepEqual((await h.plan({ operation: "restart.service.v1", unit: "postgresql.service" })).blockers.map((b) => b.code), ["UNIT_NOT_SELECTED"]);
+    assert.deepEqual((await h.plan({ operation: "restart.service.v1", unit: "nope.service" })).blockers.map((b) => b.code), ["UNIT_NOT_SELECTED"]);
+  } finally { await h.app.close(); }
+});
+
+test("T-059: a restart that leaves the unit inactive is failed, not succeeded (exit status is not evidence)", async () => {
+  const h = await actionHarness({ faults: { restartLeavesInactive: true } });
+  try {
+    const op = await h.run(await h.plan({ operation: "restart.service.v1", unit: "nginx.service" }));
+    assert.equal(op.operation.state, "failed");
+  } finally { await h.app.close(); }
+});
+
+test("T-059: reboot.host.v1 is verified by a new boot id; no new boot id is failed", async () => {
+  const ok = await actionHarness();
+  try {
+    const p = await ok.plan({ operation: "reboot.host.v1" });
+    assert.deepEqual(p.scope, { includesServiceRestart: false, includesReboot: true });
+    assert.equal((await ok.run(p)).operation.state, "succeeded");
+    assert.notEqual((await ok.sim.inspectBoot()).bootId, "boot-0");
+  } finally { await ok.app.close(); }
+  const stuck = await actionHarness({ faults: { rebootKeepsBootId: true } });
+  try {
+    assert.equal((await stuck.run(await stuck.plan({ operation: "reboot.host.v1" }))).operation.state, "failed");
+  } finally { await stuck.app.close(); }
+});
+
+test("T-059: prepare.directories.v1 creates only missing allowed paths, leaves existing ones untouched, and verifies owner and mode", async () => {
+  const h = await actionHarness({ faults: { directoryCreateFails: ["/srv/b"] } });
+  try {
+    const d = (path: string) => ({ path, owner: "spotty", group: "spotty", mode: "0750" });
+    const p = await h.plan({ operation: "prepare.directories.v1", directories: [d("/srv/a"), d("/srv/b"), d("/srv/existing")] });
+    assert.deepEqual([p.blockers, (p.scope as { existing: string[] }).existing], [[], ["/srv/existing"]]);
+    const op = await h.run(p);
+    assert.equal(op.operation.state, "partially_succeeded", "one created, one failed: partial, with the evidence");
+    const evidence = op.events.find((e) => e.type === "verification_recorded")!.payload;
+    assert.deepEqual([evidence["verified"], evidence["notVerified"]], [["/srv/a"], ["/srv/b"]]);
+    const existing = (await h.sim.inspectDirectories(["/srv/existing"]))[0]!;
+    assert.deepEqual([existing.owner, existing.mode], ["spotty", "0755"], "the existing directory was not reowned or rechmodded");
+    for (const bad of ["/etc/x", "/home/other/x", "/home/spotty/.ssh"]) {
+      assert.deepEqual((await h.plan({ operation: "prepare.directories.v1", directories: [d(bad)] })).blockers.map((b) => b.code), ["DIRECTORY_NOT_ALLOWED"], bad);
+    }
+    const home = await h.plan({ operation: "prepare.directories.v1", directories: [d("/home/spotty/projects")] });
+    assert.deepEqual(home.blockers, [], "the login user's home is allowed");
+  } finally { await h.app.close(); }
+});
+
+test("T-059: every new kind on a real server is blocked WRITES_DISABLED and never contacts it", async () => {
+  const h = await start();
+  try {
+    for (const body of [
+      { operation: "restart.service.v1", unit: "nginx.service" },
+      { operation: "reboot.host.v1" },
+      { operation: "prepare.directories.v1", directories: [{ path: "/srv/a", owner: "spotty", group: "spotty", mode: "0750" }] },
+    ]) {
+      const p = (await h.post("/api/plans", { serverId: NABIRE, ...body })).json() as { blockers: Array<{ code: string }>; preconditions: { previewDigest: string } };
+      assert.equal(p.blockers.some((b) => b.code === "WRITES_DISABLED"), true, JSON.stringify(body));
+      assert.equal(p.preconditions.previewDigest, "none", "no preview from a real server");
+    }
   } finally { await h.app.close(); }
 });

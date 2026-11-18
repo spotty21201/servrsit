@@ -40,6 +40,8 @@ export interface OutboxEntry {
   readonly intentDigest: string;
   readonly status: "pending" | "leased" | "done";
   readonly attempts: number;
+  /** T-058: consecutive steps that hit a transport error (0 after progress). */
+  readonly backoffLevel: number;
   readonly leaseOwner: string | null;
   readonly leaseUntil: string | null;
 }
@@ -65,6 +67,11 @@ export interface ApproveInput {
   /** Current value of the server's write gate, from configuration (never from the request). */
   readonly writesEnabled: boolean;
   readonly targetKind: TargetKind;
+  /**
+   * T-056: the machine's canonical identity (host key + machine id). One unresolved operation per
+   * machine, enforced by a unique index, whatever record or display name it is approved through.
+   */
+  readonly canonicalId?: string | null | undefined;
   readonly now: Date;
   readonly newId: () => string;
 }
@@ -74,17 +81,32 @@ export type ApproveResult =
   | { readonly kind: "replayed"; readonly operation: StoredOperation }
   | { readonly kind: "rejected"; readonly code: ApprovalRejection; readonly blockers?: readonly string[] };
 
+export type RequestStopResult =
+  | { readonly kind: "recorded"; readonly operation: StoredOperation }
+  | { readonly kind: "final"; readonly operation: StoredOperation }
+  | { readonly kind: "not_found" };
+
 export interface CareStore {
   insertPlan(plan: Plan): void;
   /** Latest version of a plan, or a specific version. */
   getPlan(id: string, version?: number): Plan | null;
   /** The single unresolved operation for a server, if any. */
   unresolvedFor(serverId: string): StoredOperation | null;
+  /** T-056: unresolved work on the same machine through any record. */
+  unresolvedForMachine(canonicalId: string): StoredOperation | null;
   /**
    * One transaction: checks, approval, operation (queued), "created" event and
    * dispatch-outbox entry. All or nothing.
    */
   approve(input: ApproveInput): ApproveResult;
+  /**
+   * T-055: record a stop request (flag + event, once). If nothing was ever sent, the operation is
+   * cancelled before start in the same transaction. Otherwise its state is left alone: whatever is
+   * on the target finishes, and the ledger decides the outcome. Never kills anything.
+   */
+  requestStop(operationId: string, actor: string, now: Date): RequestStopResult;
+  /** Whether this plan version already has an approval (a repeat request is then an idempotent replay). */
+  hasApproval(planId: string, planVersion: number): boolean;
   getOperation(id: string): StoredOperation | null;
   listEvents(operationId: string): OperationEvent[];
   /** Validated state change plus its event, atomically. Throws TransitionError. */
@@ -104,6 +126,8 @@ export interface CareStore {
   completeOutbox(id: string, worker: string): void;
   /** Give a leased entry back for another round (the work is not finished). */
   releaseOutbox(id: string, worker: string): void;
+  /** T-058: keep the entry out of reach until `until` (backoff after a transport error). */
+  deferOutbox(id: string, worker: string, until: Date): void;
   close(): void;
 }
 

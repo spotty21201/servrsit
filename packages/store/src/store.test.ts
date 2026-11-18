@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import { buildPlan, PRODUCTION_ACK, TransitionError, type Plan, type TransactionPreview } from "@servrsit/domain";
+import { buildPlan, PRODUCTION_ACKS, TransitionError, type Plan, type TransactionPreview } from "@servrsit/domain";
 import { FileIntentStore, IntentConflictError, SqliteCareStore } from "./index.js";
 
 const NOW = new Date("2026-11-17T10:00:00.000Z");
@@ -30,7 +30,7 @@ function makePlan(over: Partial<Parameters<typeof buildPlan>[0]> = {}): Plan {
 
 const approveArgs = (plan: Plan, over: Record<string, unknown> = {}) => ({
   planId: plan.id, planVersion: plan.version, planDigest: plan.digest, idempotencyKey: "key-1",
-  owner: "owner-1", acknowledgements: [PRODUCTION_ACK], writesEnabled: true, targetKind: "simulated" as const,
+  owner: "owner-1", acknowledgements: [...PRODUCTION_ACKS], writesEnabled: true, targetKind: "simulated" as const,
   now: new Date(NOW.getTime() + 60_000), newId: () => randomUUID(), ...over,
 });
 
@@ -184,4 +184,23 @@ test("FileIntentStore is write-once: same digest is a no-op, a different digest 
   assert.deepEqual(intents.get("op-1"), { digest: "sha256:a", body: { x: 1 } });
   assert.equal(statSync(join(dir, "intents", "op-1.json")).mode & 0o777, 0o600);
   assert.throws(() => intents.put("../escape", "d", {}), /invalid intent key/);
+});
+
+test("T-056: one unresolved operation per machine across records, enforced by the database", () => {
+  const { store } = fresh();
+  const p1 = makePlan({ id: "plan-a" });
+  store.insertPlan(p1);
+  const machine = "machine:sha256:" + "a".repeat(64);
+  const first = store.approve({ ...approveArgs(p1), canonicalId: machine });
+  assert.equal(first.kind, "created");
+  const other = buildPlan({
+    id: "plan-b", version: 1, operation: "apply.packages.v1",
+    server: { id: "00000000-0000-4000-8000-0000000000b2", production: false, writesEnabled: true },
+    preview: { upgrades: [{ name: "openssl", arch: "amd64", from: "1", to: "2", origin: "Ubuntu:24.04/noble-updates" }], removals: [], downgrades: [], held: [], locked: false, stateDigest: "sha256:x" },
+    unresolved: null, now: NOW, controllerClockTrusted: true,
+  });
+  store.insertPlan(other);
+  const second = store.approve({ ...approveArgs(other, { idempotencyKey: "key-2", acknowledgements: [] }), canonicalId: machine });
+  assert.deepEqual(second, { kind: "rejected", code: "TARGET_BUSY" }, "another record of the same machine is busy");
+  assert.notEqual(store.unresolvedForMachine(machine), null);
 });

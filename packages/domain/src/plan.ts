@@ -15,8 +15,10 @@
  * (invariant 5: those need their own plans and approvals).
  */
 
-import { isUbuntuArchiveOrigin } from "@servrsit/contracts";
+import { ACK_RECOVERY_ROUTE, isUbuntuArchiveOrigin, PRODUCTION_ACKNOWLEDGEMENTS } from "@servrsit/contracts";
 import { digestOf } from "./canonical.js";
+import type { IdentityStatus } from "./identity.js";
+import type { DirectoriesPlan, RebootPlan, RestartPlan } from "./actions.js";
 import type { OperationId } from "./catalog.js";
 
 export const PLAN_TTL_MS = 15 * 60_000;
@@ -44,6 +46,16 @@ export const BLOCKER_CODES = [
   "ONLY_EXCLUDED_PACKAGES",
   /** ServrSit's own clock is wrong or unverified, so expiries and freshness cannot be trusted (T-063). */
   "CONTROLLER_CLOCK_UNTRUSTED",
+  /** T-056: the machine's host key or machine id is unknown. */
+  "IDENTITY_UNVERIFIED",
+  /** T-056: another record shares exactly one of this machine's host key and machine id. */
+  "IDENTITY_AMBIGUOUS",
+  /** T-059: the unit is not one the owner selected for this server. */
+  "UNIT_NOT_SELECTED",
+  /** T-059: the server has no such unit. */
+  "UNIT_NOT_FOUND",
+  /** T-059: a requested directory breaks the path, owner or mode rules (Tech Spec §8.3). */
+  "DIRECTORY_NOT_ALLOWED",
 ] as const;
 export type BlockerCode = (typeof BLOCKER_CODES)[number];
 
@@ -67,6 +79,13 @@ export const BLOCKER_MESSAGES: Readonly<Record<BlockerCode, string>> = {
     "The only pending updates come from sources outside Ubuntu's archive. Update plans leave those out by default.",
   CONTROLLER_CLOCK_UNTRUSTED:
     "ServrSit's own clock is wrong or unverified, so plan expiry and data freshness cannot be trusted. Fix the clock on the ServrSit machine first.",
+  IDENTITY_UNVERIFIED: "This server's identity is not confirmed (host key and machine id), so changes cannot be enabled.",
+  IDENTITY_AMBIGUOUS:
+    "Another server record shares part of this server's identity (its host key or its machine id, but not both). Changes stay blocked until that is resolved.",
+  UNIT_NOT_SELECTED: "Only services you selected for this server can be restarted.",
+  UNIT_NOT_FOUND: "This server has no such service.",
+  DIRECTORY_NOT_ALLOWED:
+    "A requested directory is outside /srv or your home directory, or asks for an owner or permissions that are not allowed.",
 };
 
 export interface PackageChange {
@@ -110,10 +129,26 @@ export interface PlanServer {
   readonly writesEnabled: boolean;
 }
 
-export interface Plan {
+/** Fields every plan has, whatever its operation. */
+export interface PlanBase {
   readonly id: string;
   readonly version: number;
-  readonly operation: OperationId;
+  readonly serverId: string;
+  readonly production: boolean;
+  readonly preconditions: { readonly previewDigest: string };
+  /** Acknowledgements the owner must give before approving. */
+  readonly requiredAcknowledgements: readonly string[];
+  readonly createdAt: string;
+  readonly expiresAt: string;
+  readonly blockers: readonly Blocker[];
+  readonly digest: string;
+}
+
+/** A package plan. Its shape is unchanged since T-048/T-062, so its digests are too. */
+export interface PackagesPlan {
+  readonly id: string;
+  readonly version: number;
+  readonly operation: "apply.packages.v1";
   readonly serverId: string;
   readonly production: boolean;
   readonly scope: {
@@ -134,7 +169,16 @@ export interface Plan {
   readonly digest: string;
 }
 
-export const PRODUCTION_ACK = "production-impact" as const;
+/** Every plan kind (T-059). Narrow on `operation`. */
+export type Plan = PackagesPlan | RestartPlan | RebootPlan | DirectoriesPlan;
+
+/** T-057: both are required for a production server (UX Spec §10.2). */
+export const PRODUCTION_ACKS: readonly string[] = PRODUCTION_ACKNOWLEDGEMENTS;
+/**
+ * @deprecated Before T-057 there was one production acknowledgement. Kept so older imports load;
+ * on its own it no longer satisfies a production approval. Use PRODUCTION_ACKS.
+ */
+export const PRODUCTION_ACK = ACK_RECOVERY_ROUTE;
 
 const PACKAGE_NAME = /^[a-z0-9][a-z0-9+.-]{0,99}$/;
 const ARCH = /^[a-z0-9_-]{1,20}$/;
@@ -148,7 +192,7 @@ function validChange(c: PackageChange): boolean {
 export interface BuildPlanInput {
   readonly id: string;
   readonly version: number;
-  readonly operation: OperationId;
+  readonly operation: "apply.packages.v1";
   readonly server: PlanServer;
   /** Null when no preview could be obtained (for example writes are disabled and nothing was asked). */
   readonly preview: TransactionPreview | null;
@@ -157,21 +201,41 @@ export interface BuildPlanInput {
   readonly now: Date;
   /** T-063: false when ServrSit's own clock is untrusted. */
   readonly controllerClockTrusted: boolean;
+  /** T-056: the machine's identity. Checked only when writes are enabled. Absent: not checked. */
+  readonly identity?: IdentityStatus | undefined;
 }
 
-const block = (code: BlockerCode): Blocker => ({ code, message: BLOCKER_MESSAGES[code] });
+export const block = (code: BlockerCode): Blocker => ({ code, message: BLOCKER_MESSAGES[code] });
 
 /** The digest covers every field of the plan except the digest itself. */
-export function planDigest(plan: Omit<Plan, "digest">): string {
+export function planDigest(plan: object): string {
   return digestOf(plan);
 }
 
-export function buildPlan(input: BuildPlanInput): Plan {
+/** What every plan builder needs, whatever the operation. */
+export interface CommonPlanInput {
+  readonly server: PlanServer;
+  readonly unresolved: "queued" | "running" | "verifying" | "outcome_unknown" | null;
+  readonly controllerClockTrusted: boolean;
+  readonly identity?: IdentityStatus | undefined;
+}
+
+/** Blockers every plan gets, in a fixed order (unchanged for package plans). */
+export function commonBlockers(input: CommonPlanInput): Blocker[] {
   const blockers: Blocker[] = [];
   if (!input.server.writesEnabled) blockers.push(block("WRITES_DISABLED"));
   if (!input.controllerClockTrusted) blockers.push(block("CONTROLLER_CLOCK_UNTRUSTED"));
+  if (input.server.writesEnabled && input.identity !== undefined) {
+    if (input.identity.status === "unverified") blockers.push(block("IDENTITY_UNVERIFIED"));
+    if (input.identity.status === "ambiguous") blockers.push(block("IDENTITY_AMBIGUOUS"));
+  }
   if (input.unresolved === "outcome_unknown") blockers.push(block("OUTCOME_UNKNOWN"));
   else if (input.unresolved !== null) blockers.push(block("TARGET_BUSY"));
+  return blockers;
+}
+
+export function buildPlan(input: BuildPlanInput): PackagesPlan {
+  const blockers: Blocker[] = commonBlockers(input);
 
   const preview = input.preview;
   let packages: PackageChange[] = [];
@@ -201,7 +265,7 @@ export function buildPlan(input: BuildPlanInput): Plan {
     }
   }
 
-  const body: Omit<Plan, "digest"> = {
+  const body: Omit<PackagesPlan, "digest"> = {
     id: input.id,
     version: input.version,
     operation: input.operation,
@@ -212,7 +276,7 @@ export function buildPlan(input: BuildPlanInput): Plan {
     verification: {
       expectInstalled: Object.fromEntries(packages.map((c) => [`${c.name}:${c.arch}`, c.to])),
     },
-    requiredAcknowledgements: input.server.production ? [PRODUCTION_ACK] : [],
+    requiredAcknowledgements: input.server.production ? [...PRODUCTION_ACKS] : [],
     createdAt: input.now.toISOString(),
     expiresAt: new Date(input.now.getTime() + PLAN_TTL_MS).toISOString(),
     blockers,

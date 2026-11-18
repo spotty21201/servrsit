@@ -130,6 +130,8 @@ function clockFinding(c: Clock, controller: ControllerClock | null): Finding | n
 export interface FindingsInput {
   /** T-063: ServrSit's own clock. Absent means not checked. */
   readonly controllerClock?: ControllerClock | null | undefined;
+  /** T-056: names (from configuration) of other servers that report the same machine id. */
+  readonly sameMachineIdAs?: readonly string[] | undefined;
   readonly current: InspectionObservation | null;
   readonly previous: InspectionObservation | null;
   readonly consecutiveFailures: number;
@@ -155,6 +157,13 @@ export function evaluateFindings(input: FindingsInput): Finding[] {
     findings.push({
       id: "unreachable", rule: "connection.unreachable.v1", severity: "warning",
       summary: `The last ${input.consecutiveFailures} scheduled checks could not reach this host.`,
+    });
+  }
+
+  if (input.sameMachineIdAs !== undefined && input.sameMachineIdAs.length > 0) {
+    findings.push({
+      id: "identity-duplicate", rule: "identity.duplicate.v1", severity: "warning",
+      summary: `This server reports the same machine id as ${input.sameMachineIdAs.join(", ")}. It may be one machine under two names, or a cloned image. Changes stay blocked until that is resolved.`,
     });
   }
 

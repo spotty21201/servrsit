@@ -164,7 +164,17 @@ export class FleetService {
   snapshot(): FleetResponse {
     const now = this.now();
     const controlPlane = this.controlPlane();
-    const servers = this.options.config.hosts.map((host) => this.serverView(host, now, controlPlane.clock));
+    // T-056: which configured hosts report the same machine id (observed, read-only).
+    const byMachine = new Map<string, string[]>();
+    for (const host of this.options.config.hosts) {
+      const mid = this.states.get(host.id)?.lastSuccess?.observation.host.machineId;
+      if (mid?.status === "ok") byMachine.set(mid.value, [...(byMachine.get(mid.value) ?? []), host.name]);
+    }
+    const sameAs = (host: HostConfig): string[] => {
+      const mid = this.states.get(host.id)?.lastSuccess?.observation.host.machineId;
+      return mid?.status === "ok" ? (byMachine.get(mid.value) ?? []).filter((n) => n !== host.name) : [];
+    };
+    const servers = this.options.config.hosts.map((host) => this.serverView(host, now, controlPlane.clock, sameAs(host)));
     const next =
       this.timer === null
         ? null
@@ -180,7 +190,7 @@ export class FleetService {
     };
   }
 
-  private serverView(host: HostConfig, now: Date, controllerClock: ControllerClock): FleetServer {
+  private serverView(host: HostConfig, now: Date, controllerClock: ControllerClock, sameMachineIdAs: readonly string[]): FleetServer {
     const state = this.states.get(host.id);
     if (state === undefined) throw new Error(`no state for ${host.id}`);
     const success = state.lastSuccess;
@@ -219,6 +229,7 @@ export class FleetService {
             },
       findings: evaluateFindings({
         controllerClock,
+        sameMachineIdAs,
         current: success?.observation ?? null,
         previous: state.previousSuccess,
         consecutiveFailures: state.consecutiveFailures,

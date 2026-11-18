@@ -433,6 +433,12 @@ export function correctTargetTime(
   return { stamp: ok(corrected.toISOString()), basis: "corrected" };
 }
 
+/** T-056: `/etc/machine-id` is 32 lowercase hex characters. Anything else is unavailable, never guessed. */
+export function parseMachineId(lines: string[]): Field<string> {
+  const first = nonEmpty(lines)[0]?.trim();
+  return first !== undefined && /^[0-9a-f]{32}$/.test(first) ? ok(first) : unavailable("machine id not in expected format");
+}
+
 export function parseAptStamp(lines: string[], now: Date): Field<string> {
   const first = nonEmpty(lines)[0];
   const epoch = first !== undefined && /^\d{1,12}$/.test(first) ? Number(first) : 0;

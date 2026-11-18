@@ -10,6 +10,7 @@
 import { CATALOG_VERSION } from "./catalog.js";
 import { digestOf } from "./canonical.js";
 import type { PackageChange, Plan } from "./plan.js";
+import type { DirectoriesPlan, RebootPlan, RestartPlan } from "./actions.js";
 
 export const MANIFEST_SCHEMA_VERSION = 1 as const;
 /** A manifest must be accepted remotely within this window after issue. */
@@ -23,11 +24,12 @@ export interface Manifest {
   readonly operation: Plan["operation"];
   readonly catalogVersion: typeof CATALOG_VERSION;
   readonly plan: { readonly id: string; readonly version: number; readonly digest: string };
-  readonly scope: { readonly packages: readonly PackageChange[] };
+  /** Packages: exactly { packages } (unchanged since T-048). Other kinds: their plan's scope (T-059). */
+  readonly scope: { readonly packages: readonly PackageChange[] } | RestartPlan["scope"] | RebootPlan["scope"] | DirectoriesPlan["scope"];
   readonly preconditionDigest: string;
   readonly issuedAt: string;
   readonly acceptBefore: string;
-  readonly verification: { readonly expectInstalled: Readonly<Record<string, string>> };
+  readonly verification: Plan["verification"];
 }
 
 export interface ManifestInput {
@@ -51,7 +53,7 @@ export function buildManifest(input: ManifestInput): { manifest: Manifest; diges
     operation: plan.operation,
     catalogVersion: CATALOG_VERSION,
     plan: { id: plan.id, version: plan.version, digest: plan.digest },
-    scope: { packages: plan.scope.packages },
+    scope: plan.operation === "apply.packages.v1" ? { packages: plan.scope.packages } : plan.scope,
     preconditionDigest: plan.preconditions.previewDigest,
     issuedAt: input.issuedAt.toISOString(),
     acceptBefore: acceptBefore.toISOString(),
