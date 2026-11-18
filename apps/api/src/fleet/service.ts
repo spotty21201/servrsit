@@ -43,6 +43,8 @@ export interface FleetServiceOptions {
   readonly log?: { info: (o: object, m: string) => void; warn: (o: object, m: string) => void } | undefined;
   /** T-063: ServrSit's own clock, as last checked. Absent means not checked (tests). */
   readonly controllerClock?: (() => ControllerClock) | undefined;
+  /** T-076: called after every pass and single-server check (findings tracking). */
+  readonly onPassComplete?: (() => void) | undefined;
 }
 
 interface ServerState {
@@ -64,6 +66,11 @@ export class FleetService {
   private timer: NodeJS.Timeout | null = null;
   private running: Promise<void> | null = null;
   private lastRunAt: Date | null = null;
+  /** start() was called: background checks belong to this process. */
+  private scheduled = false;
+  /** T-076: the owner paused background checks. */
+  private paused = false;
+  private passStartedAt: Date | null = null;
 
   constructor(private readonly options: FleetServiceOptions) {
     this.now = options.now ?? (() => new Date());
@@ -137,6 +144,25 @@ export class FleetService {
   }
 
   private async runPass(): Promise<void> {
+    this.passStartedAt = this.now();
+    try {
+      await this.checkAll();
+    } finally {
+      this.passStartedAt = null;
+    }
+    this.notifyPass();
+  }
+
+  /** T-076: tell listeners (the findings tracker) that new results exist. Their errors never stop checks. */
+  private notifyPass(): void {
+    try {
+      this.options.onPassComplete?.();
+    } catch (error) {
+      this.options.log?.warn({ err: error }, "pass listener failed");
+    }
+  }
+
+  private async checkAll(): Promise<void> {
     const hosts = this.hosts();
     this.prune(hosts);
     for (const host of hosts) {
@@ -152,9 +178,11 @@ export class FleetService {
    * any other server. It queues behind a running pass, so checks stay serial.
    */
   refreshHost(id: string): Promise<void> {
+    if (this.paused) return Promise.resolve();
     return this.serial(async () => {
       const host = this.hosts().find((h) => h.id === id);
       if (host !== undefined) await this.refreshOne(host);
+      this.notifyPass();
     });
   }
 
@@ -184,13 +212,43 @@ export class FleetService {
 
   /** Start periodic refresh. The first pass runs immediately in the background. */
   start(): void {
-    if (this.timer !== null) return;
+    this.scheduled = true;
+    if (this.timer !== null || this.paused) return;
     void this.refreshAll();
     this.timer = setInterval(() => void this.refreshAll(), this.intervalMs);
     this.timer.unref();
   }
 
+  /**
+   * T-076 (FR-19): stop background checks until resume(). A pass already
+   * running finishes; nothing new starts.
+   */
+  pause(): void {
+    this.paused = true;
+    if (this.timer !== null) clearInterval(this.timer);
+    this.timer = null;
+  }
+
+  /** Resume: one current check now, then the normal interval. Missed runs are not replayed. */
+  resume(): void {
+    this.paused = false;
+    if (this.scheduled) this.start();
+  }
+
+  /** T-076: what the scheduler is doing, for GET /api/scheduler. */
+  schedulerState(): { scheduled: boolean; paused: boolean; passStartedAt: Date | null; nextRunAt: Date | null; intervalMs: number } {
+    const base = this.lastRunAt ?? this.passStartedAt;
+    return {
+      scheduled: this.scheduled,
+      paused: this.paused,
+      passStartedAt: this.passStartedAt,
+      nextRunAt: this.timer === null || base === null ? null : new Date(base.getTime() + this.intervalMs),
+      intervalMs: this.intervalMs,
+    };
+  }
+
   async stop(): Promise<void> {
+    this.scheduled = false;
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
     if (this.running !== null) await this.running;

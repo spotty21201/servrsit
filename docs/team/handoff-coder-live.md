@@ -1551,3 +1551,90 @@ Tester suites (temporary copy of /projects/servrsit-tester @ 1c9d5a7, not commit
 Also compare the lists sorted on both sides (`[...expected].sort()`). With that change in my temporary copy, ZT-01 passes 13/13, including "nothing started a process, opened a socket or resolved a name". None of these routes can write to a server. They act on drafts, the registry and ServrSit's own key files. Their only server contact is the read-only key scan and first check.
 
 From here, T-076..T-079 are based on `integration/next`.
+
+## T-076: findings and scheduler API (branch `feat/coder/findings`, from `integration/next`)
+
+**Contract:** `packages/contracts/src/findings.ts`. The routes are `GET /api/findings`, `POST /api/findings/:id/acknowledge`, `POST /api/findings/:id/snooze {for: 1h|1d|1w}`, `GET /api/scheduler`, `POST /api/scheduler/pause {reason?}` and `POST /api/scheduler/resume`. The owner-auth guard covers all of them.
+
+**How findings behave** (`apps/api/src/findings/tracker.ts`, `packages/store/src/findings.ts`):
+
+- **One record per issue.** Each server and finding key (for example `disk:/srv`) has at most one open record. The database enforces this. A repeat detection updates the open record; a recurrence after resolution opens a new one.
+- **When a finding resolves.** A finding resolves only when a successful, fresh check covered it and no longer showed it. `RULE_EVIDENCE` maps each rule to the check it depends on. For example, `disk.usage.v1` needs `filesystems`, and `connection.unreachable.v1` needs a successful attempt. `resolvedBy` names the check with its time.
+- **Not-rechecked.** A finding becomes `not-rechecked`, never resolved, when the checks fail, the data is stale, the covering check was unavailable, or the rule is unknown.
+- **Acknowledge and snooze** never resolve. A resolved record refuses both with 409 `NOT_ALLOWED`. The Designer stub also refuses acknowledging a `not-rechecked` finding; the API allows it.
+- **Retention.** Resolved records stay in the list for 7 days. Records are never deleted, and their events are append-only.
+- **Recording.** Findings are recorded after every fleet pass (the new `onPassComplete` option) and on every `GET`.
+- **Fixture mode** keeps its `[FIXTURE DATA]` findings in memory only, and reports the scheduler as `unavailable`.
+- **No email alerts.** `externalAlerts.available` is always `false` in Stage A, as FR-20 requires.
+
+**Scheduler** (`FleetService.pause/resume/schedulerState`):
+
+- **Pause** stops new passes. A pass already running finishes. While paused, the single-server check after a server is added is skipped too.
+- **Resume** runs one current check, then returns to the normal interval. Missed runs are not replayed (FR-19).
+- **Persistence.** The pause is stored in the new `SqliteSettingsStore`, which has an append-only history, so it survives a restart.
+- **Delayed** means the next run is more than 60 s overdue, or a pass has run longer than one interval.
+
+**New files:** `.data/findings.db`, `.data/settings.db` (both gitignored).
+
+**Web:** `apps/web/src/api/findings.ts` keeps the stub's interface: `list`, `acknowledge` and `snooze`, with errors as plain codes. It adds `scheduler`, `pause` and `resume`. `apps/web/src/api/http.ts` is a shared transport used by T-076..T-079; it sends the session CSRF token and retries once after `CSRF_INVALID`.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 221, ai 156, web 90, ssh 51, store 24, domain 22, worker 19, infra 9; typecheck all 9 exit 0
+Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, static-config 3/3,
+  care-loop 41/42 (CL-09a, known), zt01 12/13 as committed; 13/13 with the reviewed list below
+```
+
+**For the Tester:**
+
+- **New mutating routes for ZT-01:** `POST /api/findings/:id/acknowledge`, `POST /api/findings/:id/snooze`, `POST /api/scheduler/pause`, `POST /api/scheduler/resume`. These come on top of the nine T-069 routes. None of them can reach a server.
+- **Your current branch.** On `feat/tester/server-registration` (`75c2c61`), `care-loop` is 6/41 and `auth` is 36/37 (AU-04b). The result is identical on `integration/next` without T-076. Those files predate the T-057 acknowledgement mapping and the T-066 per-source lock. Your `1c9d5a7` versions pass.
+
+Next: T-077.
+
+## T-077: activity history and export (branch `feat/coder/activity`, from `integration/next`)
+
+**Contract** (`packages/contracts/src/activity.ts`):
+
+- `GET /api/activity?type=&server=&result=&from=&to=&q=&limit=` lists the history.
+- `POST /api/exports` creates an export.
+- `GET /api/exports` lists exports that have not expired.
+- `GET /api/exports/:id/download` returns the file as an attachment, or 410 once it has expired.
+
+**Records** (`apps/api/src/activity/history.ts`):
+
+- **Operations** come from the care store (new `CareStore.listOperations`). Each has a fixed title and outcome text per state. Failed, cancelled and unknown outcomes are included. `simulated: true` marks operations on a simulated target.
+- **Findings** give one record when opened and one when resolved. The resolved record says which check resolved it.
+- **Health checks**: one record per finished attempt, kept in the new `SqliteActivityStore`. Each holds the result, how many checks ran, or a fixed failure text. Nothing from server output is kept: a test plants a raw stderr string, and it does not appear.
+
+**Exports:**
+
+- Built on the server from the same records, with times in the requested IANA time zone.
+- Scrubbed for known secret values with the same scrubber used for logs and responses. A test plants a secret in a finding summary; the export does not contain it.
+- Stored until expiry and never edited.
+
+**Retention** (FR-21 proposal):
+
+- Health-check records: 30 days, then pruned.
+- Operations and findings: 90 days shown in the list. They are never deleted.
+- Exports: 7 days.
+
+**New file:** `.data/activity.db` (gitignored). Health checks are recorded after every fleet pass, and also before each read of the activity list.
+
+**Web:** `apps/web/src/api/activity.ts` keeps the stub's `list`, `createExport` and `listExports`. Two things differ because the server now builds the file:
+
+- An export result has `downloadUrl` in place of `content`, and the new `download()` fetches the file.
+- The stub's second argument to `createExport` (the records) is still accepted, but only their ids are sent.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 226, ai 156, web 93, ssh 51, store 26, domain 22, worker 19, infra 9; typecheck all 9 exit 0
+Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a, known),
+  zt01 13/13 with the reviewed list (T-069 x9, T-076 x4, plus POST /api/exports)
+```
+
+**For the Tester:** add `POST /api/exports` to ZT-01's list. It reads only ServrSit's own records and never contacts a server.
+
+Next: T-078.
