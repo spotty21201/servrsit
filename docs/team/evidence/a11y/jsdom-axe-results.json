@@ -1,0 +1,539 @@
+{
+ "auth-checking": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 23,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "ServrSit"
+  ]
+ },
+ "auth-unreachable": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 26,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Can't reach ServrSit"
+  ]
+ },
+ "auth-password": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 26,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Sign in"
+  ]
+ },
+ "auth-password-error": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 30,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Sign in"
+  ]
+ },
+ "auth-lockout": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 30,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Sign in"
+  ]
+ },
+ "auth-code": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 25,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Enter your code"
+  ]
+ },
+ "auth-code-error": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 30,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Enter your code"
+  ]
+ },
+ "auth-recovery": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 26,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Use a recovery code"
+  ]
+ },
+ "auth-notice-signed-out": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 30,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Sign in"
+  ]
+ },
+ "auth-notice-expired": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 30,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Sign in"
+  ]
+ },
+ "setup-details": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 29,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Set up ServrSit"
+  ]
+ },
+ "setup-weak-password": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 29,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Set up ServrSit"
+  ]
+ },
+ "setup-error": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 33,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Set up ServrSit"
+  ]
+ },
+ "setup-enrol": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 36,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Add your authenticator"
+  ]
+ },
+ "setup-enrol-error": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 36,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Add your authenticator"
+  ]
+ },
+ "setup-codes": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 32,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Save your recovery codes"
+  ]
+ },
+ "overview": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 38,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Your servers"
+  ]
+ },
+ "clock-fixture": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 30,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Clock banner states"
+  ]
+ },
+ "overview-api-down": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 37,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Your servers"
+  ]
+ },
+ "plan-ready": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Nabire"
+  ]
+ },
+ "plan-production": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 37,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "plan-lost": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Merauke"
+  ]
+ },
+ "plan-changed": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Nabire"
+  ]
+ },
+ "plan-expired": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Nabire"
+  ]
+ },
+ "plan-busy": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Sentani"
+  ]
+ },
+ "plan-writes-off": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "plan-production-acknowledged": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 37,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "plan-production-submitting": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 37,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-queued": {
+  "violations": [],
+  "incomplete": [
+   "aria-allowed-role",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-running": {
+  "violations": [],
+  "incomplete": [
+   "aria-allowed-role",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-running-stop": {
+  "violations": [],
+  "incomplete": [
+   "aria-allowed-role",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-verifying": {
+  "violations": [],
+  "incomplete": [
+   "aria-allowed-role",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-succeeded": {
+  "violations": [],
+  "incomplete": [
+   "aria-allowed-role",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-succeeded-reboot": {
+  "violations": [],
+  "incomplete": [
+   "aria-allowed-role",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-partial": {
+  "violations": [],
+  "incomplete": [
+   "aria-allowed-role",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-failed": {
+  "violations": [],
+  "incomplete": [
+   "aria-allowed-role",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-cancelled": {
+  "violations": [],
+  "incomplete": [
+   "aria-allowed-role",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-unknown": {
+  "violations": [],
+  "incomplete": [
+   "aria-allowed-role",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-running-transcript-open": {
+  "violations": [
+   {
+    "id": "aria-allowed-role",
+    "impact": "minor",
+    "help": "ARIA role should be appropriate for the element",
+    "nodes": [
+     "ul"
+    ]
+   },
+   {
+    "id": "listitem",
+    "impact": "serious",
+    "help": "<li> elements must be contained in a <ul> or <ol>",
+    "nodes": [
+     "ul > li:nth-child(1)",
+     "ul > li:nth-child(2)",
+     "ul > li:nth-child(3)",
+     "ul > li:nth-child(4)"
+    ]
+   }
+  ],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "ServrSit \u2014 Overview",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ }
+}

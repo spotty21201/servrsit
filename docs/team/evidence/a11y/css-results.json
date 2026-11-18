@@ -1,0 +1,2230 @@
+{
+ "targetRows": [
+  {
+   "state": "overview",
+   "el": "a.nameLink",
+   "name": "Fixture One",
+   "width": 1280,
+   "h": 26,
+   "w": null,
+   "how": "estimated from line-height 26 + padding 0",
+   "verdict": "small"
+  },
+  {
+   "state": "overview",
+   "el": "a.nameLink",
+   "name": "Fixture One",
+   "width": 390,
+   "h": 17,
+   "w": null,
+   "how": "estimated from line-height 17 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "overview",
+   "el": "a.nameLink",
+   "name": "Fixture One",
+   "width": 320,
+   "h": 17,
+   "w": null,
+   "how": "estimated from line-height 17 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "overview",
+   "el": "a.nameLink",
+   "name": "Fixture Two",
+   "width": 1280,
+   "h": 26,
+   "w": null,
+   "how": "estimated from line-height 26 + padding 0",
+   "verdict": "small"
+  },
+  {
+   "state": "overview",
+   "el": "a.nameLink",
+   "name": "Fixture Two",
+   "width": 390,
+   "h": 17,
+   "w": null,
+   "how": "estimated from line-height 17 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "overview",
+   "el": "a.nameLink",
+   "name": "Fixture Two",
+   "width": 320,
+   "h": 17,
+   "w": null,
+   "how": "estimated from line-height 17 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "overview",
+   "el": "a.nameLink",
+   "name": "Fixture Three",
+   "width": 1280,
+   "h": 26,
+   "w": null,
+   "how": "estimated from line-height 26 + padding 0",
+   "verdict": "small"
+  },
+  {
+   "state": "overview",
+   "el": "a.nameLink",
+   "name": "Fixture Three",
+   "width": 390,
+   "h": 17,
+   "w": null,
+   "how": "estimated from line-height 17 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "overview",
+   "el": "a.nameLink",
+   "name": "Fixture Three",
+   "width": 320,
+   "h": 17,
+   "w": null,
+   "how": "estimated from line-height 17 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "overview",
+   "el": "textarea.input",
+   "name": "",
+   "width": 1280,
+   "h": 36.8,
+   "w": null,
+   "how": "estimated from line-height 20.8 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "overview",
+   "el": "textarea.input",
+   "name": "",
+   "width": 390,
+   "h": 36.8,
+   "w": null,
+   "how": "estimated from line-height 20.8 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "overview",
+   "el": "textarea.input",
+   "name": "",
+   "width": 320,
+   "h": 36.8,
+   "w": null,
+   "how": "estimated from line-height 20.8 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "clock-fixture",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "clock-fixture",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "clock-fixture",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "clock-fixture",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "clock-fixture",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "clock-fixture",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "overview-api-down",
+   "el": "textarea.input",
+   "name": "",
+   "width": 1280,
+   "h": 36.8,
+   "w": null,
+   "how": "estimated from line-height 20.8 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "overview-api-down",
+   "el": "textarea.input",
+   "name": "",
+   "width": 390,
+   "h": 36.8,
+   "w": null,
+   "how": "estimated from line-height 20.8 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "overview-api-down",
+   "el": "textarea.input",
+   "name": "",
+   "width": 320,
+   "h": 36.8,
+   "w": null,
+   "how": "estimated from line-height 20.8 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-ready",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-ready",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-ready",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-ready",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-ready",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-ready",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production",
+   "el": "label.check",
+   "name": "I have a way to recover Fixture Timika i",
+   "width": 1280,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production",
+   "el": "label.check",
+   "name": "I have a way to recover Fixture Timika i",
+   "width": 390,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production",
+   "el": "label.check",
+   "name": "I have a way to recover Fixture Timika i",
+   "width": 320,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production",
+   "el": "label.check",
+   "name": "I understand that package updates can in",
+   "width": 1280,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production",
+   "el": "label.check",
+   "name": "I understand that package updates can in",
+   "width": 390,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production",
+   "el": "label.check",
+   "name": "I understand that package updates can in",
+   "width": 320,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-lost",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-lost",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-lost",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-lost",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-lost",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-lost",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-changed",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-changed",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-changed",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-changed",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-changed",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-changed",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-expired",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-expired",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-expired",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-expired",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-expired",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-expired",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-busy",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-busy",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-busy",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-busy",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-busy",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-busy",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-writes-off",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-writes-off",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-writes-off",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-writes-off",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-writes-off",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-writes-off",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "label.check",
+   "name": "I have a way to recover Fixture Timika i",
+   "width": 1280,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "label.check",
+   "name": "I have a way to recover Fixture Timika i",
+   "width": 390,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "label.check",
+   "name": "I have a way to recover Fixture Timika i",
+   "width": 320,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "label.check",
+   "name": "I understand that package updates can in",
+   "width": 1280,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "label.check",
+   "name": "I understand that package updates can in",
+   "width": 390,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production-acknowledged",
+   "el": "label.check",
+   "name": "I understand that package updates can in",
+   "width": 320,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "label.check",
+   "name": "I have a way to recover Fixture Timika i",
+   "width": 1280,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "label.check",
+   "name": "I have a way to recover Fixture Timika i",
+   "width": 390,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "label.check",
+   "name": "I have a way to recover Fixture Timika i",
+   "width": 320,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "label.check",
+   "name": "I understand that package updates can in",
+   "width": 1280,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "label.check",
+   "name": "I understand that package updates can in",
+   "width": 390,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "plan-production-submitting",
+   "el": "label.check",
+   "name": "I understand that package updates can in",
+   "width": 320,
+   "h": 34.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 16",
+   "verdict": "small"
+  },
+  {
+   "state": "op-queued",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-queued",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-queued",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-queued",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-queued",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-queued",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-queued",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-queued",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-queued",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-verifying",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-verifying",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-verifying",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-verifying",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-verifying",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-verifying",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-verifying",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-verifying",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-verifying",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded-reboot",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded-reboot",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded-reboot",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded-reboot",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded-reboot",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded-reboot",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded-reboot",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded-reboot",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-succeeded-reboot",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-partial",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-partial",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-partial",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-partial",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-partial",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-partial",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-partial",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-partial",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-partial",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-failed",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-failed",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-failed",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-failed",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-failed",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-failed",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-failed",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-failed",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-failed",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-unknown",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-unknown",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-unknown",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-unknown",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-unknown",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-unknown",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-unknown",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-unknown",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-unknown",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 1280,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 390,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "a.brand.pixel-text",
+   "name": "ServrSit, back to Overview",
+   "width": 320,
+   "h": 20,
+   "w": null,
+   "how": "estimated from line-height 20 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "a",
+   "name": "Overview",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "a",
+   "name": "Overview",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "a",
+   "name": "Overview",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 1280,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 390,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "a (inline link)",
+   "name": "View the approved plan",
+   "width": 320,
+   "h": 18.2,
+   "w": null,
+   "how": "estimated from line-height 18.2 + padding 0",
+   "verdict": "below-24"
+  }
+ ],
+ "contrastBelowNeed": [
+  {
+   "state": "op-queued",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-queued",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-queued",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-queued",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-queued",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-queued",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running-stop",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-verifying",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-verifying",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-failed",
+   "el": "strong.sPending",
+   "text": "Not started",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-failed",
+   "el": "strong.sPending",
+   "text": "Not started",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-failed",
+   "el": "strong.sPending",
+   "text": "Not started",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-failed",
+   "el": "strong.sPending",
+   "text": "Not started",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "strong.sPending",
+   "text": "Not started",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "strong.sPending",
+   "text": "Not started",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "strong.sPending",
+   "text": "Not started",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "strong.sPending",
+   "text": "Not started",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "strong.sPending",
+   "text": "Not started",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-cancelled",
+   "el": "strong.sPending",
+   "text": "Not started",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 1280,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  },
+  {
+   "state": "op-running-transcript-open",
+   "el": "strong.sPending",
+   "text": "Waiting",
+   "width": 390,
+   "ratio": 3.79,
+   "need": 4.5,
+   "fg": "#7B8490",
+   "bg": "#FFFFFF"
+  }
+ ],
+ "counts": {
+  "targetRows": 609,
+  "contrastPairs": 3060
+ }
+}

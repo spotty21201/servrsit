@@ -1,0 +1,6235 @@
+{
+ "at": "2026-11-18T04:45:02.567Z",
+ "seconds": 68,
+ "results": [
+  {
+   "state": "signin",
+   "viewport": "desktop-1280",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "Username",
+      "x": 442,
+      "y": 150,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Password",
+      "x": 442,
+      "y": 228,
+      "w": 323,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Show",
+      "x": 773,
+      "y": 228,
+      "w": 65,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Set up the owner account",
+      "x": 544,
+      "y": 371,
+      "w": 177,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin-code",
+   "viewport": "desktop-1280",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "6-digit code",
+      "x": 442,
+      "y": 204,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Use a recovery code instead",
+      "x": 442,
+      "y": 316,
+      "w": 197,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Start over",
+      "x": 650,
+      "y": 316,
+      "w": 75,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin-error",
+   "viewport": "desktop-1280",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "button",
+      "name": "Set up the owner account",
+      "x": 544,
+      "y": 447,
+      "w": 177,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+   ]
+  },
+  {
+   "state": "setup-details",
+   "viewport": "desktop-1280",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "Setup token",
+      "x": 442,
+      "y": 233,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Username",
+      "x": 442,
+      "y": 351,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Password",
+      "x": 442,
+      "y": 452,
+      "w": 323,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Show",
+      "x": 773,
+      "y": 452,
+      "w": 65,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Back to sign in",
+      "x": 442,
+      "y": 632,
+      "w": 107,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "setup-enrol",
+   "viewport": "desktop-1280",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "button",
+      "name": "Copy key",
+      "x": 650,
+      "y": 352,
+      "w": 114,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Open in authenticator app",
+      "x": 650,
+      "y": 404,
+      "w": 188,
+      "h": 48,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "6-digit code from the app",
+      "x": 442,
+      "y": 527,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "overview",
+   "viewport": "desktop-1280",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture One",
+     "w": 177,
+     "h": 31,
+     "x": 198,
+     "y": 180,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture Two",
+     "w": 177,
+     "h": 31,
+     "x": 571,
+     "y": 180,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture Three",
+     "w": 204,
+     "h": 31,
+     "x": 945,
+     "y": 180,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "select._scope_1dk3f_149",
+     "name": "Scope",
+     "w": 111,
+     "h": 28,
+     "x": 478,
+     "y": 691,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "#\u00abr0\u00bb-scope",
+        "summary": "  Element's background color could not be determined due to a background gradient"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 0,
+      "y": 217,
+      "w": 86,
+      "h": 60,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Activity",
+      "x": 0,
+      "y": 285,
+      "w": 86,
+      "h": 60,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Settings",
+      "x": 0,
+      "y": 353,
+      "w": 86,
+      "h": 60,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 8,
+      "y": 726,
+      "w": 70,
+      "h": 50,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture One",
+      "x": 198,
+      "y": 180,
+      "w": 177,
+      "h": 31,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View server for Fixture One",
+      "x": 142,
+      "y": 405,
+      "w": 133,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture Two",
+      "x": 571,
+      "y": 180,
+      "w": 177,
+      "h": 31,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Check connection for Fixture Two",
+      "x": 515,
+      "y": 405,
+      "w": 172,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture Three",
+      "x": 945,
+      "y": 180,
+      "w": 204,
+      "h": 31,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View server for Fixture Three",
+      "x": 889,
+      "y": 405,
+      "w": 133,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View all activity",
+      "x": 700,
+      "y": 543,
+      "w": 540,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "select",
+      "name": "Scope",
+      "x": 478,
+      "y": 691,
+      "w": 111,
+      "h": 28,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(201, 184, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "textarea",
+      "name": "Ask ServrSit",
+      "x": 386,
+      "y": 729,
+      "w": 536,
+      "h": 78,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": "solid 2px rgb(81, 65, 198)"
+     }
+    ],
+    "orderViolations": [
+     "#4 \"Sign out (signed in as owner)\" (8,726) -> \"Fixture One\" (198,180)",
+     "#6 \"View server for Fixture One\" (142,405) -> \"Fixture Two\" (571,180)",
+     "#8 \"Check connection for Fixture Two\" (515,405) -> \"Fixture Three\" (945,180)"
+    ],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "plan-production",
+   "viewport": "desktop-1280",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 1173,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Technical details",
+      "x": 134,
+      "y": 958,
+      "w": 636,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "I have a way to recover Fixture Ti",
+      "x": 831,
+      "y": 464,
+      "w": 20,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "I understand that package updates ",
+      "x": 831,
+      "y": 544,
+      "w": 20,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [
+     "#4 \"Technical details\" (134,958) -> \"I have a way to recover Fixture Ti\" (831,464)"
+    ],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "plan-writes-off",
+   "viewport": "desktop-1280",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 1173,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Technical details",
+      "x": 134,
+      "y": 893,
+      "w": 636,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Refresh plan",
+      "x": 840,
+      "y": 549,
+      "w": 288,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [
+     "#4 \"Technical details\" (134,893) -> \"Refresh plan\" (840,549)"
+    ],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "op-running",
+   "viewport": "desktop-1280",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "View the approved plan",
+     "w": 152,
+     "h": 18,
+     "x": 480,
+     "y": 261,
+     "inline": true,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "._step_1kjy3_251:nth-child(4) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sPending_1kjy3_264",
+        "summary": "  Element has insufficient color contrast of 3.78 (foreground color: #7b8490, background color: #ffffff, font size: 10.5pt (14px), font weight: bold). Expected "
+       },
+       {
+        "target": "._step_1kjy3_251:nth-child(5) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sPending_1kjy3_264",
+        "summary": "  Element has insufficient color contrast of 3.78 (foreground color: #7b8490, background color: #ffffff, font size: 10.5pt (14px), font weight: bold). Expected "
+       }
+      ]
+     }
+    ],
+    "incomplete": [
+     {
+      "id": "aria-allowed-role",
+      "impact": "minor",
+      "help": "ARIA role should be appropriate for the element",
+      "nodes": [
+       {
+        "target": "ul",
+        "summary": "  ARIA role log must be removed when the element is made visible, as it is not allowed for the element"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 1173,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View the approved plan",
+      "x": 480,
+      "y": 261,
+      "w": 152,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Transcript (4 events)",
+      "x": 542,
+      "y": 600,
+      "w": 604,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "op-unknown",
+   "viewport": "desktop-1280",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "View the approved plan",
+     "w": 152,
+     "h": 18,
+     "x": 485,
+     "y": 261,
+     "inline": true,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-allowed-role",
+      "impact": "minor",
+      "help": "ARIA role should be appropriate for the element",
+      "nodes": [
+       {
+        "target": "._transcript_1kjy3_274",
+        "summary": "  ARIA role log must be removed when the element is made visible, as it is not allowed for the element"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 1173,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View the approved plan",
+      "x": 485,
+      "y": 261,
+      "w": 152,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Recheck outcome",
+      "x": 134,
+      "y": 385,
+      "w": 1012,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Transcript (5 events)",
+      "x": 542,
+      "y": 709,
+      "w": 604,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "clock-fixture",
+   "viewport": "desktop-1280",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 1173,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin",
+   "viewport": "tablet-1024",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "Username",
+      "x": 314,
+      "y": 150,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Password",
+      "x": 314,
+      "y": 228,
+      "w": 323,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Show",
+      "x": 645,
+      "y": 228,
+      "w": 65,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Set up the owner account",
+      "x": 416,
+      "y": 371,
+      "w": 177,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin-code",
+   "viewport": "tablet-1024",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "6-digit code",
+      "x": 314,
+      "y": 204,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Use a recovery code instead",
+      "x": 314,
+      "y": 316,
+      "w": 197,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Start over",
+      "x": 522,
+      "y": 316,
+      "w": 75,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin-error",
+   "viewport": "tablet-1024",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "button",
+      "name": "Set up the owner account",
+      "x": 416,
+      "y": 447,
+      "w": 177,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+   ]
+  },
+  {
+   "state": "setup-details",
+   "viewport": "tablet-1024",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "Setup token",
+      "x": 314,
+      "y": 233,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Username",
+      "x": 314,
+      "y": 351,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Password",
+      "x": 314,
+      "y": 452,
+      "w": 323,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Show",
+      "x": 645,
+      "y": 452,
+      "w": 65,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Back to sign in",
+      "x": 314,
+      "y": 632,
+      "w": 107,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "setup-enrol",
+   "viewport": "tablet-1024",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "button",
+      "name": "Copy key",
+      "x": 522,
+      "y": 352,
+      "w": 114,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Open in authenticator app",
+      "x": 522,
+      "y": 404,
+      "w": 188,
+      "h": 48,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "6-digit code from the app",
+      "x": 314,
+      "y": 527,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "overview",
+   "viewport": "tablet-1024",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture One",
+     "w": 177,
+     "h": 31,
+     "x": 94,
+     "y": 274,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture Two",
+     "w": 177,
+     "h": 31,
+     "x": 422,
+     "y": 274,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture Three",
+     "w": 204,
+     "h": 31,
+     "x": 750,
+     "y": 274,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "select._scope_1dk3f_149",
+     "name": "Scope",
+     "w": 111,
+     "h": 28,
+     "x": 306,
+     "y": 785,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "._navItemActive_19jh3_89 > ._navLabel_19jh3_103",
+        "summary": "  Element's background color could not be determined due to a pseudo element"
+       },
+       {
+        "target": "#\u00abr0\u00bb-scope",
+        "summary": "  Element's background color could not be determined due to a background gradient"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 16,
+      "y": 163,
+      "w": 331,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Activity",
+      "x": 347,
+      "y": 163,
+      "w": 331,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Settings",
+      "x": 677,
+      "y": 163,
+      "w": 331,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 919,
+      "y": 119,
+      "w": 89,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture One",
+      "x": 94,
+      "y": 274,
+      "w": 177,
+      "h": 31,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View server for Fixture One",
+      "x": 38,
+      "y": 499,
+      "w": 133,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture Two",
+      "x": 422,
+      "y": 274,
+      "w": 177,
+      "h": 31,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Check connection for Fixture Two",
+      "x": 366,
+      "y": 499,
+      "w": 172,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture Three",
+      "x": 750,
+      "y": 274,
+      "w": 204,
+      "h": 31,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View server for Fixture Three",
+      "x": 694,
+      "y": 499,
+      "w": 133,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View all activity",
+      "x": 528,
+      "y": 637,
+      "w": 472,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "select",
+      "name": "Scope",
+      "x": 306,
+      "y": 785,
+      "w": 111,
+      "h": 28,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(201, 184, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "textarea",
+      "name": "Ask ServrSit",
+      "x": 214,
+      "y": 823,
+      "w": 536,
+      "h": 78,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": "solid 2px rgb(81, 65, 198)"
+     }
+    ],
+    "orderViolations": [
+     "#3 \"Settings\" (677,163) -> \"Sign out (signed in as owner)\" (919,119)",
+     "#6 \"View server for Fixture One\" (38,499) -> \"Fixture Two\" (422,274)",
+     "#8 \"Check connection for Fixture Two\" (366,499) -> \"Fixture Three\" (750,274)"
+    ],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "plan-production",
+   "viewport": "tablet-1024",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 917,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Technical details",
+      "x": 38,
+      "y": 973,
+      "w": 572,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "I have a way to recover Fixture Ti",
+      "x": 671,
+      "y": 464,
+      "w": 20,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "I understand that package updates ",
+      "x": 671,
+      "y": 544,
+      "w": 20,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [
+     "#4 \"Technical details\" (38,973) -> \"I have a way to recover Fixture Ti\" (671,464)"
+    ],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "plan-writes-off",
+   "viewport": "tablet-1024",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 917,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Technical details",
+      "x": 38,
+      "y": 908,
+      "w": 572,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Refresh plan",
+      "x": 680,
+      "y": 549,
+      "w": 288,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [
+     "#4 \"Technical details\" (38,908) -> \"Refresh plan\" (680,549)"
+    ],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "op-running",
+   "viewport": "tablet-1024",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "View the approved plan",
+     "w": 152,
+     "h": 18,
+     "x": 384,
+     "y": 261,
+     "inline": true,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "._step_1kjy3_251:nth-child(4) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sPending_1kjy3_264",
+        "summary": "  Element has insufficient color contrast of 3.78 (foreground color: #7b8490, background color: #ffffff, font size: 10.5pt (14px), font weight: bold). Expected "
+       },
+       {
+        "target": "._step_1kjy3_251:nth-child(5) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sPending_1kjy3_264",
+        "summary": "  Element has insufficient color contrast of 3.78 (foreground color: #7b8490, background color: #ffffff, font size: 10.5pt (14px), font weight: bold). Expected "
+       }
+      ]
+     }
+    ],
+    "incomplete": [
+     {
+      "id": "aria-allowed-role",
+      "impact": "minor",
+      "help": "ARIA role should be appropriate for the element",
+      "nodes": [
+       {
+        "target": "ul",
+        "summary": "  ARIA role log must be removed when the element is made visible, as it is not allowed for the element"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 917,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View the approved plan",
+      "x": 384,
+      "y": 261,
+      "w": 152,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Transcript (4 events)",
+      "x": 446,
+      "y": 600,
+      "w": 540,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "op-unknown",
+   "viewport": "tablet-1024",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "View the approved plan",
+     "w": 152,
+     "h": 18,
+     "x": 389,
+     "y": 261,
+     "inline": true,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-allowed-role",
+      "impact": "minor",
+      "help": "ARIA role should be appropriate for the element",
+      "nodes": [
+       {
+        "target": "._transcript_1kjy3_274",
+        "summary": "  ARIA role log must be removed when the element is made visible, as it is not allowed for the element"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 917,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View the approved plan",
+      "x": 389,
+      "y": 261,
+      "w": 152,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Recheck outcome",
+      "x": 38,
+      "y": 385,
+      "w": 948,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Transcript (5 events)",
+      "x": 446,
+      "y": 709,
+      "w": 540,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "clock-fixture",
+   "viewport": "tablet-1024",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 917,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin",
+   "viewport": "tablet-768",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "Username",
+      "x": 186,
+      "y": 150,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Password",
+      "x": 186,
+      "y": 228,
+      "w": 323,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Show",
+      "x": 517,
+      "y": 228,
+      "w": 65,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Set up the owner account",
+      "x": 288,
+      "y": 371,
+      "w": 177,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin-code",
+   "viewport": "tablet-768",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "6-digit code",
+      "x": 186,
+      "y": 204,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Use a recovery code instead",
+      "x": 186,
+      "y": 316,
+      "w": 197,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Start over",
+      "x": 394,
+      "y": 316,
+      "w": 75,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin-error",
+   "viewport": "tablet-768",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "button",
+      "name": "Set up the owner account",
+      "x": 288,
+      "y": 447,
+      "w": 177,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+   ]
+  },
+  {
+   "state": "setup-details",
+   "viewport": "tablet-768",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "Setup token",
+      "x": 186,
+      "y": 233,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Username",
+      "x": 186,
+      "y": 351,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Password",
+      "x": 186,
+      "y": 452,
+      "w": 323,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Show",
+      "x": 517,
+      "y": 452,
+      "w": 65,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Back to sign in",
+      "x": 186,
+      "y": 632,
+      "w": 107,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "setup-enrol",
+   "viewport": "tablet-768",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "button",
+      "name": "Copy key",
+      "x": 394,
+      "y": 352,
+      "w": 114,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Open in authenticator app",
+      "x": 394,
+      "y": 404,
+      "w": 188,
+      "h": 48,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "6-digit code from the app",
+      "x": 186,
+      "y": 527,
+      "w": 396,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "overview",
+   "viewport": "tablet-768",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture One",
+     "w": 177,
+     "h": 31,
+     "x": 94,
+     "y": 274,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture Two",
+     "w": 177,
+     "h": 31,
+     "x": 458,
+     "y": 274,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture Three",
+     "w": 204,
+     "h": 31,
+     "x": 94,
+     "y": 584,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "select._scope_1dk3f_149",
+     "name": "Scope",
+     "w": 111,
+     "h": 28,
+     "x": 178,
+     "y": 1031,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "._navItemActive_19jh3_89 > ._navLabel_19jh3_103",
+        "summary": "  Element's background color could not be determined due to a pseudo element"
+       },
+       {
+        "target": "#\u00abr0\u00bb-scope",
+        "summary": "  Element's background color could not be determined due to a background gradient"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 16,
+      "y": 163,
+      "w": 245,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Activity",
+      "x": 261,
+      "y": 163,
+      "w": 245,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Settings",
+      "x": 507,
+      "y": 163,
+      "w": 245,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 663,
+      "y": 119,
+      "w": 89,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture One",
+      "x": 94,
+      "y": 274,
+      "w": 177,
+      "h": 31,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View server for Fixture One",
+      "x": 38,
+      "y": 499,
+      "w": 133,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture Two",
+      "x": 458,
+      "y": 274,
+      "w": 177,
+      "h": 31,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Check connection for Fixture Two",
+      "x": 402,
+      "y": 499,
+      "w": 172,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture Three",
+      "x": 94,
+      "y": 584,
+      "w": 204,
+      "h": 31,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View server for Fixture Three",
+      "x": 38,
+      "y": 745,
+      "w": 133,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View all activity",
+      "x": 396,
+      "y": 883,
+      "w": 348,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "select",
+      "name": "Scope",
+      "x": 178,
+      "y": 1031,
+      "w": 111,
+      "h": 28,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(201, 184, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "textarea",
+      "name": "Ask ServrSit",
+      "x": 86,
+      "y": 1069,
+      "w": 536,
+      "h": 78,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": "solid 2px rgb(81, 65, 198)"
+     }
+    ],
+    "orderViolations": [
+     "#3 \"Settings\" (507,163) -> \"Sign out (signed in as owner)\" (663,119)",
+     "#6 \"View server for Fixture One\" (38,499) -> \"Fixture Two\" (458,274)"
+    ],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "plan-production",
+   "viewport": "tablet-768",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "label._check_1kjy3_198",
+     "name": "I understand that package updates ca",
+     "w": 692,
+     "h": 39,
+     "x": 38,
+     "y": 1226,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 661,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Technical details",
+      "x": 38,
+      "y": 981,
+      "w": 692,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "I have a way to recover Fixture Ti",
+      "x": 47,
+      "y": 1174,
+      "w": 20,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "I understand that package updates ",
+      "x": 47,
+      "y": 1236,
+      "w": 20,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "plan-writes-off",
+   "viewport": "tablet-768",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 661,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Technical details",
+      "x": 38,
+      "y": 916,
+      "w": 692,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Refresh plan",
+      "x": 56,
+      "y": 1157,
+      "w": 656,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "op-running",
+   "viewport": "tablet-768",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "View the approved plan",
+     "w": 152,
+     "h": 18,
+     "x": 384,
+     "y": 261,
+     "inline": true,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "._step_1kjy3_251:nth-child(4) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sPending_1kjy3_264",
+        "summary": "  Element has insufficient color contrast of 3.78 (foreground color: #7b8490, background color: #ffffff, font size: 10.5pt (14px), font weight: bold). Expected "
+       },
+       {
+        "target": "._step_1kjy3_251:nth-child(5) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sPending_1kjy3_264",
+        "summary": "  Element has insufficient color contrast of 3.78 (foreground color: #7b8490, background color: #ffffff, font size: 10.5pt (14px), font weight: bold). Expected "
+       }
+      ]
+     }
+    ],
+    "incomplete": [
+     {
+      "id": "aria-allowed-role",
+      "impact": "minor",
+      "help": "ARIA role should be appropriate for the element",
+      "nodes": [
+       {
+        "target": "ul",
+        "summary": "  ARIA role log must be removed when the element is made visible, as it is not allowed for the element"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 661,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View the approved plan",
+      "x": 384,
+      "y": 261,
+      "w": 152,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Transcript (4 events)",
+      "x": 38,
+      "y": 973,
+      "w": 692,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "op-unknown",
+   "viewport": "tablet-768",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "View the approved plan",
+     "w": 152,
+     "h": 18,
+     "x": 393,
+     "y": 261,
+     "inline": true,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-allowed-role",
+      "impact": "minor",
+      "help": "ARIA role should be appropriate for the element",
+      "nodes": [
+       {
+        "target": "._transcript_1kjy3_274",
+        "summary": "  ARIA role log must be removed when the element is made visible, as it is not allowed for the element"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 661,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View the approved plan",
+      "x": 393,
+      "y": 261,
+      "w": 152,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Recheck outcome",
+      "x": 38,
+      "y": 385,
+      "w": 692,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Transcript (5 events)",
+      "x": 38,
+      "y": 1103,
+      "w": 692,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "clock-fixture",
+   "viewport": "tablet-768",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 24,
+     "y": 134,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 136,
+     "y": 136,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 24,
+      "y": 134,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 136,
+      "y": 136,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 661,
+      "y": 123,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin",
+   "viewport": "mobile-390",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "Username",
+      "x": 34,
+      "y": 138,
+      "w": 322,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Password",
+      "x": 34,
+      "y": 216,
+      "w": 249,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Show",
+      "x": 291,
+      "y": 216,
+      "w": 65,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Set up the owner account",
+      "x": 136,
+      "y": 377,
+      "w": 177,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin-code",
+   "viewport": "mobile-390",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "6-digit code",
+      "x": 34,
+      "y": 213,
+      "w": 322,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Use a recovery code instead",
+      "x": 34,
+      "y": 325,
+      "w": 197,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Start over",
+      "x": 242,
+      "y": 325,
+      "w": 75,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin-error",
+   "viewport": "mobile-390",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "button",
+      "name": "Set up the owner account",
+      "x": 136,
+      "y": 453,
+      "w": 177,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+   ]
+  },
+  {
+   "state": "setup-details",
+   "viewport": "mobile-390",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "Setup token",
+      "x": 34,
+      "y": 262,
+      "w": 322,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Username",
+      "x": 34,
+      "y": 399,
+      "w": 322,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Password",
+      "x": 34,
+      "y": 499,
+      "w": 249,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Show",
+      "x": 291,
+      "y": 499,
+      "w": 65,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Back to sign in",
+      "x": 34,
+      "y": 680,
+      "w": 107,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "setup-enrol",
+   "viewport": "mobile-390",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "button",
+      "name": "Copy key",
+      "x": 34,
+      "y": 606,
+      "w": 114,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Open in authenticator app",
+      "x": 34,
+      "y": 658,
+      "w": 225,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "6-digit code from the app",
+      "x": 34,
+      "y": 758,
+      "w": 322,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "overview",
+   "viewport": "mobile-390",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture One",
+     "w": 118,
+     "h": 20,
+     "x": 66,
+     "y": 357,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture Two",
+     "w": 118,
+     "h": 20,
+     "x": 66,
+     "y": 561,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture Three",
+     "w": 136,
+     "h": 20,
+     "x": 66,
+     "y": 825,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "._navItemActive_19jh3_89 > ._navLabel_19jh3_103",
+        "summary": "  Element's background color could not be determined due to a pseudo element"
+       },
+       {
+        "target": "#\u00abr0\u00bb-scope",
+        "summary": "  Element's background color could not be determined due to a background gradient"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 16,
+      "y": 217,
+      "w": 119,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Activity",
+      "x": 135,
+      "y": 217,
+      "w": 119,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Settings",
+      "x": 255,
+      "y": 217,
+      "w": 119,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 285,
+      "y": 173,
+      "w": 89,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture One",
+      "x": 66,
+      "y": 357,
+      "w": 118,
+      "h": 20,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View server for Fixture One",
+      "x": 26,
+      "y": 491,
+      "w": 117,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture Two",
+      "x": 66,
+      "y": 561,
+      "w": 118,
+      "h": 20,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Check connection for Fixture Two",
+      "x": 26,
+      "y": 755,
+      "w": 156,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture Three",
+      "x": 66,
+      "y": 825,
+      "w": 136,
+      "h": 20,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View server for Fixture Three",
+      "x": 26,
+      "y": 945,
+      "w": 117,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View all activity",
+      "x": 16,
+      "y": 1234,
+      "w": 358,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "select",
+      "name": "Scope",
+      "x": 110,
+      "y": 1298,
+      "w": 111,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(201, 184, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "textarea",
+      "name": "Ask ServrSit",
+      "x": 18,
+      "y": 1376,
+      "w": 294,
+      "h": 78,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": "solid 2px rgb(81, 65, 198)"
+     }
+    ],
+    "orderViolations": [
+     "#3 \"Settings\" (255,217) -> \"Sign out (signed in as owner)\" (285,173)"
+    ],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "plan-production",
+   "viewport": "mobile-390",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 16,
+     "y": 177,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 128,
+     "y": 179,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 16,
+      "y": 177,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 128,
+      "y": 179,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 291,
+      "y": 205,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Technical details",
+      "x": 30,
+      "y": 1295,
+      "w": 330,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "I have a way to recover Fixture Ti",
+      "x": 39,
+      "y": 1491,
+      "w": 20,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "I understand that package updates ",
+      "x": 39,
+      "y": 1571,
+      "w": 20,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "plan-writes-off",
+   "viewport": "mobile-390",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 16,
+     "y": 177,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 128,
+     "y": 179,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 16,
+      "y": 177,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 128,
+      "y": 179,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 291,
+      "y": 205,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Technical details",
+      "x": 30,
+      "y": 1161,
+      "w": 330,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Refresh plan",
+      "x": 48,
+      "y": 1424,
+      "w": 294,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "op-running",
+   "viewport": "mobile-390",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 16,
+     "y": 177,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 128,
+     "y": 179,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "View the approved plan",
+     "w": 152,
+     "h": 18,
+     "x": 16,
+     "y": 387,
+     "inline": true,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "._step_1kjy3_251:nth-child(4) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sPending_1kjy3_264",
+        "summary": "  Element has insufficient color contrast of 3.78 (foreground color: #7b8490, background color: #ffffff, font size: 10.5pt (14px), font weight: bold). Expected "
+       },
+       {
+        "target": "._step_1kjy3_251:nth-child(5) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sPending_1kjy3_264",
+        "summary": "  Element has insufficient color contrast of 3.78 (foreground color: #7b8490, background color: #ffffff, font size: 10.5pt (14px), font weight: bold). Expected "
+       }
+      ]
+     }
+    ],
+    "incomplete": [
+     {
+      "id": "aria-allowed-role",
+      "impact": "minor",
+      "help": "ARIA role should be appropriate for the element",
+      "nodes": [
+       {
+        "target": "ul",
+        "summary": "  ARIA role log must be removed when the element is made visible, as it is not allowed for the element"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 16,
+      "y": 177,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 128,
+      "y": 179,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 291,
+      "y": 205,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View the approved plan",
+      "x": 16,
+      "y": 387,
+      "w": 152,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Transcript (4 events)",
+      "x": 30,
+      "y": 1168,
+      "w": 330,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "op-unknown",
+   "viewport": "mobile-390",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 16,
+     "y": 177,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 128,
+     "y": 179,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "View the approved plan",
+     "w": 152,
+     "h": 18,
+     "x": 16,
+     "y": 387,
+     "inline": true,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-allowed-role",
+      "impact": "minor",
+      "help": "ARIA role should be appropriate for the element",
+      "nodes": [
+       {
+        "target": "._transcript_1kjy3_274",
+        "summary": "  ARIA role log must be removed when the element is made visible, as it is not allowed for the element"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 16,
+      "y": 177,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 128,
+      "y": 179,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 291,
+      "y": 205,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View the approved plan",
+      "x": 16,
+      "y": 387,
+      "w": 152,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Recheck outcome",
+      "x": 30,
+      "y": 537,
+      "w": 330,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Transcript (5 events)",
+      "x": 30,
+      "y": 1403,
+      "w": 330,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "clock-fixture",
+   "viewport": "mobile-390",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 16,
+     "y": 177,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 128,
+     "y": 179,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 16,
+      "y": 177,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 128,
+      "y": 179,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 291,
+      "y": 205,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin",
+   "viewport": "narrow-320",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "Username",
+      "x": 34,
+      "y": 138,
+      "w": 252,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Password",
+      "x": 34,
+      "y": 216,
+      "w": 179,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Show",
+      "x": 221,
+      "y": 216,
+      "w": 65,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Set up the owner account",
+      "x": 34,
+      "y": 395,
+      "w": 177,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin-code",
+   "viewport": "narrow-320",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "6-digit code",
+      "x": 34,
+      "y": 213,
+      "w": 252,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Use a recovery code instead",
+      "x": 34,
+      "y": 325,
+      "w": 197,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Start over",
+      "x": 34,
+      "y": 369,
+      "w": 75,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "signin-error",
+   "viewport": "narrow-320",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "button",
+      "name": "Set up the owner account",
+      "x": 34,
+      "y": 490,
+      "w": 177,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+   ]
+  },
+  {
+   "state": "setup-details",
+   "viewport": "narrow-320",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "input",
+      "name": "Setup token",
+      "x": 34,
+      "y": 262,
+      "w": 252,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Username",
+      "x": 34,
+      "y": 399,
+      "w": 252,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "Password",
+      "x": 34,
+      "y": 517,
+      "w": 179,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Show",
+      "x": 221,
+      "y": 517,
+      "w": 65,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Back to sign in",
+      "x": 34,
+      "y": 716,
+      "w": 107,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "setup-enrol",
+   "viewport": "narrow-320",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "help": "Elements must only use permitted ARIA attributes",
+      "nodes": [
+       {
+        "target": "._brand_gvwz8_31",
+        "summary": "  aria-label attribute is not well supported on \"p\" elements with no valid role attribute."
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "button",
+      "name": "Copy key",
+      "x": 34,
+      "y": 624,
+      "w": 114,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Open in authenticator app",
+      "x": 34,
+      "y": 676,
+      "w": 225,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "6-digit code from the app",
+      "x": 34,
+      "y": 795,
+      "w": 252,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "overview",
+   "viewport": "narrow-320",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture One",
+     "w": 118,
+     "h": 20,
+     "x": 66,
+     "y": 357,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture Two",
+     "w": 118,
+     "h": 20,
+     "x": 66,
+     "y": 561,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a._nameLink_1it0c_137",
+     "name": "Fixture Three",
+     "w": 136,
+     "h": 20,
+     "x": 66,
+     "y": 825,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "._navItemActive_19jh3_89 > ._navLabel_19jh3_103",
+        "summary": "  Element's background color could not be determined due to a pseudo element"
+       },
+       {
+        "target": "#\u00abr0\u00bb-scope",
+        "summary": "  Element's background color could not be determined due to a background gradient"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 16,
+      "y": 217,
+      "w": 96,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Activity",
+      "x": 112,
+      "y": 217,
+      "w": 96,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Settings",
+      "x": 208,
+      "y": 217,
+      "w": 96,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 215,
+      "y": 173,
+      "w": 89,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture One",
+      "x": 66,
+      "y": 357,
+      "w": 118,
+      "h": 20,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View server for Fixture One",
+      "x": 26,
+      "y": 491,
+      "w": 117,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture Two",
+      "x": 66,
+      "y": 561,
+      "w": 118,
+      "h": 20,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Check connection for Fixture Two",
+      "x": 26,
+      "y": 755,
+      "w": 156,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Fixture Three",
+      "x": 66,
+      "y": 825,
+      "w": 136,
+      "h": 20,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgb(215, 239, 82)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View server for Fixture Three",
+      "x": 26,
+      "y": 979,
+      "w": 117,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 118, 72)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View all activity",
+      "x": 16,
+      "y": 1286,
+      "w": 288,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "select",
+      "name": "Scope",
+      "x": 110,
+      "y": 1350,
+      "w": 111,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(201, 184, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "textarea",
+      "name": "Ask ServrSit",
+      "x": 18,
+      "y": 1428,
+      "w": 224,
+      "h": 78,
+      "outline": "none 3px rgb(29, 37, 50)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": "solid 2px rgb(81, 65, 198)"
+     }
+    ],
+    "orderViolations": [
+     "#3 \"Settings\" (208,217) -> \"Sign out (signed in as owner)\" (215,173)"
+    ],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "plan-production",
+   "viewport": "narrow-320",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 16,
+     "y": 177,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 128,
+     "y": 179,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 16,
+      "y": 177,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 128,
+      "y": 179,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 221,
+      "y": 205,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Technical details",
+      "x": 30,
+      "y": 1441,
+      "w": 260,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "I have a way to recover Fixture Ti",
+      "x": 39,
+      "y": 1655,
+      "w": 20,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "input",
+      "name": "I understand that package updates ",
+      "x": 39,
+      "y": 1754,
+      "w": 20,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "plan-writes-off",
+   "viewport": "narrow-320",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 16,
+     "y": 177,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 128,
+     "y": 179,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 16,
+      "y": 177,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 128,
+      "y": 179,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 221,
+      "y": 205,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Technical details",
+      "x": 30,
+      "y": 1322,
+      "w": 260,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Refresh plan",
+      "x": 48,
+      "y": 1639,
+      "w": 224,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "op-running",
+   "viewport": "narrow-320",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 16,
+     "y": 177,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 128,
+     "y": 179,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "View the approved plan",
+     "w": 152,
+     "h": 18,
+     "x": 16,
+     "y": 427,
+     "inline": true,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "._step_1kjy3_251:nth-child(4) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sPending_1kjy3_264",
+        "summary": "  Element has insufficient color contrast of 3.78 (foreground color: #7b8490, background color: #ffffff, font size: 10.5pt (14px), font weight: bold). Expected "
+       },
+       {
+        "target": "._step_1kjy3_251:nth-child(5) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sPending_1kjy3_264",
+        "summary": "  Element has insufficient color contrast of 3.78 (foreground color: #7b8490, background color: #ffffff, font size: 10.5pt (14px), font weight: bold). Expected "
+       }
+      ]
+     }
+    ],
+    "incomplete": [
+     {
+      "id": "aria-allowed-role",
+      "impact": "minor",
+      "help": "ARIA role should be appropriate for the element",
+      "nodes": [
+       {
+        "target": "ul",
+        "summary": "  ARIA role log must be removed when the element is made visible, as it is not allowed for the element"
+       }
+      ]
+     },
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "._step_1kjy3_251:nth-child(2) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sDone_1kjy3_260",
+        "summary": "  Element's background color could not be determined due to a pseudo element"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 16,
+      "y": 177,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 128,
+      "y": 179,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 221,
+      "y": 205,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View the approved plan",
+      "x": 16,
+      "y": 427,
+      "w": 152,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Transcript (4 events)",
+      "x": 30,
+      "y": 1305,
+      "w": 260,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "op-unknown",
+   "viewport": "narrow-320",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 16,
+     "y": 177,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 128,
+     "y": 179,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "View the approved plan",
+     "w": 152,
+     "h": 18,
+     "x": 16,
+     "y": 427,
+     "inline": true,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": [
+     {
+      "id": "aria-allowed-role",
+      "impact": "minor",
+      "help": "ARIA role should be appropriate for the element",
+      "nodes": [
+       {
+        "target": "._transcript_1kjy3_274",
+        "summary": "  ARIA role log must be removed when the element is made visible, as it is not allowed for the element"
+       }
+      ]
+     },
+     {
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": [
+       {
+        "target": "._step_1kjy3_251:nth-child(2) > ._stepBody_1kjy3_257 > ._stepMeta_1kjy3_259 > ._sDone_1kjy3_260",
+        "summary": "  Element's background color could not be determined due to a pseudo element"
+       }
+      ]
+     }
+    ]
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 16,
+      "y": 177,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 128,
+      "y": 179,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 221,
+      "y": 205,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "View the approved plan",
+      "x": 16,
+      "y": 427,
+      "w": 152,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Recheck outcome",
+      "x": 30,
+      "y": 598,
+      "w": 260,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "summary",
+      "name": "Transcript (5 events)",
+      "x": 30,
+      "y": 1501,
+      "w": 260,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "clock-fixture",
+   "viewport": "narrow-320",
+   "title": "ServrSit \u2014 Overview",
+   "overflowX": 0,
+   "targets": [
+    {
+     "tag": "a._brand_1kjy3_31",
+     "name": "ServrSit, back to Overview",
+     "w": 88,
+     "h": 20,
+     "x": 16,
+     "y": 177,
+     "inline": false,
+     "disabled": false
+    },
+    {
+     "tag": "a",
+     "name": "Overview",
+     "w": 61,
+     "h": 18.2,
+     "x": 16,
+     "y": 205,
+     "inline": false,
+     "disabled": false
+    }
+   ],
+   "axe": {
+    "violations": [],
+    "incomplete": []
+   },
+   "tab": {
+    "stops": [
+     {
+      "tag": "a",
+      "name": "ServrSit, back to Overview",
+      "x": 16,
+      "y": 177,
+      "w": 88,
+      "h": 20,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "a",
+      "name": "Overview",
+      "x": 16,
+      "y": 205,
+      "w": 61,
+      "h": 18,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "underline",
+      "bg": "rgba(0, 0, 0, 0)",
+      "obscured": 0,
+      "container": null
+     },
+     {
+      "tag": "button",
+      "name": "Sign out (signed in as owner)",
+      "x": 221,
+      "y": 231,
+      "w": 83,
+      "h": 44,
+      "outline": "solid 2px rgb(81, 65, 198)",
+      "shadow": false,
+      "underline": "none",
+      "bg": "rgb(255, 255, 255)",
+      "obscured": 0,
+      "container": null
+     }
+    ],
+    "orderViolations": [],
+    "noIndicator": []
+   },
+   "errors": []
+  },
+  {
+   "state": "sign-out-focus",
+   "viewport": "desktop-1280",
+   "signOutFocus": {
+    "active": "body",
+    "notice": "You\u2019re signed out. Your servers have a sitter either way."
+   }
+  }
+ ]
+}

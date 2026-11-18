@@ -1,0 +1,12 @@
+{
+  "name": "@servrsit/tests-a11y",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Tester-owned accessibility tooling. Standalone on purpose: not part of the pnpm workspace, so no product manifest or lockfile is touched. Install with: pnpm install --ignore-workspace --frozen-lockfile",
+  "type": "module",
+  "devDependencies": {
+    "axe-core": "4.14.1",
+    "jsdom": "31.0.1",
+    "postcss": "8.5.33"
+  }
+}
