@@ -102,12 +102,13 @@ test("O2: other failures do not raise the host-key finding", () => {
 
 // ---- T-061: clock skew -------------------------------------------------------------
 
-test("T-061: a target clock 7 hours slow (Sentani's case) is a time-sync warning on the first observation", () => {
+test("T-061: a 7-hour difference from ServrSit's clock is a time-sync warning on the first observation", () => {
   const f = run(makeObservation({ clockSkewSeconds: -7 * 3600 }), null).find((x) => x.id === "clock-skew");
   assert.equal(f?.rule, "time.skew.v1");
   assert.equal(f?.severity, "warning");
-  assert.match(f?.summary ?? "", /^This server's clock is about 7 h behind ServrSit's clock\. /);
-  assert.match(run(makeObservation({ clockSkewSeconds: 600 }), null).find((x) => x.id === "clock-skew")?.summary ?? "", /about 10 min ahead of ServrSit's clock\./);
+  // T-063: with ServrSit's own clock unchecked, the finding does not blame the server.
+  assert.match(f?.summary ?? "", /^This server's clock reads about 7 h earlier than ServrSit's\. ServrSit's own clock is not verified, so either clock could be the wrong one\./);
+  assert.match(run(makeObservation({ clockSkewSeconds: 600 }), null).find((x) => x.id === "clock-skew")?.summary ?? "", /reads about 10 min later than ServrSit's/);
 });
 
 test("T-061: within 2 minutes, or a clock that could not be read, is not a skew finding", () => {
@@ -129,4 +130,26 @@ test("T-062: the pending-updates finding names what comes from outside Ubuntu an
   );
   const plain = run(makeObservation({ pending: 2 }), null).find((x) => x.id === "updates-pending");
   assert.doesNotMatch(plain?.summary ?? "", /outside Ubuntu/);
+});
+
+// ---- T-063: attribute the skew to the right clock ------------------------------------
+
+const controller = (status: "trusted" | "untrusted", offsetSeconds: number | null) => ({
+  status, checkedAt: "2026-11-17T08:00:00.000Z", ntpSynchronized: status === "trusted", offsetSeconds,
+  uncertaintySeconds: offsetSeconds === null ? null : 2, basis: offsetSeconds === null ? "none" as const : "https-date" as const, sources: [], reason: "x",
+});
+const skewFinding = (skew: number, c: ReturnType<typeof controller> | null) =>
+  evaluateFindings({ current: makeObservation({ clockSkewSeconds: skew }), previous: null, ...none, controllerClock: c }).find((x) => x.id === "clock-skew");
+
+test("T-063: Merauke's case: ServrSit 7 h fast, so a server reading 7 h earlier is right and gets no finding", () => {
+  assert.equal(skewFinding(-25202, controller("untrusted", 25200)), undefined);
+});
+
+test("T-063: with ServrSit's offset known, a server that is really off is told against real time", () => {
+  assert.equal(skewFinding(-25200 - 600, controller("untrusted", 25200))?.summary.startsWith("This server's clock is about 10 min behind real time."), true);
+  assert.equal(skewFinding(-600, controller("trusted", 0))?.summary.startsWith("This server's clock is about 10 min behind real time."), true);
+});
+
+test("T-063: with ServrSit's clock trusted but no offset reading, the server is blamed against a verified clock", () => {
+  assert.match(skewFinding(-600, controller("trusted", null))?.summary ?? "", /^This server's clock is about 10 min behind ServrSit's clock, which is verified\./);
 });

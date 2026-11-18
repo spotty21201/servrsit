@@ -16,6 +16,27 @@ export interface TimeContext {
   readonly timeZone: string;
   /** The moment the answer is produced. Ages are relative to this. */
   readonly now: Date;
+  /**
+   * T-063: ServrSit's own clock. When "untrusted", every time and age is
+   * uncertain and the answer must say so. Absent means not checked.
+   */
+  readonly controllerClock?: { readonly status: "trusted" | "untrusted" | "not-checked"; readonly offsetSeconds: number | null } | undefined;
+}
+
+/** T-063: the warning attached to every answer while ServrSit's own clock is untrusted; null otherwise. */
+export function controllerClockWarning(ctx: TimeContext): string | null {
+  const c = ctx.controllerClock;
+  if (c === undefined || c.status !== "untrusted") return null;
+  const by =
+    c.offsetSeconds === null
+      ? "cannot be verified"
+      : `is about ${spanText(c.offsetSeconds)} ${c.offsetSeconds > 0 ? "fast" : "slow"}`;
+  return `ServrSit's own clock ${by}, so every time and age here may be wrong.`;
+}
+
+function spanText(seconds: number): string {
+  const abs = Math.abs(seconds);
+  return abs >= 3600 ? `${Math.round(abs / 3600)} h` : abs >= 60 ? `${Math.round(abs / 60)} min` : `${abs} s`;
 }
 
 /** A time as shown to the model and the owner: local text plus age. */
