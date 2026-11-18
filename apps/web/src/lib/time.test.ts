@@ -54,3 +54,13 @@ test("clock with age", () => {
   assert.equal(formatClockWithAge(D("2026-11-17T02:56:00Z"), now, JKT), "09:56 WIB (4 min ago)");
   assert.equal(formatClockWithAge(D("2026-11-15T03:00:00Z"), now, JKT), "15 Nov 10:00 WIB");
 });
+
+import { formatTimeSeconds, formatUntil } from "./time";
+
+test("seconds clock and time-until", () => {
+  assert.equal(formatTimeSeconds(D("2026-11-17T02:42:09Z"), JKT), "09:42:09");
+  const now = D("2026-11-17T03:00:00Z");
+  assert.equal(formatUntil(D("2026-11-17T03:12:00Z"), now), "in 12 min");
+  assert.equal(formatUntil(D("2026-11-17T03:00:30Z"), now), "in 30 s");
+  assert.equal(formatUntil(D("2026-11-17T02:59:59Z"), now), "expired");
+});
