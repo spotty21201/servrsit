@@ -56,6 +56,8 @@ function Routes() {
   if (route.name === "settings") return <SettingsScreen />;
   if (route.name === "baselines") return <BaselineScreen />;
   if (route.name === "activity") return <ActivityScreen />;
+  if (route.name === "fixtureSettings") return <SettingsScreen fixture />;
+  if (route.name === "fixtureBaselines") return <BaselineScreen fixture />;
   if (route.name === "fixtureActivity") return <ActivityScreen fixture />;
   if (route.name === "fixtureFindings") return <FindingsScreen fixture />;
   if (route.name === "findings") return <FindingsScreen />;

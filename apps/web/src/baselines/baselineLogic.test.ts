@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createFixtureBaselinesClient } from "../api/stubs/baselines";
-import { canMarkIntentional, describeSetup, EXCLUSION_STATEMENT, groupRows, referenceAge, setupScope, splitCandidates, STATUS_LABEL, summaryText, validateBaselineName } from "./baselineLogic";
+import { createFixtureBaselinesClient } from "../fixtures/baselinesFixture";
+import { baselineErrorText, canMarkIntentional, describeSetup, EXCLUSION_STATEMENT, groupRows, referenceAge, setupScope, splitCandidates, STATUS_LABEL, summaryText, validateBaselineName } from "./baselineLogic";
 
 const NOW = new Date("2026-11-17T03:00:00Z");
 const TZ = "Asia/Jakarta";
@@ -81,14 +81,14 @@ test("setup scope: creates only Missing items; conflicts, not-checked and intent
   assert.ok(rows.ok);
   const s = setupScope(rows.data);
   assert.deepEqual(s.directories.map((r) => r.label), ["/srv/app"]);
-  assert.deepEqual(s.packages.map((r) => r.label), ["nginx"]);
+  assert.deepEqual(s.notIncluded.map((r) => r.label), ["nginx"]);
   assert.deepEqual(s.leftAlone.map((x) => x.label), ["/var/backups/app", "/opt/tools"]);
   assert.match(s.leftAlone[1]!.reason, /conflicts with the baseline, so it is not changed/);
-  assert.equal(describeSetup(s), "A setup plan would create 1 directory and install 1 package, and leave 2 items alone.");
+  assert.equal(describeSetup(s), "A setup plan would create 1 directory and leave 2 items alone. 1 missing item is not included.");
 });
 
 test("repeating a completed setup changes nothing", () => {
-  const rows = [{ conventionId: "a", kind: "directory", label: "/srv/app", expected: "", found: "x", status: "matches", reason: "", intentional: null }] as const;
+  const rows = [{ conventionId: "a", kind: "directory", label: "/srv/app", expected: "", found: "x", status: "matches", reason: "", actionable: false, intentional: null }] as const;
   const s = setupScope(rows);
   assert.equal(s.nothingToDo, true);
   assert.match(describeSetup(s), /would change nothing/);
@@ -98,8 +98,8 @@ test("the setup plan id goes to the canonical plan screen; a real host's plan is
   const { c, b } = await saved();
   const sim = await c.createSetupPlan(b.id, "b-dev2");
   const real = await c.createSetupPlan(b.id, "b-web2");
-  assert.deepEqual(sim, { ok: true, data: { planId: "fixture-plan-prepare" } });
-  assert.deepEqual(real, { ok: true, data: { planId: "fixture-plan-prepare-blocked" } });
+  assert.ok(sim.ok && sim.data.planId === "fixture-plan-prepare" && sim.data.included === 2 && sim.data.notIncluded.length === 1);
+  assert.ok(real.ok && real.data.planId === "fixture-plan-prepare-blocked");
 });
 
 test("exclusion statement names what is never copied; names validate", () => {
@@ -107,4 +107,28 @@ test("exclusion statement names what is never copied; names validate", () => {
   assert.equal(validateBaselineName(""), "Give the baseline a name.");
   assert.equal(validateBaselineName("Web server baseline"), null);
   assert.notEqual(validateBaselineName("<b>"), null);
+});
+
+test("a missing package is never planned; only missing directories are", async () => {
+  const { c, b } = await saved();
+  const rows = await c.compare(b.id, "b-dev2");
+  assert.ok(rows.ok);
+  const s = setupScope(rows.data);
+  assert.ok(s.directories.every((r) => r.kind === "directory"));
+  assert.ok(s.notIncluded.every((r) => r.kind === "package"));
+  assert.doesNotMatch(describeSetup(s), /install/);
+});
+
+test("a never-observed server says so", () => {
+  assert.equal(referenceAge({ observedAt: null }, NOW, TZ).text, "Never observed by ServrSit");
+  assert.equal(referenceAge({ observedAt: null }, NOW, TZ).old, true);
+});
+
+test("error wording: stale candidates, refusals and lost answers", () => {
+  assert.match(baselineErrorText("STALE_CANDIDATES"), /read it again/);
+  assert.match(baselineErrorText("NOT_ALLOWED", "Reason."), /Nothing was changed/);
+  for (const code of ["NETWORK", "TIMEOUT", "INVALID_RESPONSE"] as const) {
+    assert.match(baselineErrorText(code), /may or may not/);
+    assert.doesNotMatch(baselineErrorText(code), /Nothing was changed/);
+  }
 });

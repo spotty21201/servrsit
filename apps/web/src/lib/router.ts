@@ -14,6 +14,8 @@ export type Route =
   | { readonly name: "fixtureConnect" }
   | { readonly name: "fixtureFindings" }
   | { readonly name: "fixtureActivity" }
+  | { readonly name: "fixtureBaselines" }
+  | { readonly name: "fixtureSettings" }
   | { readonly name: "baselines" }
   | { readonly name: "settings" }
   | { readonly name: "activity" };
@@ -27,6 +29,8 @@ export function matchRoute(pathname: string): Route {
   if (clean === "/findings") return { name: "findings" };
   if (clean === "/fixtures/connect") return { name: "fixtureConnect" };
   if (clean === "/fixtures/findings") return { name: "fixtureFindings" };
+  if (clean === "/fixtures/settings") return { name: "fixtureSettings" };
+  if (clean === "/fixtures/baselines") return { name: "fixtureBaselines" };
   if (clean === "/fixtures/activity") return { name: "fixtureActivity" };
   if (clean === "/fixtures/overview") return { name: "fixtureOverview" };
   if (clean === "/baselines") return { name: "baselines" };

@@ -127,3 +127,48 @@ Evidence: `docs/team/evidence/a11y-fixes/` (results and two screenshots). Not ru
 3. Activity filters run in the browser over the loaded records (up to 1000). Server-side filters (`type`, `server`, `result`, `from`, `to`, `q`) are not used yet.
 
 Next: T-078 (baselines), T-079 (settings).
+
+## Addendum 6: T-080 part 3 (baselines on the real T-078 client)
+
+**Merge:** `integration/next` merged into `feat/designer/t080` with no conflicts.
+
+**Changed**
+- `BaselineScreen` uses `api/baselines.ts` (T-078), no Coder file edited. The stub became `src/fixtures/baselinesFixture.ts`, implements the full real interface, and backs `/fixtures/baselines` (banner always on).
+- The `[FIXTURE DATA]` banner also shows on `/baselines` when the API lists a simulated server; those servers carry a "Simulated" tag.
+- Step 2 shows the inventory source, its age and the API's own notes ("Not everything could be read"). The comparison shows source and observation time.
+- Setup scope follows the contract: only missing directories (`actionable`) are planned. Missing packages appear under "Missing, not included" with the reason that no operation installs packages yet. The old "Ubuntu packages to install" list is gone.
+- Name validation uses the contract's `BASELINE_NAME`. A never-observed server reads "Never observed by ServrSit. ServrSit has no facts about this machine yet."
+- Error wording from `baselineErrorText`: `STALE_CANDIDATES` tells the owner to read the reference again; lost answers say the step may or may not have happened.
+
+**Checks**
+- `pnpm typecheck`, `pnpm test` (199 pass, 0 fail), `pnpm build`: clean.
+- Browser on my own API (:3005, fixture fleet) and preview (:5174): real step 1 and the real "could not read the server" answer (503 UNAVAILABLE, "Fixture mode: no server is inspected") display correctly. The full fixture flow (reference, conventions, save, compare, review plan) ran on `/fixtures/baselines`. axe wcag2a/aa/21aa: 0 violations on all four states. Evidence: `docs/team/evidence/t080/baselines-*`.
+
+**Not verified**
+- Steps 2 to 4 against the real API: fixture fleet mode refuses inventory (503), so save, compare, mark intentional and setup plan are covered by the fixture client and `api/baselines.test.ts` only.
+- A real setup plan opens `/plans/:planId`, but Plan review still runs on the care stub (`api/stubs/care.ts`); there is no real care client in `apps/web/src/api/`. Until Coder provides one, a real plan id will show "not found" there. Please confirm which task adds it.
+
+**Settings (T-079):** landed on `integration/next` after this commit; see addendum 7.
+
+## Addendum 7: T-080 part 4 (settings on the real T-079 client)
+
+**Merge:** `integration/next` merged again (T-079), no conflicts.
+
+**Changed**
+- `SettingsScreen` uses `api/settings.ts`. The stub became `src/fixtures/settingsFixture.ts` and backs `/fixtures/settings` (banner always on). `api/stubs/` now holds only `care.ts`.
+- Real page banner: `/api/settings` has no mode field, so the screen reads `mode` from `/api/fleet` (one fetch, no polling) and shows `[FIXTURE DATA]` when it says fixture.
+- Contract-driven changes:
+  - `dailyTimeInEffect: false`: the daily time is labelled "(not used yet)" with the API's reason, and "Next daily check" reads "Not scheduled yet" instead of a computed time.
+  - AI: the "what is sent" line comes from `ai.sends`. The switch refuses to turn on when `ai.available` is false and says why.
+  - Retention shows the exports row. `keyKind: "local"` is labelled.
+  - Disconnect: `canDisconnect: false` (any queued or running operation) shows "Disconnecting is blocked" with the reason, offers Close only, and has no confirm button. The old "queued work will be cancelled" wording is gone, because the API blocks instead of cancelling.
+  - Error wording from `settingsErrorText`. Lost answers never say "Nothing was changed".
+
+**Checks**
+- `pnpm typecheck`, `pnpm test` (204 pass, 0 fail), `pnpm build`: clean.
+- Browser, own API (:3005 fixture fleet) and preview (:5174): real `/settings` loads and passes axe (wcag2a/aa/21aa, 0 violations); saving a schedule returned 200 and persisted; Pause was refused by the API ("Fixture mode: no checks run") and the screen showed that refusal; the disconnect confirmation opened for a real-API server (axe 0). `/fixtures/settings`: blocked disconnect (no confirm button) and a completed disconnect of Fixture Dev-2 (axe 0). Evidence: `docs/team/evidence/t080/settings-*`.
+
+**Not verified / for Coder**
+- An actual disconnect on the real API (it would delete a key and stop schedules); covered by `api/settings.test.ts` and the fixture only.
+- `SettingsData` and `ActivityResponse` have no `mode`; the settings page borrows it from `/api/fleet`. Consider adding it to both.
+- Plan review (`/plans/:id`) and operation pages still run on `api/stubs/care.ts`. A setup plan created by T-078 on the real API will not open there until a real care client exists.
