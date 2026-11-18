@@ -22,7 +22,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ApprovalRequestSchema, PlanRequestSchema, type ControllerClock } from "@servrsit/contracts";
 import { buildPlan, type Plan } from "@servrsit/domain";
 import type { ApprovalRejection, CareStore, StoredOperation, TargetKind } from "@servrsit/store";
-import type { WriteTarget } from "@servrsit/worker";
+import { Reconciler, type WriteTarget } from "@servrsit/worker";
 import { CSRF_HEADER, type CsrfGuard } from "../csrf.js";
 
 export interface CareServer {
@@ -189,6 +189,35 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     return reply
       .code(result.kind === "created" ? 201 : 200)
       .send({ operationId: result.operation.id, state: result.operation.state, replayed: result.kind === "replayed" });
+  });
+
+  // T-055 (FR-16, Tech Spec §11): a stop REQUEST. A flag and an event; never a kill. Something never
+  // sent is cancelled before start; anything that may be on the target keeps going and the ledger
+  // decides. Repeating it, or asking after the operation finished, is harmless.
+  fastify.post("/api/operations/:id/stop-request", { bodyLimit: 1024 }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
+    if (!o.csrf.check(request.headers)) return reply.code(403).send({ error: "CSRF_INVALID" });
+    const r = o.store.requestStop(request.params.id, "owner", now());
+    request.log.info({ operationId: request.params.id, result: r.kind }, "care: stop request");
+    if (r.kind === "not_found") return notFound(reply);
+    // Already finished: nothing to stop. Accepted and harmless; a final record is never changed.
+    const stop = r.kind === "final" ? "already-final" : r.operation.state === "cancelled_before_start" ? "cancelled" : "requested";
+    return reply.header("cache-control", "no-store").send({ ...operationView(r.operation, o.store), stop });
+  });
+
+  // T-055 (FR-17, Tech Spec §13): reconcile against the target's ledger and installed state. Read-only
+  // toward the target: it can never start, retry or stop a mutation. A server whose writes are
+  // disabled, or a real one, is never contacted.
+  fastify.post("/api/operations/:id/reconcile", { bodyLimit: 1024 }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
+    if (!o.csrf.check(request.headers)) return reply.code(403).send({ error: "CSRF_INVALID" });
+    const op = o.store.getOperation(request.params.id);
+    if (op === null) return notFound(reply);
+    const server = serverById(op.serverId);
+    if (server === undefined || server.kind !== "simulated" || !server.writesEnabled) {
+      return reply.code(409).send({ error: "RECONCILE_UNAVAILABLE" });
+    }
+    const reconciled = await new Reconciler({ store: o.store, targets: o.targets, actor: "owner", now }).reconcile(op.id);
+    request.log.info({ operationId: op.id, from: op.state, to: reconciled.state }, "care: reconcile");
+    return reply.header("cache-control", "no-store").send(operationView(reconciled, o.store));
   });
 
   fastify.get("/api/operations/:id", async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {

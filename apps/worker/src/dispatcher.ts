@@ -27,6 +27,7 @@ import {
   type Signer,
 } from "@servrsit/domain";
 import type { CareStore, IntentStore, StoredOperation } from "@servrsit/store";
+import { Reconciler } from "./reconciler.js";
 import { TransportError, type RemoteRecord, type WriteTarget } from "./target.js";
 
 export interface DispatcherOptions {
@@ -50,9 +51,11 @@ const ACTOR = (id: string) => `worker:${id}`;
 
 export class Dispatcher {
   private readonly leaseMs: number;
+  private readonly reconciler: Reconciler;
 
   constructor(private readonly o: DispatcherOptions) {
     this.leaseMs = o.leaseMs ?? 30_000;
+    this.reconciler = new Reconciler({ store: o.store, targets: o.targets, actor: ACTOR(o.workerId), now: o.now });
   }
 
   /** Lease one outbox entry, advance its operation one step, and release or complete it. */
@@ -107,9 +110,9 @@ export class Dispatcher {
         return this.dispatch(op, plan);
       case "running":
       case "outcome_unknown":
-        return this.observe(op);
+        return this.reconciler.observe(op);
       case "verifying":
-        return this.verify(op, plan);
+        return this.reconciler.verify(op, plan);
       default:
         return op;
     }
@@ -134,11 +137,20 @@ export class Dispatcher {
       });
     }
 
+    // T-055: a stop requested before anything was sent is honoured here, at the safe boundary.
+    if (!attempted && op.stopRequested) {
+      return this.transition(op, "cancelled_before_start", "cancelled", { code: "STOP_REQUESTED", effects: "none: nothing was sent" });
+    }
+
     // A previous attempt may have reached the target: ask the ledger first.
     if (attempted) {
       try {
         const q = await target.query(op.id);
         if (q.found) return this.accepted(op, q.record, "reconciled-before-retry");
+        // T-055: the ledger says it never accepted this id, and the owner asked to stop: do not resubmit.
+        if (op.stopRequested) {
+          return this.transition(op, "cancelled_before_start", "cancelled", { code: "STOP_REQUESTED", effects: "none: the target never accepted it" });
+        }
       } catch (error) {
         if (!(error instanceof TransportError)) throw error;
         return this.transition(op, "outcome_unknown", "outcome_unknown", {
@@ -189,75 +201,6 @@ export class Dispatcher {
   }
 
   private accepted(op: StoredOperation, record: RemoteRecord, how: string): StoredOperation {
-    this.o.store.setRemoteOperationId(op.id, record.operationId, this.o.now());
-    const current = this.o.store.getOperation(op.id) as StoredOperation;
-    if (current.state === "queued") {
-      return this.transition(current, "running", "remote_accepted", { how, remoteState: record.state });
-    }
-    return current;
-  }
-
-  private async observe(op: StoredOperation): Promise<StoredOperation> {
-    const target = this.o.targets.get(op.serverId);
-    if (target === undefined) return op;
-    let q;
-    try {
-      q = await target.query(op.id);
-    } catch (error) {
-      if (!(error instanceof TransportError)) throw error;
-      // Invariant 6: a lost connection is not evidence the work stopped.
-      if (op.state === "running") {
-        return this.transition(op, "outcome_unknown", "outcome_unknown", { reason: "the ledger could not be queried" });
-      }
-      this.event(op, "transport_error", { during: "reconcile" });
-      return op;
-    }
-
-    if (!q.found) {
-      if (op.state === "running") {
-        return this.transition(op, "outcome_unknown", "outcome_unknown", { reason: "the ledger has no record of an accepted operation" });
-      }
-      return op;
-    }
-
-    const record = q.record;
-    if (record.state === "running") {
-      if (op.state === "outcome_unknown") return this.transition(op, "running", "reconciled", { remoteState: "running" });
-      this.event(op, "remote_progress", { remoteState: "running" });
-      return op;
-    }
-    const via = op.state === "outcome_unknown" ? "reconciled" : "remote_finished";
-    return this.transition(op, "verifying", via, { remoteState: "finished", exitCode: record.exitCode });
-  }
-
-  private async verify(op: StoredOperation, plan: Plan): Promise<StoredOperation> {
-    const target = this.o.targets.get(op.serverId);
-    if (target === undefined) return op;
-    const expected = plan.verification.expectInstalled;
-    const keys = Object.keys(expected);
-    let actual;
-    try {
-      actual = await target.inspectInstalled(keys);
-    } catch (error) {
-      if (!(error instanceof TransportError)) throw error;
-      this.event(op, "transport_error", { during: "verification" });
-      return op;
-    }
-    const verified = keys.filter((k) => actual[k] === expected[k]);
-    const notVerified = keys.filter((k) => actual[k] !== expected[k]);
-    const exitCode = this.lastExitCode(op);
-    const payload = { verified, notVerified, exitCode };
-    if (notVerified.length === 0 && exitCode === 0) return this.transition(op, "succeeded", "verification_recorded", payload);
-    if (verified.length === 0) return this.transition(op, "failed", "verification_recorded", payload);
-    return this.transition(op, "partially_succeeded", "verification_recorded", payload);
-  }
-
-  private lastExitCode(op: StoredOperation): number | null {
-    const events = this.o.store.listEvents(op.id);
-    for (let i = events.length - 1; i >= 0; i--) {
-      const code = events[i]?.payload["exitCode"];
-      if (typeof code === "number") return code;
-    }
-    return null;
+    return this.reconciler.accepted(op, record, how);
   }
 }

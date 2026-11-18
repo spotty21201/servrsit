@@ -24,6 +24,7 @@ import type {
   CareStore,
   OperationEvent,
   OutboxEntry,
+  RequestStopResult,
   StoredOperation,
   TargetKind,
 } from "./store.js";
@@ -118,6 +119,7 @@ CREATE TRIGGER IF NOT EXISTS operations_final_is_final BEFORE UPDATE OF state ON
 `;
 
 const UNRESOLVED_SQL = "('queued', 'running', 'verifying', 'outcome_unknown')";
+const FINAL_STATES: ReadonlySet<string> = new Set(["succeeded", "partially_succeeded", "failed", "cancelled_before_start"]);
 
 interface OperationRow {
   id: string; approval_id: string; plan_id: string; plan_version: number; server_id: string;
@@ -296,6 +298,30 @@ export class SqliteCareStore implements CareStore {
       this.db.prepare("UPDATE operations SET state = ?, updated_at = ? WHERE id = ?").run(to, at, operationId);
       this.insertEvent(operationId, event, actor, from, to, payload, at);
       return toOperation(mustRow(this.db.prepare("SELECT * FROM operations WHERE id = ?").get(operationId)));
+    });
+  }
+
+  requestStop(operationId: string, actor: string, now: Date): RequestStopResult {
+    return this.tx((): RequestStopResult => {
+      const row = this.db.prepare("SELECT * FROM operations WHERE id = ?").get(operationId) as OperationRow | undefined;
+      if (row === undefined) return { kind: "not_found" };
+      const op = toOperation(row);
+      if (FINAL_STATES.has(op.state)) return { kind: "final", operation: op };
+      const at = now.toISOString();
+      if (!op.stopRequested) {
+        this.db.prepare("UPDATE operations SET stop_requested = 1, updated_at = ? WHERE id = ?").run(at, operationId);
+        this.insertEvent(operationId, "stop_requested", actor, null, null, {}, at);
+      }
+      // Nothing was ever sent: it is safe to cancel now, in the same transaction.
+      const attempted = this.db
+        .prepare("SELECT 1 AS x FROM operation_events WHERE operation_id = ? AND type = 'dispatch_attempted'")
+        .get(operationId) !== undefined;
+      if (op.state === "queued" && !attempted) {
+        assertTransition("queued", "cancelled_before_start", "cancelled");
+        this.db.prepare("UPDATE operations SET state = 'cancelled_before_start', updated_at = ? WHERE id = ?").run(at, operationId);
+        this.insertEvent(operationId, "cancelled", actor, "queued", "cancelled_before_start", { code: "STOP_REQUESTED", effects: "none: nothing was sent" }, at);
+      }
+      return { kind: "recorded", operation: toOperation(mustRow(this.db.prepare("SELECT * FROM operations WHERE id = ?").get(operationId))) };
     });
   }
 

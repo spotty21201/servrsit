@@ -74,6 +74,11 @@ export type ApproveResult =
   | { readonly kind: "replayed"; readonly operation: StoredOperation }
   | { readonly kind: "rejected"; readonly code: ApprovalRejection; readonly blockers?: readonly string[] };
 
+export type RequestStopResult =
+  | { readonly kind: "recorded"; readonly operation: StoredOperation }
+  | { readonly kind: "final"; readonly operation: StoredOperation }
+  | { readonly kind: "not_found" };
+
 export interface CareStore {
   insertPlan(plan: Plan): void;
   /** Latest version of a plan, or a specific version. */
@@ -85,6 +90,12 @@ export interface CareStore {
    * dispatch-outbox entry. All or nothing.
    */
   approve(input: ApproveInput): ApproveResult;
+  /**
+   * T-055: record a stop request (flag + event, once). If nothing was ever sent, the operation is
+   * cancelled before start in the same transaction. Otherwise its state is left alone: whatever is
+   * on the target finishes, and the ledger decides the outcome. Never kills anything.
+   */
+  requestStop(operationId: string, actor: string, now: Date): RequestStopResult;
   /** Whether this plan version already has an approval (a repeat request is then an idempotent replay). */
   hasApproval(planId: string, planVersion: number): boolean;
   getOperation(id: string): StoredOperation | null;

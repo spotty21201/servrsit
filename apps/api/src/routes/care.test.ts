@@ -322,3 +322,54 @@ test("T-054: replaying an approval after its operation ran returns the same oper
     assert.equal((again.json() as { operationId: string }).operationId, (first.json() as { operationId: string }).operationId);
   } finally { await h.app.close(); }
 });
+
+// ---- T-055: stop request and reconcile ------------------------------------------------
+
+test("T-055: stop before anything was sent cancels before start; nothing is ever sent", async () => {
+  const h = await start();
+  try {
+    const { operationId } = (await h.approve(await h.plan())).json() as { operationId: string };
+    const r = await h.post(`/api/operations/${operationId}/stop-request`, {}, h.goodHeaders);
+    assert.equal(r.statusCode, 200);
+    const body = r.json() as { operation: { state: string; stopRequested: boolean }; stop: string; events: Array<{ type: string }> };
+    assert.deepEqual([body.operation.state, body.operation.stopRequested, body.stop], ["cancelled_before_start", true, "cancelled"]);
+    for (let i = 0; i < 3; i++) await h.dispatcher.runOnce();
+    assert.equal(h.sim.snapshot().installed["openssl:amd64"], "3.0.13-0ubuntu3.4", "nothing was applied");
+    const again = await h.post(`/api/operations/${operationId}/stop-request`, {}, h.goodHeaders);
+    assert.deepEqual([again.statusCode, (again.json() as { stop: string }).stop], [200, "already-final"], "repeating is harmless");
+  } finally { await h.app.close(); }
+});
+
+test("T-055: stop while running only records the request; the work finishes and is verified", async () => {
+  const h = await start();
+  try {
+    const { operationId } = (await h.approve(await h.plan())).json() as { operationId: string };
+    await h.dispatcher.runOnce(); // sent and accepted: running
+    const r = (await h.post(`/api/operations/${operationId}/stop-request`, {}, h.goodHeaders)).json() as { operation: { state: string; stopRequested: boolean }; events: Array<{ type: string }> };
+    assert.deepEqual([r.operation.state, r.operation.stopRequested], ["running", true]);
+    assert.equal(r.events.filter((e) => e.type === "stop_requested").length, 1);
+    await h.post(`/api/operations/${operationId}/stop-request`, {}, h.goodHeaders);
+    for (let i = 0; i < 6; i++) { await h.dispatcher.runOnce(); h.clock.advance(1500); }
+    const view = (await h.app.inject({ method: "GET", url: `/api/operations/${operationId}` })).json() as { operation: { state: string }; events: Array<{ type: string }> };
+    assert.equal(view.operation.state, "succeeded", "a stop request is not a kill");
+    assert.equal(view.events.filter((e) => e.type === "stop_requested").length, 1, "the second request added nothing");
+  } finally { await h.app.close(); }
+});
+
+test("T-055: reconcile follows the ledger and never sends anything; real servers are never contacted", async () => {
+  const h = await start();
+  try {
+    const { operationId } = (await h.approve(await h.plan())).json() as { operationId: string };
+    const queued = (await h.post(`/api/operations/${operationId}/reconcile`, {}, h.goodHeaders)).json() as { operation: { state: string } };
+    assert.equal(queued.operation.state, "queued", "a queued operation the target does not hold stays queued: reconcile does not send it");
+    assert.equal(h.sim.snapshot().installed["openssl:amd64"], "3.0.13-0ubuntu3.4");
+    await h.dispatcher.runOnce();
+    h.clock.advance(1500);
+    for (let i = 0; i < 4; i++) await h.post(`/api/operations/${operationId}/reconcile`, {}, h.goodHeaders);
+    const done = (await h.app.inject({ method: "GET", url: `/api/operations/${operationId}` })).json() as { operation: { state: string } };
+    assert.equal(done.operation.state, "succeeded", "reconcile can follow the ledger to verification");
+    assert.equal((await h.post("/api/operations/nope/reconcile", {}, h.goodHeaders)).statusCode, 404);
+    const noCsrf = await h.post(`/api/operations/${operationId}/reconcile`, {}, { origin: "http://100.104.220.8:5173" });
+    assert.equal(noCsrf.statusCode, 403);
+  } finally { await h.app.close(); }
+});

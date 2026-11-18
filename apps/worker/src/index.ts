@@ -1,5 +1,7 @@
 export { Dispatcher } from "./dispatcher.js";
 export type { DispatcherOptions, StepResult } from "./dispatcher.js";
+export { Reconciler } from "./reconciler.js";
+export type { ReconcilerOptions } from "./reconciler.js";
 export { SimulatedTarget } from "./simulated-target.js";
 export type { SimulatedFaults, SimulatedTargetOptions } from "./simulated-target.js";
 export { SshWriteTarget, WritesDisabledError } from "./ssh-write-target.js";
