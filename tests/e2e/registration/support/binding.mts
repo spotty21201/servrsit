@@ -19,7 +19,7 @@ import { buildServer } from "../../../../apps/api/src/server.ts";
 import { enrolOwner, setupTokenSink, type SignedInOwner } from "../../../../apps/api/src/auth/testing.ts";
 import { createKeyVault, type HostKeyScanner, type KeyVault } from "../../../../apps/api/src/servers/ssh-tools.ts";
 import { FleetService } from "../../../../apps/api/src/fleet/service.ts";
-import { collectViaSsh, TargetRejectedError, buildCollectorScript } from "../../../../packages/ssh/src/index.ts";
+import { collectViaSsh, TargetRejectedError, buildCollectorScript, probePrivilegeViaSsh, buildPrivilegeScript } from "../../../../packages/ssh/src/index.ts";
 import { NORMAL, DEGRADED, MALICIOUS, renderOutput } from "../../../../packages/ssh/src/collector.fixtures.ts";
 import { SqliteAuthStore, SqliteServerStore } from "../../../../packages/store/src/index.ts";
 import { AddressPolicy } from "../../../../apps/api/src/servers/address.ts";
@@ -98,6 +98,12 @@ export class RegBinding implements RegHarness {
     try { const pub = readFileSync(`${idFile}.pub`, "utf8").trim().split(/\s+/); pubFp = fingerprintOfBlob(Buffer.from(pub[1] ?? "", "base64")); } catch { return res(255, "", "Permission denied (publickey)."); }
     if (!target._auth(pubFp)) return res(255, "", "Permission denied (publickey).");
     const nonce = /[0-9a-f]{32}/.exec(req.stdin)?.[0] ?? "";
+    // T-081: the disclosed privilege check is a second fixed script (sudo -n -l: non-interactive LIST of rules, runs nothing)
+    let priv = ""; try { priv = buildPrivilegeScript(nonce); } catch { priv = "(invalid nonce)"; }
+    if (req.stdin === priv) {
+      this.scripts.push("FIXED_PRIVILEGE_SCRIPT"); target._exec("FIXED_PRIVILEGE_SCRIPT");
+      return res(0, `@@BEGIN ${nonce} sudorules@@\n\n@@END ${nonce} sudorules 127@@\n`, ""); // no sudo installed on the fake server
+    }
     let expected = ""; try { expected = buildCollectorScript(nonce); } catch { expected = "(invalid nonce)"; }
     const exact = req.stdin === expected; this.scripts.push(exact ? "FIXED_COLLECTOR_SCRIPT" : req.stdin);
     target._exec(exact ? "FIXED_COLLECTOR_SCRIPT" : req.stdin);
@@ -115,6 +121,11 @@ export class RegBinding implements RegHarness {
     collectViaSsh({ host: t.host, port: t.port, user: t.user, identityFile: t.identityFile }, { knownHostsFile: t.knownHostsFile, allowedPorts: policy.allowedPorts },
       { runner: this.runner as never, now: () => new Date(this.t), checkResolution: async (host) => { const c = await policy.check(host, t.port); if (!c.ok) throw new TargetRejectedError(c.reason); } });
 
+  /** The product's own default privilege probe (registry.ts), with only the subprocess runner replaced. */
+  private privilegeProbe = (policy: AddressPolicy) => (t: { host: string; port: number; user: string; identityFile: string; knownHostsFile: string }) =>
+    probePrivilegeViaSsh({ host: t.host, port: t.port, user: t.user, identityFile: t.identityFile }, { knownHostsFile: t.knownHostsFile, allowedPorts: policy.allowedPorts },
+      { runner: this.runner as never, checkResolution: async (host: string) => { const c = await policy.check(host, t.port); if (!c.ok) throw new TargetRejectedError(c.reason); } });
+
   private registration() { return { controllerAddress: this.world.controllerAddresses[0]!, allowedPorts: [22], enrolledRoutes: this.routes, allowPublicAddresses: false, operatorAddresses: this.world.operatorAddresses }; }
 
   private async build(): Promise<void> {
@@ -131,7 +142,7 @@ export class RegBinding implements RegHarness {
       config: config as never, mode: "live", startChecks: false, ownerContextPath: null, fleetService: this.service,
       logStream: { write: (m: string) => { this.lines.push(m); } },
       auth: { store: this.authStore, onSetupToken: this.sink.onSetupToken }, // real clock: advancing registry time (24 h draft expiry) must not end the owner's 8 h session
-      servers: { store: this.store, vault: this.vault, scanner: this.scanner, probe: this.probe, collector: coll as never, resolver: async (h: string) => this.world.resolve(h), selfAddresses: () => this.world.controllerAddresses, now: () => new Date(this.t) },
+      servers: { store: this.store, vault: this.vault, scanner: this.scanner, probe: this.probe, collector: coll as never, privilegeProbe: this.privilegeProbe(policy) as never, resolver: async (h: string) => this.world.resolve(h), selfAddresses: () => this.world.controllerAddresses, now: () => new Date(this.t) },
     } as never);
     if (!this.owner) this.owner = await enrolOwner(this.app as never, this.sink.token());
   }
@@ -173,7 +184,7 @@ export class RegBinding implements RegHarness {
     return this.rows().map((r) => this.store.get(String(r.id))!).filter((s) => s.source === "registration").map((s) => ({ id: s.id, name: s.name, address: s.address ?? "", port: s.port ?? 0, production: s.production, writesEnabled: s.writesEnabled, status: s.disconnectedAt ? "disconnected" : "active" }));
   }
   async draftCount(): Promise<number> { const db = new DatabaseSync(this.dbPath, { readOnly: true }); try { return Number((db.prepare("SELECT count(*) AS n FROM server_drafts").get() as any).n); } finally { db.close(); } }
-  allowedCommands(): readonly string[] { return ["FIXED_COLLECTOR_SCRIPT"]; }
+  allowedCommands(): readonly string[] { return ["FIXED_COLLECTOR_SCRIPT", "FIXED_PRIVILEGE_SCRIPT"]; }
   private keyFiles(): string[] {
     const out: string[] = []; const walk = (d: string) => { if (!existsSync(d)) return; for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) walk(p); else out.push(p); } };
     walk(this.keysDir); return out;
@@ -201,7 +212,7 @@ export class RegBinding implements RegHarness {
   seedImported(name: string, address: string): { id: string; identityFile: string } {
     const identityFile = join(this.dir, "owner-own-key-standin"); writeFileSync(identityFile, "STAND-IN for the owner's own private key: not a real key\n", { mode: 0o600 });
     const id = "33333333-3333-4333-a333-" + String(Math.floor(this.t / 1000) % 1e12).padStart(12, "0");
-    const r = this.store.register({ id, source: "import", access: "ssh", name, role: null, production: true, address, port: 22, user: "owner", identityFile, knownHostsFile: null, importantServices: [], collect: true, collectDisabledReason: null, hostKey: null, accessKey: null, createdAt: new Date(this.t).toISOString() } as never, "import", "import", new Date(this.t));
+    const r = this.store.register({ id, source: "import", access: "ssh", name, role: null, production: true, productionStatus: "yes", address, port: 22, user: "owner", identityFile, knownHostsFile: null, importantServices: [], collect: true, collectDisabledReason: null, hostKey: null, accessKey: null, createdAt: new Date(this.t).toISOString() } as never, "import", "import", new Date(this.t));
     if (!(r as any).ok) throw new Error(`seedImported: ${JSON.stringify(r)}`);
     return { id, identityFile };
   }

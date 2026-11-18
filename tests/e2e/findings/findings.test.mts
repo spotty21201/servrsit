@@ -78,7 +78,7 @@ test("FN-12 acknowledge and snooze on unknown or malformed ids are clean 4xx; on
   } finally { await w.close(); }
 });
 
-test("FN-12b a very long id gets the contract's error body and is not echoed (same framework behaviour as D-R1)", { todo: "reported: D-X2" }, async () => {
+test("FN-12b (guard, D-X2 fixed by T-082) a very long id gets the contract's error body and is not echoed", async () => {
   const w = await world();
   try { const r = await post(w, "a".repeat(200), "acknowledge"); assert.ok(FindingsErrorSchema.safeParse(r.data).success, `body: ${r.raw.slice(0, 120)}`); assert.ok(!r.raw.includes("a".repeat(40)), "the refusal echoes the id"); } finally { await w.close(); }
 });

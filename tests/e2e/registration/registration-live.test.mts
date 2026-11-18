@@ -31,7 +31,7 @@ const { RegBinding } = await import("./support/binding.mts");
 
 for (const s of [...part1, ...part2]) {
   const probe = await RegBinding.create(); const missing = (s.needs ?? []).filter((c) => !probe.has(c)); await probe.close();
-  const TODO: Record<string, string> = { "SR-41b": "reported: D-R2", "SR-53b": "reported: D-R1", "SR-23b": "reported: D-R3" };
+  const TODO: Record<string, string> = { "SR-23b": "reported: D-R3" }; // SR-41b (D-R2) and SR-53b (D-R1) are guards since T-081/T-082
   test(`${s.id} ${s.title}`, missing.length ? { skip: `NOT RUN: binding cannot provide ${missing.join(", ")}` } : TODO[s.id] ? { todo: TODO[s.id] } : {}, async () => {
     const h = await RegBinding.create();
     try { await s.run(h); } finally { await h.close(); }
