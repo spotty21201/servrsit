@@ -378,6 +378,16 @@ export class SimulatedTarget implements WriteTarget {
     return Object.fromEntries(keys.map((k) => [k, this.installed[k] ?? null]));
   }
 
+  /**
+   * [SIMULATED] T-078: what a read-only inventory would see: directories with
+   * owner, group and mode, and installed packages (name without arch -> version).
+   */
+  inventorySnapshot(): { directories: Array<{ path: string; owner: string; group: string; mode: string }>; installed: Record<string, string> } {
+    const installed: Record<string, string> = {};
+    for (const [key, version] of Object.entries(this.installed)) installed[key.split(":")[0] ?? key] = version;
+    return { directories: [...this.directories.entries()].map(([path, d]) => ({ path, ...d })), installed };
+  }
+
   /** For tests and diagnostics. */
   snapshot(): { installed: Readonly<Record<string, string>>; ledger: string } {
     return { installed: { ...this.installed }, ledger: canonicalJson([...this.ledger.keys()]) };

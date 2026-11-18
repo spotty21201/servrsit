@@ -134,6 +134,16 @@ export class FleetService {
     return next;
   }
 
+  /**
+   * T-078: run other read-only work on servers (the baseline inventory) in
+   * the same queue as checks, so no two connections overlap.
+   */
+  exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.chain.then(fn);
+    this.chain = next.then(() => undefined, () => undefined);
+    return next;
+  }
+
   /** Run one pass over all hosts, serially. Concurrent calls share one run. */
   refreshAll(): Promise<void> {
     if (this.running !== null) return this.running;

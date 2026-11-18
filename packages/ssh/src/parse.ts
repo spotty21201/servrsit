@@ -55,8 +55,9 @@ export function splitSections(
   stdout: string,
   nonce: string,
   maxSectionBytes: number = LIMITS.maxSectionBytes,
+  sectionNames: readonly string[] = SECTION_NAMES,
 ): Map<string, RawSection> {
-  const names = SECTION_NAMES.map(escapeForRegex).join("|");
+  const names = sectionNames.map(escapeForRegex).join("|");
   const begin = new RegExp(`^@@BEGIN ${nonce} (${names})@@$`);
   const end = new RegExp(`^@@END ${nonce} (${names}) (\\d{1,3})@@$`);
 
