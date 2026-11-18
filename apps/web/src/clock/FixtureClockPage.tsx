@@ -4,6 +4,7 @@
  */
 import { CareShell } from "../care/CareShell";
 import { formatRelative } from "../lib/time";
+import { usePageTitle } from "../lib/pageTitle";
 import { ClockProvider } from "./ClockContext";
 import { ClockBanner } from "./TopBanners";
 import { clockBanner, FIXTURE_CLOCKS } from "./clockBanner";
@@ -17,6 +18,7 @@ const LABELS: Record<keyof typeof FIXTURE_CLOCKS, string> = {
 };
 
 export function FixtureClockPage() {
+  usePageTitle("Clock banner states (fixture)");
   const now = new Date();
   const seen = new Date(now.getTime() - 3 * 60_000);
   return (

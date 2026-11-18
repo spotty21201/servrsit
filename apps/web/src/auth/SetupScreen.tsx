@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { USERNAME_PATTERN, type SessionInfo, type SetupStartResponse } from "@servrsit/contracts";
 import { confirmSetup, startSetup, type AuthResult } from "../api/auth";
 import { DEFAULT_OWNER_TIME_ZONE } from "../lib/time";
+import { usePageTitle } from "../lib/pageTitle";
 import { AuthFrame, Notice } from "./AuthFrame";
 import { authError, groupSecret, isPasswordAcceptable, isTotpComplete, normaliseTotp, passwordHint, recoveryFileText, type ErrorView, type Step } from "./authText";
 import { copyText, downloadText } from "./copy";
@@ -107,6 +108,7 @@ export function SetupScreen({ onDone, onBack }: Props) {
     setSecretCopied((await copyText(enrol.totpSecret)) ? "ok" : "failed");
   }
 
+  usePageTitle(phase === "details" ? "Set up ServrSit: account" : phase === "enrol" ? "Set up ServrSit: authenticator" : "Set up ServrSit: recovery codes");
   const title = phase === "details" ? "Set up ServrSit" : phase === "enrol" ? "Add your authenticator" : "Save your recovery codes";
 
   return (

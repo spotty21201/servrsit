@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import type { SessionInfo } from "@servrsit/contracts";
 import { getSession, logout } from "../api/auth";
 import { AuthFrame, Notice } from "./AuthFrame";
+import { setPageTitle } from "../lib/pageTitle";
 import { SessionContext, type SessionApi } from "./session";
 import { SetupScreen } from "./SetupScreen";
 import { SignInScreen, type SignInNotice } from "./SignInScreen";
@@ -31,6 +32,11 @@ type Mode =
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<Mode>({ kind: "checking" });
+  // Only the gate's own screens set a title here; every other mode's screen sets its own.
+  useEffect(() => {
+    if (mode.kind === "checking") setPageTitle("Checking your session", false);
+    if (mode.kind === "unreachable") setPageTitle("Can't reach ServrSit", true);
+  }, [mode.kind]);
 
   const check = useCallback(async () => {
     setMode({ kind: "checking" });

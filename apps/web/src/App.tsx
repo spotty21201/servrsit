@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { useFleet } from "./api/useFleet";
 import { OverviewScreen } from "./components/overview/index.js";
 import { toOverviewVM } from "./components/overview/fleetViewModel.js";
+import { usePageTitle } from "./lib/pageTitle";
 import { RouteAnnouncer } from "./lib/RouteAnnouncer";
 import { AuthGate } from "./auth/AuthGate";
 import { ClockProvider, useClock } from "./clock/ClockContext";
@@ -56,6 +57,7 @@ function Routes() {
 function OverviewRoute() {
   const fleet = useFleet();
   const { view: clockView } = useClock();
+  usePageTitle(fleet.phase === "loading" ? "Loading your servers" : "Overview", fleet.phase !== "loading");
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {

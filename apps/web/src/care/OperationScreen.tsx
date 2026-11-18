@@ -23,6 +23,7 @@ import { useClock } from "../clock/ClockContext";
 import { createCareClient, type CareClient, type OperationView, type PlanView } from "../api/stubs/care";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
 import { planPath } from "../lib/router";
+import { usePageTitle } from "../lib/pageTitle";
 import { StatusBadge } from "../components/StatusBadge/index.js";
 import { CareShell, LoadFailure, ProductionLabel, SimulatedLabel } from "./CareShell";
 import { createFixtureClient, fixturePlanFor, isFixtureId } from "./fixtures";
@@ -169,6 +170,7 @@ export function OperationScreen({ operationId, client: injected }: { operationId
   }, [client, planId]);
 
   const vm = view ? toOperationVM(view, plan, now, tz, clockView?.agesUncertain ?? false) : null;
+  usePageTitle(vm ? `${vm.title}: ${vm.stateLabel}` : error ? "Operation not available" : "Loading the operation", vm !== null || error !== null);
 
   return (
     <CareShell fixture={fixture} section="Operation">

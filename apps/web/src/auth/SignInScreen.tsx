@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { login, verifySecondFactor, type AuthResult } from "../api/auth";
 import type { SessionInfo } from "@servrsit/contracts";
 import { DEFAULT_OWNER_TIME_ZONE } from "../lib/time";
+import { usePageTitle } from "../lib/pageTitle";
 import { AuthFrame, Notice } from "./AuthFrame";
 import { authError, isTotpComplete, normaliseRecovery, normaliseTotp, type ErrorView, type Step } from "./authText";
 import styles from "./auth.module.css";
@@ -93,6 +94,7 @@ export function SignInScreen({ notice, onSignedIn, onSetup }: Props) {
   }
 
   const title = step === "password" ? "Sign in" : step === "totp" ? "Enter your code" : "Use a recovery code";
+  usePageTitle(step === "password" ? (notice === "expired" ? "Session ended, sign in" : notice === "signed-out" ? "Signed out, sign in" : "Sign in") : step === "totp" ? "Sign in: enter your code" : "Sign in: recovery code");
 
   return (
     <AuthFrame title={title} titleRef={titleRef}>

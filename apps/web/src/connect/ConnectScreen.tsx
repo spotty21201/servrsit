@@ -23,6 +23,7 @@ import { copyText } from "../auth/copy";
 import { CareShell } from "../care/CareShell";
 import { createFixtureServersClient, type ServersClient, type ServersResult } from "../api/stubs/servers";
 import { serverPath } from "../lib/router";
+import { usePageTitle } from "../lib/pageTitle";
 import {
   compareFingerprint, DRAFT_ID_KEY, DRAFT_KEY, EMPTY_DRAFT, FAILURE_TEXT, hasErrors, NOT_SURE_NOTE, parseDraft, parseDraftId, registrationError,
   serializeDraft, STEPS, toDraftRequest, treatedAsProduction, validateMeet, type Classification, type ConnectDraft, type FieldErrors,
@@ -178,6 +179,7 @@ export function ConnectScreen({ client: injected }: { client?: ServersClient }) 
   async function copyLine(text: string): Promise<void> { setCopied((await copyText(text)) ? "ok" : "failed"); }
 
   const title = STEPS[step] ?? STEPS[0];
+  usePageTitle(`Connect a server: step ${step + 1} of 4, ${title}`);
   const unavailable = check?.steps.filter((x) => x.state === "unavailable" || x.state === "failed").length ?? 0;
   const checkDone = check?.finished === true && !check.failureCode;
 

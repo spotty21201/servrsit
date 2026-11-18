@@ -24,6 +24,7 @@ import { useClock } from "../clock/ClockContext";
 import { createCareClient, type CareClient, type PlanView } from "../api/stubs/care";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
 import { operationPath } from "../lib/router";
+import { usePageTitle } from "../lib/pageTitle";
 import { StatusBadge } from "../components/StatusBadge/index.js";
 import { IDLE, newIdempotencyKey, PHASE_LABEL, submitApproval, type ApprovalPhase } from "./approval";
 import { CareShell, LoadFailure, LockGlyph, ProductionLabel, SimulatedLabel } from "./CareShell";
@@ -123,6 +124,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
     if (end.phase === "rejected") { setNotice(end.notice); setPhase(IDLE); }
   }
 
+  usePageTitle(vm ? `Plan review: ${vm.title}${vm.disposition.canApprove ? "" : ` (${vm.disposition.title})`}` : loadError ? "Plan not available" : "Loading the plan", vm !== null || loadError !== null);
   const sectionId = (s: string): string => `${ids}-${s}`;
 
   return (

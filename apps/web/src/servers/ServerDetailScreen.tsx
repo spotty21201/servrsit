@@ -18,6 +18,7 @@ import { useClock } from "../clock/ClockContext";
 import { StatusBadge } from "../components/StatusBadge/index.js";
 import { PixelServerIcon } from "../components/server-card/PixelServerIcon.js";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
+import { usePageTitle } from "../lib/pageTitle";
 import { DASH, toServerDetailVM, type MountRow, type ServerDetailVM, type Shown } from "./serverDetailViewModel";
 import c from "../care/care.module.css";
 import styles from "./servers.module.css";
@@ -197,6 +198,7 @@ export function ServerDetailScreen({ serverId, section }: { serverId: string; se
   const server = fleet.data && index >= 0 ? fleet.data.servers[index] : undefined;
   const vm = server ? toServerDetailVM(server, index, now, tz, clockView?.agesUncertain ?? false) : null;
   const card = vm?.card;
+  usePageTitle(card ? `${card.name}: server detail` : fleet.phase === "ready" ? "Server not found" : fleet.phase === "error" ? "Servers not available" : "Loading the server", fleet.phase !== "loading");
 
   return (
     <CareShell fixture={server?.source === "fixture"} section="Server">

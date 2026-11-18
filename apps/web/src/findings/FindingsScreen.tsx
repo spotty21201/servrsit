@@ -15,6 +15,7 @@ import { createFixtureFindingsClient, type FindingRecord, type FindingsClient, t
 import { CareShell, ProductionLabel } from "../care/CareShell";
 import { useClock } from "../clock/ClockContext";
 import { DEFAULT_OWNER_TIME_ZONE } from "../lib/time";
+import { usePageTitle } from "../lib/pageTitle";
 import { SchedulerNotice } from "./SchedulerNotice";
 import { schedulerNotice, sortFindings, summarise, toFindingVM, type FindingVM } from "./findingsViewModel";
 import c from "../care/care.module.css";
@@ -62,6 +63,7 @@ export function FindingsScreen({ client: injected }: { client?: FindingsClient }
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
+  usePageTitle("Findings");
   const clockView = useClock().view;
   const holder = useMemo(() => ({ scenario: "running" as FixtureScheduler }), []);
   holder.scenario = scenario;
