@@ -127,6 +127,7 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
                   </>
                 )}
               </p>
+              <a href="/servers/new" className={styles.connectLink}>Connect a server</a>
             </header>
 
             {/* Data-state notices (inline, never a toast) */}

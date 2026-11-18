@@ -175,6 +175,20 @@
   border-bottom: 2px solid var(--color-ink);
 }
 
+.connectLink {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-1-half);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-button);
+  background-color: var(--color-surface);
+  font-size: var(--text-compact-size);
+  font-weight: var(--font-weight-semibold);
+}
+.connectLink:hover { background-color: var(--color-canvas); text-decoration: none; }
+
 .pageTitle {
   font-size: var(--text-page-title-size);   /* 24px pixel */
   line-height: var(--text-page-title-line-height);

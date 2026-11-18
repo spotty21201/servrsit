@@ -85,6 +85,10 @@ function Sections({ vm, section }: { vm: ServerDetailVM; section: "settings" | "
             <p className={c.p}>{vm.findingsEmpty}</p>
           )}
 
+          {!vm.hasObservation ? (
+            <p className={c.p}><span className={styles.dash}>{DASH}</span> <span className={styles.why}>Checks, resources and system facts appear after the first successful check. Nothing is estimated in the meantime.</span></p>
+          ) : (
+            <>
           <h3 className={styles.h3}>Checks</h3>
           <p className={c.p}>{vm.checks.summary}</p>
           {vm.checks.unavailable.length > 0 && (
@@ -121,12 +125,15 @@ function Sections({ vm, section }: { vm: ServerDetailVM; section: "settings" | "
               </Fact>
             )}
           </dl>
+            </>
+          )}
         </section>
       </div>
 
       <div className={c.stack}>
         <section className={c.panel} aria-labelledby="server-care">
           <h2 id="server-care" className={c.h2}>Care</h2>
+          {vm.hasObservation ? (
           <dl className={styles.facts}>
             <Fact label="Pending updates" v={care.pending} />
             <Fact label="Package information" v={care.packageInfoAge}>
@@ -146,6 +153,13 @@ function Sections({ vm, section }: { vm: ServerDetailVM; section: "settings" | "
             <Fact label="Baseline" v={care.baseline} />
             <Fact label="Recent operations" v={care.operations} />
           </dl>
+          ) : (
+            <dl className={styles.facts}>
+              <Fact label="Updates and reboot" v={care.pending} />
+              <Fact label="Baseline" v={care.baseline} />
+              <Fact label="Recent operations" v={care.operations} />
+            </dl>
+          )}
           <button type="button" className={c.secondary} disabled aria-describedby={reasonId}>Review updates</button>
           <p id={reasonId} className={c.small}>{care.reviewDisabledReason}</p>
         </section>
