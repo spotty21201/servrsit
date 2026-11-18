@@ -23,12 +23,16 @@ If it still says `no` (your network may block NTP), set it once from the web and
 sudo date -u -s "$(curl -sI https://www.google.com | grep -i '^date:' | cut -d' ' -f2-)"
 ```
 
-## 2. Decisions still open
+## 2. Review the new screens
+
+Open http://100.104.220.8:5173/review-001/index.html (48 screenshots, desktop and phone, all [FIXTURE] sample data). These screens are built but not yet in your running app, because they come with the new login (see ADR-018). Noticed so far: the overview no longer fits one screen when there are 5 attention items, and the SERVRSIT logo wraps in the side rail.
+
+## 3. Decisions still open
 - Disposable Ubuntu server for write testing (you said: after development).
 - AWS or other always-on host (you said: not yet).
 - Optional: dedicated ServrSit key for Nabire.
 - Optional: allow `sudo apt` install of browser libraries for automated screenshots.
 
-## 3. Things you may want to know
+## 4. Things you may want to know
 - Sentani has 4 pending updates; 3 or more are Docker packages from Docker's own repository. ServrSit will list those separately and leave them out of Ubuntu update plans by default.
 - Sentani's own automatic updates installed `sosreport` and two gstreamer packages on 17 Nov.
