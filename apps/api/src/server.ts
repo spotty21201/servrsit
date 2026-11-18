@@ -267,7 +267,7 @@ export async function buildServer(options: BuildServerOptions = {}) {
   const fastify = Fastify({
     // T-081 (D-R1): long path parameters reach the routes, which answer with the
     // contract's own error; Fastify's default error would echo the path.
-    maxParamLength: 2048,
+    routerOptions: { maxParamLength: 2048 },
     logger:
       options.logger === false
         ? false
