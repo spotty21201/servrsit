@@ -10,12 +10,12 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { createAssistant } from "@servrsit/ai";
-import { SqliteActivityStore, SqliteAuthStore, SqliteFindingStore, SqliteServerStore, SqliteSettingsStore } from "@servrsit/store";
+import { SqliteActivityStore, SqliteAuthStore, SqliteBaselineStore, SqliteFindingStore, SqliteServerStore, SqliteSettingsStore } from "@servrsit/store";
 import { loadAiRuntime } from "./ai-runtime.js";
 import { createAsyncLogStream } from "./log-stream.js";
 import { resolvePort } from "./port.js";
 import { buildServer, DEFAULT_AUTH_DB_PATH } from "./server.js";
-import { DEFAULT_ACTIVITY_PATH, DEFAULT_FINDINGS_PATH, DEFAULT_REGISTRY_PATH, DEFAULT_SETTINGS_PATH } from "./fleet/config.js";
+import { DEFAULT_ACTIVITY_PATH, DEFAULT_BASELINES_PATH, DEFAULT_FINDINGS_PATH, DEFAULT_REGISTRY_PATH, DEFAULT_SETTINGS_PATH } from "./fleet/config.js";
 import { createShutdownHandler } from "./shutdown.js";
 
 const PORT = resolvePort();
@@ -32,6 +32,7 @@ async function start(): Promise<void> {
     findings: {
       store: new SqliteFindingStore({ path: process.env["SERVRSIT_FINDINGS_DB"] ?? DEFAULT_FINDINGS_PATH.pathname }),
       activity: new SqliteActivityStore({ path: process.env["SERVRSIT_ACTIVITY_DB"] ?? DEFAULT_ACTIVITY_PATH.pathname }),
+      baselines: new SqliteBaselineStore({ path: process.env["SERVRSIT_BASELINES_DB"] ?? DEFAULT_BASELINES_PATH.pathname }),
       settings: new SqliteSettingsStore({ path: process.env["SERVRSIT_SETTINGS_DB"] ?? DEFAULT_SETTINGS_PATH.pathname }),
     },
     redactSecrets: ai.redactSecrets,
