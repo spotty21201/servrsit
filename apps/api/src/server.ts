@@ -30,11 +30,18 @@ import { DEFAULT_ALLOWED_ORIGINS } from "./csrf.js";
 import serverRoutes from "./routes/servers.js";
 import findingRoutes, { PAUSE_KEY, type PausedSetting } from "./routes/findings.js";
 import { FindingTracker } from "./findings/tracker.js";
+import activityRoutes from "./routes/activity.js";
+import baselineRoutes from "./routes/baselines.js";
+import { BaselineService, type BaselineServerInfo } from "./baselines/service.js";
+import { collectInventoryLocal, collectInventoryViaSsh, TargetRejectedError, type Inventory, type InventoryDirectory } from "@servrsit/ssh";
+import { userInfo } from "node:os";
+import type { PlanRequest } from "@servrsit/contracts";
+import { ActivityService, InspectionRecorder } from "./activity/history.js";
 import { AddressPolicy, type Resolver } from "./servers/address.js";
 import { ServerRegistry, type FirstCheckCollector } from "./servers/registry.js";
 import { createHostKeyScanner, createKeyVault, probeTcp, type HostKeyScanner, type KeyVault } from "./servers/ssh-tools.js";
 import { DEFAULT_OWNER_CONTEXT_PATH, OwnerContextFile } from "./owner-context-file.js";
-import { SqliteAuthStore, SqliteCareStore, SqliteServerStore, SqliteFindingStore, SqliteSettingsStore, type CareStore, type NewServer, type StoredServer } from "@servrsit/store";
+import { SqliteAuthStore, SqliteCareStore, SqliteServerStore, SqliteFindingStore, SqliteSettingsStore, SqliteActivityStore, SqliteBaselineStore, type CareStore, type NewServer, type StoredServer } from "@servrsit/store";
 import { SshWriteTarget, type WriteTarget } from "@servrsit/worker";
 import { buildFixtureFleet } from "./fleet/fixture.js";
 import { ControllerClockMonitor, NOT_CHECKED_CLOCK } from "./clock/controller-clock.js";
@@ -84,6 +91,10 @@ export interface BuildServerOptions {
 
 export interface FindingsWiring {
   readonly store?: SqliteFindingStore | undefined;
+  /** T-077: inspection history and exports. */
+  readonly activity?: SqliteActivityStore | undefined;
+  /** T-078: baselines and their exceptions. */
+  readonly baselines?: SqliteBaselineStore | undefined;
   readonly settings?: SqliteSettingsStore | undefined;
   readonly now?: (() => Date) | undefined;
 }
@@ -340,7 +351,12 @@ export async function buildServer(options: BuildServerOptions = {}) {
     options.care,
   );
   const careStore = options.care?.store ?? new SqliteCareStore({ path: ":memory:" });
+  // T-078: the care plan builder, shared with baseline setup plans.
+  let carePlanner: ((request: PlanRequest) => Promise<{ plan: { id: string } } | null>) | null = null;
   await fastify.register(careRoutes, {
+    exposePlanner: (create) => {
+      carePlanner = create;
+    },
     store: careStore,
     servers: care.servers,
     targets: care.targets,
@@ -382,6 +398,67 @@ export async function buildServer(options: BuildServerOptions = {}) {
     },
   });
 
+  // T-078: baselines. Inventory is read-only and runs in the check queue.
+  const baselineServers = (): BaselineServerInfo[] => {
+    const observed = new Map(fleetSnapshot().servers.map((x) => [x.id, x.observedAt]));
+    const real = registryHosts().map((h) => ({
+      id: h.id, name: h.name, role: h.role, production: h.production, writesEnabled: false, simulated: false,
+      observedAt: observed.get(h.id) ?? null, user: h.access === "ssh" ? h.user : userInfo().username,
+    }));
+    const sims = (options.care?.simulated ?? []).map(({ server: x }) => ({
+      id: x.id, name: x.name, role: "[SIMULATED]", production: x.production, writesEnabled: x.writesEnabled, simulated: true, observedAt: null, user: x.user ?? null,
+    }));
+    return [...real, ...sims];
+  };
+  const unavailableInventory = (message: string) => ({ ok: false as const, code: "UNAVAILABLE" as const, message });
+  await fastify.register(baselineRoutes, {
+    service: new BaselineService({
+      store: options.findings?.baselines ?? new SqliteBaselineStore({ path: ":memory:" }),
+      servers: baselineServers,
+      plan: () => carePlanner,
+      now: options.findings?.now,
+      inventory: async (serverId) => {
+        if (mode === "fixture") return unavailableInventory("Fixture mode: no server is inspected.");
+        const sim = options.care?.simulated?.find((x) => x.server.id === serverId);
+        if (sim !== undefined) {
+          const simTarget = sim.target as unknown as { inventorySnapshot?: () => { directories: InventoryDirectory[]; installed: Record<string, string> } };
+          const snap = simTarget.inventorySnapshot?.();
+          if (snap === undefined) return unavailableInventory("This simulated server has no inventory.");
+          const inventory: Inventory = {
+            collectedAt: new Date().toISOString(),
+            source: "simulated",
+            home: sim.server.user === undefined ? { status: "unavailable", reason: "no login user" } : { status: "ok", value: `/home/${sim.server.user}`, partial: false },
+            directories: { status: "ok", value: snap.directories, partial: false },
+            packages: { status: "ok", value: snap.installed, partial: false },
+            ubuntuPackages: { status: "ok", value: Object.keys(snap.installed), partial: false },
+          };
+          return { ok: true, inventory };
+        }
+        const host = registryHosts().find((h) => h.id === serverId);
+        if (host === undefined) return unavailableInventory("Unknown server.");
+        if (!host.collect) return unavailableInventory("Checks are switched off for this server.");
+        return service.exclusive(() =>
+          host.access === "local"
+            ? collectInventoryLocal()
+            : collectInventoryViaSsh(
+                { host: host.address, port: host.port, user: host.user, ...(host.identityFile === undefined ? {} : { identityFile: host.identityFile }) },
+                { knownHostsFile: host.knownHostsFile ?? knownHostsPath(), allowedPorts: reg.allowedPorts },
+                {
+                  checkResolution: async (name) => {
+                    const c = await policy.check(name, host.port);
+                    if (!c.ok) throw new TargetRejectedError(c.reason);
+                  },
+                },
+              ),
+        );
+      },
+    }),
+    owner: (request) => {
+      if (request.authSession === null) throw new Error("baseline route reached without a session");
+      return request.authSession.info.username;
+    },
+  });
+
   // Fixture mode never contacts any server.
   // T-076: findings and the scheduler. Fixture mode keeps its [FIXTURE DATA]
   // findings in memory only, never in the persistent store.
@@ -389,7 +466,34 @@ export async function buildServer(options: BuildServerOptions = {}) {
   const findingStore = mode === "fixture" ? new SqliteFindingStore({ path: ":memory:" }) : (options.findings?.store ?? new SqliteFindingStore({ path: ":memory:" }));
   const fleetSnapshot = () => (mode === "fixture" ? buildFixtureFleet(config, new Date()) : service.snapshot());
   const tracker = new FindingTracker({ store: findingStore, fleet: fleetSnapshot, now: options.findings?.now });
-  onPass = () => tracker.sync();
+  const activityStore = mode === "fixture" ? new SqliteActivityStore({ path: ":memory:" }) : (options.findings?.activity ?? new SqliteActivityStore({ path: ":memory:" }));
+  const inspections = new InspectionRecorder(activityStore, options.findings?.now);
+  onPass = () => {
+    const snapshot = fleetSnapshot();
+    tracker.sync(snapshot);
+    inspections.sync(snapshot);
+  };
+  const scrub = createScrubber(secrets);
+  await fastify.register(activityRoutes, {
+    service: new ActivityService({
+      activity: activityStore,
+      care: careStore,
+      findings: findingStore,
+      serverInfo: (id) => {
+        const known0 = care.servers().find((x) => x.id === id);
+        if (known0 !== undefined) return { name: known0.name, production: known0.production };
+        const known = registryStore.get(id);
+        return known === null ? null : { name: known.name, production: known.production };
+      },
+      scrub: (text) => String(scrub(text)),
+      refresh: () => onPass(),
+      now: options.findings?.now,
+    }),
+    owner: (request) => {
+      if (request.authSession === null) throw new Error("activity route reached without a session");
+      return request.authSession.info.username;
+    },
+  });
   await fastify.register(findingRoutes, {
     mode,
     tracker,

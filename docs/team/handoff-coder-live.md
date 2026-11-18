@@ -1540,3 +1540,101 @@ Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21,
 - **Your current branch.** On `feat/tester/server-registration` (`75c2c61`), `care-loop` is 6/41 and `auth` is 36/37 (AU-04b). The result is identical on `integration/next` without T-076. Those files predate the T-057 acknowledgement mapping and the T-066 per-source lock. Your `1c9d5a7` versions pass.
 
 Next: T-077.
+
+## T-077: activity history and export (branch `feat/coder/activity`, from `integration/next`)
+
+**Contract** (`packages/contracts/src/activity.ts`):
+
+- `GET /api/activity?type=&server=&result=&from=&to=&q=&limit=` lists the history.
+- `POST /api/exports` creates an export.
+- `GET /api/exports` lists exports that have not expired.
+- `GET /api/exports/:id/download` returns the file as an attachment, or 410 once it has expired.
+
+**Records** (`apps/api/src/activity/history.ts`):
+
+- **Operations** come from the care store (new `CareStore.listOperations`). Each has a fixed title and outcome text per state. Failed, cancelled and unknown outcomes are included. `simulated: true` marks operations on a simulated target.
+- **Findings** give one record when opened and one when resolved. The resolved record says which check resolved it.
+- **Health checks**: one record per finished attempt, kept in the new `SqliteActivityStore`. Each holds the result, how many checks ran, or a fixed failure text. Nothing from server output is kept: a test plants a raw stderr string, and it does not appear.
+
+**Exports:**
+
+- Built on the server from the same records, with times in the requested IANA time zone.
+- Scrubbed for known secret values with the same scrubber used for logs and responses. A test plants a secret in a finding summary; the export does not contain it.
+- Stored until expiry and never edited.
+
+**Retention** (FR-21 proposal):
+
+- Health-check records: 30 days, then pruned.
+- Operations and findings: 90 days shown in the list. They are never deleted.
+- Exports: 7 days.
+
+**New file:** `.data/activity.db` (gitignored). Health checks are recorded after every fleet pass, and also before each read of the activity list.
+
+**Web:** `apps/web/src/api/activity.ts` keeps the stub's `list`, `createExport` and `listExports`. Two things differ because the server now builds the file:
+
+- An export result has `downloadUrl` in place of `content`, and the new `download()` fetches the file.
+- The stub's second argument to `createExport` (the records) is still accepted, but only their ids are sent.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 226, ai 156, web 93, ssh 51, store 26, domain 22, worker 19, infra 9; typecheck all 9 exit 0
+Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a, known),
+  zt01 13/13 with the reviewed list (T-069 x9, T-076 x4, plus POST /api/exports)
+```
+
+**For the Tester:** add `POST /api/exports` to ZT-01's list. It reads only ServrSit's own records and never contacts a server.
+
+Next: T-078.
+
+## T-078: baselines, comparison and setup plans (branch `feat/coder/baselines`, from `integration/next`)
+
+**Contract** (`packages/contracts/src/baselines.ts`):
+
+- `GET /api/baselines/servers`
+- `GET /api/baselines`
+- `GET /api/baselines/candidates?reference=`
+- `POST /api/baselines` (new baseline, or the next version when `baselineId` is set)
+- `GET /api/baselines/:id`
+- `POST /api/baselines/:id/compare`
+- `PUT` and `DELETE /api/baselines/:id/exceptions...`
+- `GET /api/baselines/:id/history?target=`
+- `POST /api/baselines/:id/setup-plan`
+
+**New read-only inventory** (`packages/ssh/src/inventory.ts`). It runs only when the owner asks for candidates or a comparison, never on the schedule, and goes through the same check queue (`FleetService.exclusive`). It uses the same transport and pinning rules as the health check: an unpinned host is never contacted. The fixed script lists:
+
+- directories under `/srv` (two levels deep) and the login user's home (one level, not hidden), with owner, group and mode, using `find -printf`;
+- installed packages and versions, using `awk` on `/var/lib/dpkg/status`;
+- which installed versions appear in Ubuntu's own archive lists, using `awk` on `/var/lib/apt/lists/*ubuntu.com_ubuntu_dists_*_Packages`.
+
+The script uses no sudo, writes nothing, has no pipes and no `-exec`, and does no network access. A reviewed-allowlist test covers it, like the collector. On Merauke it read 705 installed packages, 703 of them confirmed from Ubuntu's archive, in about 1.7 s. That run was local and read-only. **I did not run it on any remote server.** On a server with a mirror outside `*.ubuntu.com`, no package can be confirmed, and the response says so.
+
+**Rules:**
+
+- **Candidates.** A directory is eligible only if `directoryAllowed` would accept creating it: under `/srv` or `/home/<user>`, plain path, no setuid/setgid/sticky bit, not world-writable. A package is eligible only if its installed version is in Ubuntu's archive. Every ineligible item carries a reason.
+- **Home conventions** are stored relative to the home, with the owner and group recorded as the login user. They are then compared against the target's own user and home.
+- **Comparison** reports `matches`, `missing`, `conflict`, `different-by-design` (marked intentional) or `not-checked` (part of the listing could not be read). It copies and deletes nothing.
+- **Exceptions** change only their own record. Every mark and removal goes into an append-only history.
+- **Setup plan.** It holds only the missing directories (at most 20, parents first) and is built by the same care planner (`exposePlanner`) as every other plan, as `prepare.directories.v1`. A server with writes disabled gets a plan blocked `WRITES_DISABLED`. The response lists everything else under `notIncluded`, with reasons.
+
+**Not done, Orchestrator decision needed:**
+
+- **Package installation from a baseline is not implemented.** There is no install operation (`install.packages.v1`) in the catalog, the worker or the simulated target. Missing packages are reported with "Installing packages is not a supported operation yet". Adding that operation is a new write capability and needs its own task and review.
+
+**New file:** `.data/baselines.db` (gitignored).
+
+**Web:** `apps/web/src/api/baselines.ts` keeps the stub's methods and return shapes. It adds `listBaselines`, `candidatesResponse` and `comparison`, which return the full responses with source, time and notes.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 232, ai 156, web 96, ssh 56, store 27, domain 22, worker 19, infra 9; typecheck all 9 exit 0
+Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a, known),
+  zt01 13/13 with the reviewed list (adds POST /api/baselines, /:id/compare, PUT and DELETE /:id/exceptions, /:id/setup-plan)
+```
+
+**For the Tester:**
+
+- **ZT-01 review.** Of the new routes, only `setup-plan` produces something that could later change a server, and it goes through the existing plan and approval path, so the hard gate still applies. Compare and candidates contact a server read-only.
+
+Next: T-079.

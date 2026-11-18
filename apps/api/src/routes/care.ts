@@ -60,6 +60,11 @@ export interface CareRouteOptions {
    * "not-checked" (tests, fixture mode) does not block.
    */
   readonly controllerClock?: (() => ControllerClock) | undefined;
+  /**
+   * T-078: receives the same plan builder the routes use, so other features
+   * (baseline setup) create canonical plans through one path.
+   */
+  readonly exposePlanner?: ((create: (request: PlanRequest) => Promise<{ plan: Plan; view: ReturnType<typeof planView> } | null>) => void) | undefined;
 }
 
 const STATUS: Readonly<Record<ApprovalRejection, number>> = {
@@ -193,6 +198,13 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
         return (await target.previewDirectories(p.scope.requested.map((d) => d.path)))?.stateDigest ?? null;
     }
   }
+
+  o.exposePlanner?.(async (request) => {
+    const server = serverById(request.serverId);
+    if (server === undefined) return null;
+    const plan = await makePlan(newId(), 1, server, request);
+    return { plan, view: planView(plan, server) };
+  });
 
   fastify.post("/api/plans", { bodyLimit: 4096 }, async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = PlanRequestSchema.safeParse(request.body);
