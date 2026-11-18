@@ -21,14 +21,14 @@
 .topbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-1) var(--space-3);
   padding: var(--space-1-half) var(--content-padding-mobile);
   border-bottom: 2px solid var(--color-ink);
   background-color: var(--color-surface);
 }
 
-.brand { font-size: 16px; line-height: 20px; color: var(--color-ink); }
+.brand { display: inline-flex; align-items: center; min-height: var(--touch-target-min); font-size: 16px; line-height: 20px; color: var(--color-ink); }
 .brand:hover { text-decoration: none; }
 
 .crumbs {
@@ -39,7 +39,8 @@
   line-height: var(--text-compact-line-height);
   color: var(--color-muted-ink);
 }
-.crumbs a { text-decoration: underline; }
+.crumbs { align-items: center; }
+.crumbs a { display: inline-flex; align-items: center; min-height: var(--touch-target-min); text-decoration: underline; }
 .crumbs [aria-current="page"] { color: var(--color-ink); font-weight: var(--font-weight-semibold); }
 
 .main {
@@ -122,6 +123,7 @@
 }
 .notice p { color: var(--color-ink); }
 .noticeTitle { display: flex; align-items: center; gap: var(--space-1); font-weight: var(--font-weight-semibold); color: inherit !important; }
+h1.noticeTitle { font-size: var(--text-section-title-size); line-height: var(--text-section-title-line-height); }
 .noticeAttention { color: var(--color-state-attention-fg); background-color: var(--color-state-attention-bg); }
 .noticeFailed { color: var(--color-state-failed-fg); background-color: var(--color-state-failed-bg); }
 .noticeUnknown { color: var(--color-state-unknown-fg); background-color: var(--color-state-unknown-bg); }
@@ -132,14 +134,14 @@
 
 .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-section); align-items: start; }
 
-.stack { display: flex; flex-direction: column; gap: var(--gap-cards); min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: var(--space-1-half); min-width: 0; }
 
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-card-inner);
+  gap: var(--space-half) var(--space-1);
   min-width: 0;
-  padding: var(--pad-card);
+  padding: var(--space-1) var(--space-1-half);   /* T-065 polish: tighter than the 12px all round of T-060 */
   background-color: var(--color-surface);
   border: 2px solid var(--color-ink);
   border-radius: var(--radius-panel);
@@ -202,6 +204,7 @@
   align-items: start;
   padding: var(--space-1);
   border: 1px solid var(--color-control-boundary);
+  min-height: var(--touch-target-min);
   border-radius: var(--radius-input);
   font-size: var(--text-compact-size);
   line-height: var(--text-compact-line-height);
@@ -229,10 +232,10 @@
   text-decoration: none;
 }
 .primary { background-color: var(--color-tangerine); }
-.primary:hover:not(:disabled) { background-color: var(--color-citron); text-decoration: none; }
+.primary:hover:not(:disabled):not([aria-disabled="true"]) { background-color: var(--color-citron); text-decoration: none; }
 .secondary, .linkBtn { background-color: var(--color-surface); }
 .secondary:hover:not(:disabled), .linkBtn:hover { background-color: var(--color-canvas); text-decoration: none; }
-.primary:disabled, .secondary:disabled {
+.primary:disabled, .secondary:disabled, .primary[aria-disabled="true"], .secondary[aria-disabled="true"] {
   cursor: not-allowed;
   background-color: var(--color-state-unknown-bg);
   color: var(--color-state-unknown-fg);
@@ -240,7 +243,8 @@
 }
 .primary, .secondary { width: 100%; }
 
-.statusLine { font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); font-weight: var(--font-weight-semibold); min-height: 1.25rem; }
+.statusLine { font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); font-weight: var(--font-weight-semibold); }
+.statusLine:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 .diffList { list-style: none; display: flex; flex-direction: column; gap: var(--space-half); font-family: var(--font-mono); font-size: var(--text-technical-size); }
 .diffList > li { overflow-wrap: anywhere; }
@@ -260,7 +264,9 @@
 .sCurrent { color: var(--color-state-progress-fg); }
 .sFailed { color: var(--color-state-failed-fg); }
 .sUnknown { color: var(--color-state-unknown-fg); }
-.sPending { color: var(--color-control-boundary); }
+/* Text uses Muted ink (5.8:1 on white), never the control-boundary grey (3.8:1): D-U9 */
+.sPending { color: var(--color-muted-ink); }
+.sPending .stepIcon, .stepIcon.sPending { color: var(--color-muted-ink); }
 
 /* ── Operation: receipt ────────────────────────────────────────────────── */
 
@@ -285,6 +291,7 @@
   line-height: var(--text-technical-line-height);
   list-style: none;
 }
+.transcriptList { list-style: none; }
 .transcript li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-1); }
 .transcript li > span:last-child { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
 .tTime { color: #B7C0CC; font-variant-numeric: tabular-nums; }
@@ -311,4 +318,18 @@
 
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
+}
+
+/* ── Forced colors / Windows high contrast (D-U11). Focus uses outline, which is kept.
+   Backgrounds are dropped in this mode, so anything that relied on a fill alone
+   gets system colours and a border. ─────────────────────────────────────────── */
+@media (forced-colors: active) {
+  .step::before { background-color: CanvasText; }
+  .stepIcon { border-color: CanvasText; }
+  .stateTag, .chip, .simLabel, .productionLabel { border: 1px solid CanvasText; forced-color-adjust: none; color: CanvasText; background-color: Canvas; }
+  .productionLabel { background-color: Highlight; color: HighlightText; }
+  .primary { forced-color-adjust: none; background-color: ButtonFace; color: ButtonText; border: 2px solid ButtonText; }
+  .primary:disabled, .secondary:disabled, .primary[aria-disabled="true"], .secondary[aria-disabled="true"] { color: GrayText; border-color: GrayText; }
+  .check:has(input:checked) { border: 2px solid Highlight; }
+  .transcript { border: 1px solid CanvasText; }
 }

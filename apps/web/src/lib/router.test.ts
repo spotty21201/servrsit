@@ -13,7 +13,26 @@ test("anything else is the overview, including unsafe ids", () => {
   }
 });
 
+test("fixture clock page route", () => { assert.deepEqual(matchRoute("/fixtures/clock"), { name: "fixtureClock" }); });
+
 test("path builders encode", () => {
   assert.equal(planPath("a b"), "/plans/a%20b");
   assert.equal(operationPath("x"), "/operations/x");
+});
+
+test("server detail and connect routes", () => {
+  const id = "11111111-1111-4111-a111-111111111111";
+  assert.deepEqual(matchRoute(`/servers/${id}`), { name: "server", id, section: null });
+  assert.deepEqual(matchRoute(`/servers/${id}/settings`), { name: "server", id, section: "settings" });
+  assert.deepEqual(matchRoute(`/servers/${id}/verify/`), { name: "server", id, section: "verify" });
+  assert.deepEqual(matchRoute("/servers/new"), { name: "connect" });
+  assert.deepEqual(matchRoute("/servers/a/b/c"), { name: "overview" });
+  assert.deepEqual(matchRoute("/servers/%3Cx%3E"), { name: "overview" });
+});
+
+test("findings and activity routes", () => {
+  assert.deepEqual(matchRoute("/baselines"), { name: "baselines" });
+  assert.deepEqual(matchRoute("/settings"), { name: "settings" });
+  assert.deepEqual(matchRoute("/findings"), { name: "findings" });
+  assert.deepEqual(matchRoute("/activity/"), { name: "activity" });
 });

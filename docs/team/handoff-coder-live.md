@@ -1108,6 +1108,58 @@ private-key headers in staged diff: T-050 has 1, the test string "-----BEGIN OPE
 2. **ADR number clash:** your ADR-015 (assistant voice) and my `docs/decisions/ADR-015-care-loop-persistence.md` share a number. Please renumber one. T-053 will use ADR-017 as briefed.
 3. **PID 458878**, my leftover API watcher, is still running in `/projects/servrsit/apps/api` (elapsed 16:38:19 when checked). I have not stopped it because it serves the founder.
 
+## T-061: target clock skew (commit `408f2e5`, branch `feat/coder/clock-skew`, from `integration/live-v1` at `39ae4af`)
+
+**How it works:**
+
+- **Measurement:** a new fixed collector section, `date +%s`, runs **first** in the read-only script and is on the reviewed allowlist in `script.test.ts`. It prints the time and cannot set it; setting needs `-s` or a date argument, plus root.
+  - Skew is the target epoch minus the midpoint of ServrSit's collection window.
+  - Uncertainty is half the window plus 1 s.
+  - The reading is stored as `host.clock`.
+- **Coverage:** `clock` is a counted check, so the total is now 16. An unreadable clock is "unavailable", never zero skew.
+- **Finding:** beyond 120 s after subtracting the uncertainty, `time.skew.v1` is a **warning** on the first observation: "This server's clock is about 7 h behind ServrSit's clock. Times the server writes itself, such as when it last refreshed package lists, are corrected for this. Check time synchronisation on the server."
+- **Ages from target timestamps:** the APT stamp is the only time the target writes. `packages.metadataClock` records how it was handled:
+  - `in-sync`: used as is;
+  - `corrected`: shifted by the measured skew;
+  - `unverified`: the clock could not be read, and the deterministic text says "this time may be wrong".
+  - The AI input carries `clock` and `packageListsClock`.
+- **Writes:** not wired to block anything yet. Real hosts are already `WRITES_DISABLED`, and simulated targets have no clock. The finding is the hook for Tech Spec §8.2's rule that skew blocks new changes, to be added with the planning precondition re-check (T-054).
+
+**Live evidence (one read-only collection, Sentani, 2026-11-17 22:08 UTC):** `skewSeconds -25202`, `uncertaintySeconds 4` (7 h 0 min 2 s slow), `metadataClock "corrected"`, coverage 16/16, `time.skew.v1` warning raised. This matches the Orchestrator's reading (14:27 against 21:27).
+
+## T-062: updates from outside Ubuntu's archive (commit `1405116`, branch `feat/coder/package-origins`, stacked on T-061)
+
+**How it works:**
+
+- **Classification:** each `Inst` line in the apt simulation is classified by origin.
+  - **Ubuntu's archive** is only `Ubuntu:NN.NN/<codename>`, `-updates` or `-security`.
+  - **Outside it:** backports, proposed, PPAs, ESM, mixed origins (for example `Ubuntu…, Docker CE:noble`) and lines that do not fully parse.
+- **Observation:** a new field `packages.pendingOutsideUbuntu` holds `{count, first 50 {name, origin}}`. Names and origins are validated, and a failure becomes `(unrecognised)`. `pendingCount` is unchanged (the total).
+- **Plans:** `scope.packages` holds only Ubuntu-archive changes, with no origin labels, so the manifest and verification are as before. `scope.excludedPackages` lists the rest with `reason: "outside-ubuntu-archive"`. If everything is excluded, the blocker is `ONLY_EXCLUDED_PACKAGES`. **A change with no origin is excluded.**
+  - The simulated target labels fixture upgrades without an origin as `Ubuntu:24.04/noble-updates` [SIMULATED], so existing simulated scenarios behave as before.
+- **"By default":** there is no way to include them yet. Adding one would need a reviewed plan option.
+- **Owner text:** the `packages.pending.v1` finding, the AI input (`pendingOutsideUbuntu`) and the deterministic text all name these updates. The fact check accepts "3 from Docker's repository, 0 from Ubuntu".
+
+**Live evidence (one read-only collection, Sentani):** `pendingCount 3`; `pendingOutsideUbuntu` count 3: `docker-ce-cli`, `docker-ce`, `docker-ce-rootless-extras`, all from `Docker CE:noble`. The finding text is as above. While writing the parser I also ran one in-memory probe that printed only Sentani's `Inst` lines, to learn the exact format. Nothing was saved.
+
+**Checks run (real output, at `1405116`):**
+
+```
+pnpm -r --workspace-concurrency=1 run test -> exit 0
+  suites 9, 16 (domain), 50 (ssh), 48 (web), 11 (store), 144 (ai), 18 (worker), 135 (api); fail 0 everywhere
+typecheck: ai, contracts, domain, ssh, store, ui, api, web, worker, infra -> exit 0 each
+key scan of staged diff -> clean (T-061 and T-062)
+Tester gate, their files unchanged (temporary copy, removed): zt01-real-hosts 12/12 (route inventory unchanged),
+  static-config 3/3, self-check 28/28, care-loop 35 pass / 6 fail / 1 not run = their baseline exactly
+```
+
+**Test fixtures changed** (needed by the contract change; all mine): the domain and store plan fixtures now carry an Ubuntu origin, and the API, AI and SSH observation fixtures carry `clock`, `metadataClock` and `pendingOutsideUbuntu`.
+
+**Needs Orchestrator action (T-061/T-062):**
+
+1. **Merge order:** `feat/coder/package-origins` contains T-061 and T-062 and does not depend on T-053, so it can merge before it. Both it and `feat/coder/owner-auth` append to this handoff file, so merging the second one has a trivial conflict at the end of the file: keep both sections.
+2. **Sentani's clock is 7 h slow.** Fixing it is a change on the server (time sync), which only the founder may authorize. ServrSit now corrects package ages for it and shows a warning.
+3. **Next in my queue:** T-054 through T-059 (not started). ZT-01 and the route inventory remain the standing gate.
 ## T-053: local owner auth with mandatory TOTP (commit `2bfaa34`, branch `feat/coder/owner-auth`, rebased on `integration/live-v1` at `39ae4af`)
 
 Fixes Tester finding **F1**. Decision record: `docs/decisions/ADR-017-local-owner-auth.md`.

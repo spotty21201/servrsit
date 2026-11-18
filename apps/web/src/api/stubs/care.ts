@@ -18,6 +18,27 @@ export interface PackageChange {
   readonly to: string;
 }
 
+/** A directory a setup plan would create (T-073, PRD FR-15). Existing directories are never changed. */
+export interface PrepareDirectory {
+  readonly path: string;
+  readonly owner: string;
+  readonly mode: string;
+}
+
+/**
+ * Present only on a "prepare a server" plan. PROVISIONAL local type: the care
+ * contract has no setup operation yet (CARE_OPERATIONS is apply.packages.v1
+ * only). The canonical Plan review screen renders it when present.
+ */
+export interface PreparePlan {
+  readonly baselineName: string;
+  readonly baselineVersion: number;
+  readonly referenceName: string;
+  readonly directories: readonly PrepareDirectory[];
+  /** Items left alone on purpose (conflicts), with the reason. */
+  readonly leftAlone: readonly { readonly label: string; readonly reason: string }[];
+}
+
 export interface PlanBlocker {
   readonly code: string;
   readonly message: string;
@@ -43,6 +64,8 @@ export interface PlanView {
   readonly digest: string;
   readonly target: { readonly serverId: string; readonly name: string; readonly kind: string; readonly simulated: boolean };
   readonly approvable: boolean;
+  /** Set only for a setup (prepare) plan. */
+  readonly prepare?: PreparePlan;
 }
 
 export type OperationStateName =

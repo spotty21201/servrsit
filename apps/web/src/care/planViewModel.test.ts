@@ -79,3 +79,32 @@ test("diffScope reports added, removed and changed packages", () => {
   assert.deepEqual(d.removed, [b]);
   assert.deepEqual(d.changed, [{ before: a, after: a2 }]);
 });
+
+test("clock untrusted: approval is paused with the clock reason, expiry and ages are marked ≈", () => {
+  const vm = toPlanVM(plan(), NOW, TZ, null, true);
+  assert.equal(vm.disposition.canApprove, false);
+  assert.equal(vm.disposition.title, "Approvals are paused");
+  assert.match(vm.disposition.reason, /clock is wrong/);
+  assert.equal(vm.expiry.relative, "≈ in 12 min");
+  assert.match(vm.createdText, /≈ 3 min ago/);
+  assert.equal(toPlanVM(plan(), NOW, TZ, null, false).disposition.canApprove, true);
+});
+
+test("a setup plan reads as one: title, scope, exclusions, specific approve label, still blocked on real hosts", () => {
+  const prep = {
+    baselineName: "Web server baseline", baselineVersion: 1, referenceName: "Fixture Web-1",
+    directories: [{ path: "/srv/app", owner: "deploy:deploy", mode: "0755" }],
+    leftAlone: [{ label: "/opt/tools", reason: "It exists and is owned by another user, so it is not changed." }],
+  };
+  const vm = toPlanVM(plan({ prepare: prep }), NOW, TZ);
+  assert.equal(vm.title, "Prepare Nabire from Web server baseline");
+  assert.equal(vm.approveLabel, "Approve setup of Nabire");
+  assert.match(vm.scopeSummary, /^1 directory to create and 2 packages to install, from Web server baseline version 1 \(reference: Fixture Web-1\)/);
+  assert.match(vm.exclusions.join(" "), /credentials, SSH host keys, application data, databases, personal files and network settings/);
+  assert.match(vm.exclusions.join(" "), /nothing is changed recursively/);
+  assert.deepEqual(vm.leftAlone.map((x) => x.label), ["/opt/tools"]);
+  const blocked = toPlanVM(plan({ prepare: prep, approvable: false, blockers: [{ code: "WRITES_DISABLED", message: "x" }], scope: { packages: [], includesServiceRestart: false, includesReboot: false }, preconditions: { previewDigest: "none" } }), NOW, TZ);
+  assert.equal(blocked.disposition.kind, "writes-disabled");
+  assert.equal(blocked.disposition.canApprove, false);
+  assert.equal(toPlanVM(plan({ prepare: { ...prep, directories: [] }, scope: { packages: [], includesServiceRestart: false, includesReboot: false } }), NOW, TZ).scopeSummary, "Nothing to create or install: this server already matches the baseline.");
+});
