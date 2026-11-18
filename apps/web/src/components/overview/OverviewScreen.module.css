@@ -106,12 +106,14 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* DOM order = visual order everywhere (D-U12): wordmark, account, then the nav list.
+   On the desktop rail the account block sits directly under the wordmark. */
 .navAccount {
   display: flex;
   justify-content: center;
   width: 100%;
-  padding-top: var(--space-2);
-  border-top: 2px solid var(--color-ink);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--color-ink);
 }
 
 .accountButton {
@@ -345,7 +347,6 @@
     width: auto;
     border-bottom: none;
     padding: 0;
-    order: 1;
   }
 
   .wordmarkText {
@@ -356,12 +357,10 @@
   .navAccount {
     width: auto;
     padding: 0;
-    border-top: none;
-    order: 2;
+    border-bottom: none;
   }
 
   .navList {
-    order: 3;
     flex: 1 1 100%;            /* own row beneath wordmark + account */
     flex-direction: row;
     width: 100%;

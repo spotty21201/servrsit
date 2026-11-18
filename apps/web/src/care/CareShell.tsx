@@ -29,7 +29,7 @@ export function CareShell({ fixture, section, children }: CareShellProps) {
         </nav>
         <SignOutButton variant="bar" />
       </header>
-      <main id="main-content" className={styles.main}>{children}</main>
+      <main id="main-content" className={styles.main} tabIndex={-1}>{children}</main>
     </div>
   );
 }

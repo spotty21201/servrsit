@@ -59,6 +59,16 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
           </span>
         </div>
 
+        <div className={styles.navAccount}>
+          {session ? (
+            <SignOutButton variant="rail" />
+          ) : (
+            <button type="button" className={styles.accountButton} aria-label="Account settings">
+              <span aria-hidden="true">S</span>
+            </button>
+          )}
+        </div>
+
         <ul className={styles.navList}>
           <li>
             <a href="/overview" className={`${styles.navItem} ${styles.navItemActive}`} aria-current="page">
@@ -80,18 +90,9 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
           </li>
         </ul>
 
-        <div className={styles.navAccount}>
-          {session ? (
-            <SignOutButton variant="rail" />
-          ) : (
-            <button type="button" className={styles.accountButton} aria-label="Account settings">
-              <span aria-hidden="true">S</span>
-            </button>
-          )}
-        </div>
       </nav>
 
-      <main className={styles.main} id="main-content">
+      <main className={styles.main} id="main-content" tabIndex={-1}>
         <div className={styles.band} aria-hidden="true" />
 
         <div className={styles.contentWrapper}>

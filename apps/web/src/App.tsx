@@ -16,6 +16,7 @@ import { OverviewScreen } from "./components/overview/index.js";
 import { toOverviewVM } from "./components/overview/fleetViewModel.js";
 import { usePageTitle } from "./lib/pageTitle";
 import { RouteAnnouncer } from "./lib/RouteAnnouncer";
+import { SkipLink } from "./lib/SkipLink";
 import { AuthGate } from "./auth/AuthGate";
 import { ClockProvider, useClock } from "./clock/ClockContext";
 import { FixtureClockPage } from "./clock/FixtureClockPage";
@@ -32,6 +33,7 @@ const CLOCK_TICK_MS = 30_000;
 export default function App() {
   return (
     <>
+    <SkipLink />
     <RouteAnnouncer />
     <AuthGate>
       <ClockProvider>

@@ -150,6 +150,26 @@ h1, h2, h3, h4, h5, h6 {
   overflow-wrap: break-word;
 }
 
+/* Skip link: off-screen until focused (D-U2). Absolute, so it never affects layout or horizontal scroll. */
+.skip-link {
+  position: absolute;
+  left: var(--space-1);
+  top: var(--space-1);
+  z-index: 1000;
+  transform: translateY(-300%);
+  padding: var(--space-1) var(--space-2);
+  min-height: var(--touch-target-min);
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-ink);
+  color: #fff;
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-button);
+}
+.skip-link:focus { transform: none; }
+
+main:focus { outline: none; }
+
 /* Visually hidden utility — for accessible labels */
 .sr-only {
   position: absolute;

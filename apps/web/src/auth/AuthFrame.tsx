@@ -8,8 +8,8 @@ import styles from "./auth.module.css";
 export function AuthFrame({ title, titleRef, children }: { title: string; titleRef?: React.Ref<HTMLHeadingElement>; children: ReactNode }) {
   return (
     <div className={styles.page}>
-      <main id="main-content" className={styles.main}>
-        <p className={`${styles.brand} pixel-text`} aria-label="ServrSit">ServrSit</p>
+      <main id="main-content" className={styles.main} tabIndex={-1}>
+        <p className={`${styles.brand} pixel-text`}>ServrSit</p>
         <section className={styles.card} aria-labelledby="auth-title">
           <h1 id="auth-title" ref={titleRef} tabIndex={-1} className={`${styles.title} pixel-text`}>{title}</h1>
           {children}

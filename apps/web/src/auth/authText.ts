@@ -60,6 +60,8 @@ export function authError(error: AuthClientError, step: Step, now: Date, tz: str
       return view(step === "setup-token"
         ? `Check the fields. The username may use letters, digits, dots, dashes and underscores. The password needs ${PASSWORD_MIN_CHARS}–${PASSWORD_MAX_CHARS} characters.`
         : "Check what you typed and try again.");
+    case "CLOCK_UNTRUSTED":
+      return view("ServrSit's own clock is wrong, so setting up the authenticator would not work once it is fixed. Fix the clock on the machine ServrSit runs on, then start setup again.");
     case "CSRF_INVALID":
       return view("The page's security check failed. Reload the page and try again.");
     case "UNAUTHENTICATED":
