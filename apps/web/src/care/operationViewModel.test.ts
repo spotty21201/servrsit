@@ -100,3 +100,60 @@ test("transcript lines are timestamped event text with only known payload fields
   assert.match(v.transcript[2]?.text ?? "", /^remote_rejected {2}queued -> failed {2}code=PACKAGE_LOCKED/);
   assert.match(v.transcript[0]?.time ?? "", /^\d\d:\d\d:\d\d$/);
 });
+
+async function vmFor(opId: string, planId: string) {
+  const c = createFixtureClient(() => NOW);
+  const r = await c.getOperation(opId);
+  assert.ok(r.ok);
+  return toOperationVM(r.data, fixturePlans(NOW)[planId]!, NOW, TZ);
+}
+
+test("a restart operation reads as a restart, verified by a new start time", async () => {
+  const v = await vmFor("fixture-op-restart-succeeded", "fixture-plan-restart");
+  assert.equal(v.title, "Restart nginx.service on Fixture Nabire");
+  assert.equal(v.stateLabel, "Completed and verified");
+  assert.equal(v.steps[2]?.title, "Restart the service");
+  assert.equal(v.steps[3]?.title, "Check the service started again");
+  assert.match(v.explanation, /start time is new/);
+  assert.deepEqual(v.receipt?.changed, ["nginx.service restarted"]);
+  assert.match(v.receipt?.couldNotVerify.join(" ") ?? "", /behaves correctly after it started/);
+  assert.doesNotMatch(JSON.stringify(v.receipt), /reboot/i);
+});
+
+test("a running reboot says the server will not answer for a while; stop is offered as a request", async () => {
+  const v = await vmFor("fixture-op-reboot-running", "fixture-plan-reboot");
+  assert.equal(v.title, "Reboot Fixture Timika");
+  assert.match(v.explanation, /rebooting and will not answer for a while/);
+  assert.equal(v.stop.visible, true);
+  assert.equal(v.stop.help, STOP_HELP);
+});
+
+test("a partly created set of directories lists what matched and what did not, with owner and mode", async () => {
+  const v = await vmFor("fixture-op-dirs-partial", "fixture-plan-prepare");
+  assert.equal(v.title, "Create directories on Fixture Dev-2");
+  assert.equal(v.stateLabel, "Some work completed");
+  assert.deepEqual(v.receipt?.changed, ["/srv/app (owner deploy:deploy, mode 0755)"]);
+  assert.match(v.receipt?.couldNotVerify[0] ?? "", /\/srv\/backups\/app \(owner root:root, mode 0750\): it is missing or its owner, group or mode differs/);
+  assert.equal(v.receipt?.verified[0], "1 of 2 directories match the plan.");
+});
+
+test("a queued operation can be cancelled before it starts; the fixture client says so", async () => {
+  const c = createFixtureClient(() => NOW);
+  const r = await c.getOperation("fixture-op-queued");
+  assert.ok(r.ok);
+  const queued = toOperationVM(r.data, plan, NOW, TZ);
+  assert.equal(queued.stop.visible, true);
+  assert.equal(queued.stop.label, "Cancel before it starts");
+  const s = await c.requestStop("fixture-op-queued");
+  assert.ok(s.ok && s.data.stop === "cancelled" && s.data.operation.state === "cancelled_before_start");
+  const again = await c.requestStop("fixture-op-queued");
+  assert.ok(again.ok && again.data.stop === "already-final");
+  const run = await c.requestStop("fixture-op-running");
+  assert.ok(run.ok && run.data.stop === "requested" && run.data.operation.stopRequested);
+});
+
+test("rechecking an unknown outcome in the fixture leaves it unknown, never resolved by the client", async () => {
+  const c = createFixtureClient(() => NOW);
+  const r = await c.reconcile("fixture-op-unknown");
+  assert.ok(r.ok && r.data.operation.state === "outcome_unknown");
+});

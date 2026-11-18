@@ -172,3 +172,24 @@ Next: T-078 (baselines), T-079 (settings).
 - An actual disconnect on the real API (it would delete a key and stop schedules); covered by `api/settings.test.ts` and the fixture only.
 - `SettingsData` and `ActivityResponse` have no `mode`; the settings page borrows it from `/api/fleet`. Consider adding it to both.
 - Plan review (`/plans/:id`) and operation pages still run on `api/stubs/care.ts`. A setup plan created by T-078 on the real API will not open there until a real care client exists.
+
+## Addendum 8: T-082 care client swap, and review pack 002
+
+**Merge:** `integration/next` merged (T-082 `api/care.ts`), no conflicts. `api/stubs/` is gone.
+
+**Changed**
+- `PlanScreen`, `OperationScreen`, `approval.ts` and the view models use `api/care.ts`. Fixture client (`care/fixtures.ts`) implements the full `CareClient` including `createActionPlan`, `requestStop`, `reconcile`.
+- Plan review now covers all four operations as separate approvals: packages, restart one service, reboot the host, create directories. Each has its own title, scope, impact, verification and approve label. Restart names the unit and says it is not a reboot; reboot says it is the whole machine. Directory plans list what is created and the paths that already exist and stay untouched. The old "prepare from baseline" fields (`prepare`, left-alone list) are gone because the real plan does not carry them.
+- **Production confirmations:** the page used its own tokens (`recovery-route`, `interruption-risk`) and server-name wording. It now shows the contract's two confirmations with their exact fixed text and sends exactly the tokens the plan requires. A token the page cannot show blocks approval.
+- Blocker codes with fixed text: `UNIT_NOT_SELECTED`, `UNIT_NOT_FOUND`, `DIRECTORY_NOT_ALLOWED`, `CONTROLLER_CLOCK_UNTRUSTED`, `IDENTITY_UNVERIFIED`, `IDENTITY_AMBIGUOUS`; `NO_CHANGES` and `PLAN_UNAVAILABLE` read per kind.
+- Operation page: per-kind steps, explanations and receipts (restart verified by a new start time, reboot by a new boot id, directories listed with owner, group and mode). "Stop after this safe step" and "Cancel before it starts" now call `requestStop` and report requested, cancelled or already final. "Recheck outcome" calls `reconcile` and says plainly when the outcome is still not confirmed.
+- Plan data from the API (unit, paths) is shown only if well-formed; malformed entries are dropped.
+
+**Checks**
+- `pnpm typecheck`, `pnpm test` (215 pass, 0 fail), `pnpm build`: clean.
+- Browser, own API (:3005) and preview (:5174): fixture plans for every kind and five operations pass axe (wcag2a/aa/21aa, 0 violations), no horizontal scroll; cancel, stop and recheck work on the fixtures. Against the real API, created packages, reboot, restart and directory plans for a registered server (all blocked by writes-off) and opened each at `/plans/:id` on the real client: renders correctly, axe 0, no console errors. Evidence: `docs/team/evidence/t082/`.
+- Review pack 002 re-shot (41 states x 2 sizes) with the new plan and operation states (images 38 to 41), `index.md` updated.
+
+**Not verified / for Coder**
+- Approval and operation polling on a real operation: no real host accepts writes, so only the plan side ran on the real API. Approval, stop and reconcile are covered by `api/care.test.ts` and the fixture client.
+- Reconcile is shown as "checked again" whenever the API answers; the record shows what changed. If `reconcile` can answer with the same unknown state, the screen says so.
