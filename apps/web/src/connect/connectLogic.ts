@@ -195,7 +195,7 @@ export function compareFingerprint(shown: string, entered: string): Comparison {
 // ── Error wording (fixed text; the API's own `reason` is shown only for the
 //    codes where it is the explanation, and it is our text, never server output) ─
 
-type AnyError = ServerRegistrationError | { readonly error: "NETWORK" | "INVALID_RESPONSE"; readonly reason?: undefined };
+type AnyError = ServerRegistrationError | { readonly error: "NETWORK" | "TIMEOUT" | "INVALID_RESPONSE" | "CSRF_INVALID" | "UNAUTHENTICATED"; readonly reason?: undefined };
 
 export function registrationError(e: AnyError): string {
   switch (e.error) {
@@ -210,8 +210,12 @@ export function registrationError(e: AnyError): string {
     case "STATE_CONFLICT": return `That step is not available yet. ${e.reason ?? ""}`.trim();
     case "SERVER_NOT_FOUND": return "That server no longer exists.";
     case "INVALID_INPUT": return "The API did not accept those details. Check the fields and try again.";
-    case "NETWORK": return "Couldn't reach ServrSit. Nothing was changed. Check the connection and try again.";
-    case "INVALID_RESPONSE": return "ServrSit answered in a way this page doesn't understand. Nothing was changed.";
+    // A lost answer does not prove the step did not happen, so these never say "nothing was changed".
+    case "NETWORK": return "Couldn't reach ServrSit. This step may or may not have happened. Reload the page to see where the setup stands.";
+    case "TIMEOUT": return "ServrSit did not answer in time. This step may or may not have happened. Reload the page to see where the setup stands.";
+    case "INVALID_RESPONSE": return "ServrSit answered in a way this page doesn't understand. This step may or may not have happened. Reload the page to see where the setup stands.";
+    case "CSRF_INVALID": return "The page's security check failed twice. Nothing was changed. Reload the page and try again.";
+    case "UNAUTHENTICATED": return "You are signed out. Sign in again; your setup is kept for 24 hours.";
   }
 }
 

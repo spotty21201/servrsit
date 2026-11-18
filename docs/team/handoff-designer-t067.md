@@ -88,3 +88,11 @@ Same fixes applied to the new screens (titles, reasons, 44 px targets, stretched
 - Findings and Activity run on fixtures until Coder provides contracts and endpoints; `/findings` is not linked from the live Overview.
 - D-U10: inline links inside sentences keep their text-height targets (allowed by WCAG 2.5.8; not changed).
 - The Overview page title reads "Loading your servers" until the first fleet response arrives, then "Overview".
+
+---
+
+# Addendum 3: T-080 part 1, servers client (branch `feat/designer/t080`)
+- The Connect flow now uses **Coder's real client** `apps/web/src/api/servers.ts` (not edited). `api/stubs/servers.ts` is gone. The in-memory model of the contract moved to `fixtures/serversFixture.ts` (same `ServersClient` interface, plus no-op `updateServer`/`disconnect`) and drives the preview at **`/fixtures/connect`** (shows the [FIXTURE DATA] banner; `?state=error` still works). `/servers/new` no longer shows a fixture banner and, after activation, links to the new server's page.
+- `registrationError()` handles the client's new codes: TIMEOUT, CSRF_INVALID, UNAUTHENTICATED. A lost or unreadable answer on a state-changing call no longer says "Nothing was changed": it says the step may or may not have happened and to reload (the draft is resumed from the stored id).
+- Checked against the real API on my own instance (:3005, own registry and auth databases): the screen's `POST /api/servers/drafts` carried the session CSRF header and the API's answer ("That address is not allowed. This private address is outside every route enrolled for ServrSit.") is shown. The later steps need a reachable SSH host, so they are covered by the fixture flow and Coder's client tests, not run against a real host.
+- Tests: 182 web tests pass, build ok. Findings, Activity, Baselines and Settings keep their stubs until T-076 to T-079 land.

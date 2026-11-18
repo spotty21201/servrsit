@@ -13,8 +13,9 @@
  *
  * The contract enforces host key -> confirm -> access key, so identity comes
  * before access (UX Spec lists them the other way round; flagged in the
- * handoff). The screen runs on the [FIXTURE] client until the routes exist, so
- * the [FIXTURE DATA] banner is always shown. Local storage holds the
+ * handoff). The screen runs on Coder's real client (api/servers.ts). The
+ * /fixtures/connect preview runs the same screen on an in-memory fixture and
+ * shows the [FIXTURE DATA] banner. Local storage holds the
  * non-secret form fields and the server draft's id only.
  */
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
@@ -22,7 +23,7 @@ import type { ServerDraft, FirstCheck } from "@servrsit/contracts";
 import { copyText } from "../auth/copy";
 import { CareShell } from "../care/CareShell";
 import { ReasonButton } from "../auth/AuthFrame";
-import { createFixtureServersClient, type ServersClient, type ServersResult } from "../api/stubs/servers";
+import { createServersClient, type ServersClient, type ServersResult } from "../api/servers";
 import { serverPath } from "../lib/router";
 import { usePageTitle } from "../lib/pageTitle";
 import {
@@ -50,8 +51,8 @@ function stepFor(d: ServerDraft): number {
   }
 }
 
-export function ConnectScreen({ client: injected }: { client?: ServersClient }) {
-  const client = useMemo(() => injected ?? createFixtureServersClient(), [injected]);
+export function ConnectScreen({ client: injected, fixture = false }: { client?: ServersClient; /** True only for the /fixtures/connect preview, which shows the [FIXTURE DATA] banner. */ fixture?: boolean }) {
+  const client = useMemo(() => injected ?? createServersClient(), [injected]);
   const restoredForm = useMemo(() => parseDraft(store.get(DRAFT_KEY)), []);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<ConnectDraft>(restoredForm ?? EMPTY_DRAFT);
@@ -192,7 +193,7 @@ export function ConnectScreen({ client: injected }: { client?: ServersClient }) 
   const checkDone = check?.finished === true && !check.failureCode;
 
   return (
-    <CareShell fixture section="Connect a server">
+    <CareShell fixture={fixture} section="Connect a server">
       <header className={c.header}>
         <h1 className={c.title} ref={titleRef} tabIndex={-1}>Connect a server</h1>
         <p className={c.small}>Step {step + 1} of 4: {title}. ServrSit only looks at the server. It cannot change anything yet.</p>
@@ -368,7 +369,7 @@ export function ConnectScreen({ client: injected }: { client?: ServersClient }) 
                 <pre className={s.codeBlock} tabIndex={0} aria-label="authorized_keys line">{draft.accessKey.authorizedKeysLine}</pre>
                 <div className={c.row}><button type="button" className={c.secondary} onClick={() => void copyLine(draft.accessKey?.authorizedKeysLine ?? "")}>Copy the line</button></div>
                 <p className={c.small} role="status">{copied === "ok" ? "Copied." : copied === "failed" ? "Couldn't copy. Select the line and copy it by hand." : ""}</p>
-                <p className={c.small}><span className={c.mono}>restrict</span> switches off port forwarding, terminals and agent forwarding for this key. <span className={c.mono}>from=&quot;{draft.accessKey.controllerAddress}&quot;</span> lets only ServrSit&rsquo;s address use it. Key fingerprint: <span className={c.mono}>{draft.accessKey.keyFingerprint}</span>. [FIXTURE: this key and address are samples.]</p>
+                <p className={c.small}><span className={c.mono}>restrict</span> switches off port forwarding, terminals and agent forwarding for this key. <span className={c.mono}>from=&quot;{draft.accessKey.controllerAddress}&quot;</span> lets only ServrSit&rsquo;s address use it. Key fingerprint: <span className={c.mono}>{draft.accessKey.keyFingerprint}</span>.{fixture ? " [FIXTURE: this key and address are samples.]" : ""}</p>
               </>
             ) : <p className={c.p} role="status">The key has not been made yet. Go back and confirm the host key.</p>}
             <div className={s.nav}>
@@ -423,9 +424,18 @@ export function ConnectScreen({ client: injected }: { client?: ServersClient }) 
               </>
             )}
             {added && (
-              <div className={`${c.notice} ${c.noticeProgress}`} role="status">
-                <p className={c.noticeTitle}>[FIXTURE] Server added (sample)</p>
-                <p>With the live API this opens the new server&rsquo;s page. Here nothing was saved. <a href={serverPath(added)}>Server page (sample id)</a></p>
+              <div className={`${c.notice} ${fixture ? c.noticeProgress : c.noticePassed}`} role="status">
+                {fixture ? (
+                  <>
+                    <p className={c.noticeTitle}>[FIXTURE] Server added (sample)</p>
+                    <p>Nothing was saved. With the real API this opens the new server&rsquo;s page. <a href={serverPath(added)}>Server page (sample id)</a></p>
+                  </>
+                ) : (
+                  <>
+                    <p className={c.noticeTitle}>{draft.name} is added</p>
+                    <p>ServrSit will check it on the schedule from now on. It can look at the server; it cannot change anything yet. <a href={serverPath(added)}>Open {draft.name}</a></p>
+                  </>
+                )}
               </div>
             )}
             <div className={s.nav}>

@@ -87,6 +87,11 @@ test("every contract error code has fixed wording; none echoes server text beyon
   for (const code of ["INVALID_INPUT", "ADDRESS_REJECTED", "DUPLICATE_SERVER", "DRAFT_NOT_FOUND", "DRAFT_EXPIRED", "HOST_KEY_NOT_CONFIRMED", "FINGERPRINT_MISMATCH", "HOST_KEY_CHANGED", "ROUTE_UNAVAILABLE", "STATE_CONFLICT", "SERVER_NOT_FOUND"] as const) {
     assert.ok(registrationError({ error: code }).length > 10, code);
   }
-  assert.match(registrationError({ error: "NETWORK" }), /Nothing was changed/);
+  for (const code of ["NETWORK", "TIMEOUT", "INVALID_RESPONSE"] as const) {
+    assert.match(registrationError({ error: code }), /may or may not have happened/, code);
+    assert.doesNotMatch(registrationError({ error: code }), /Nothing was changed/, code);
+  }
+  assert.match(registrationError({ error: "CSRF_INVALID" }), /security check failed/);
+  assert.match(registrationError({ error: "UNAUTHENTICATED" }), /signed out/);
   assert.match(registrationError({ error: "FINGERPRINT_MISMATCH" }), /Nothing was trusted/);
 });

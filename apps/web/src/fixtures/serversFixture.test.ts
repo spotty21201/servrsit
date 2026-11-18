@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ActivateResponseSchema, FirstCheckSchema, ServerDraftSchema } from "@servrsit/contracts";
-import { createFixtureServersClient, createServersClient, FIXTURE_DUPLICATE, FIXTURE_FINGERPRINT, FIXTURE_UNREACHABLE_ADDRESS } from "./servers";
+import { createFixtureServersClient, FIXTURE_DUPLICATE, FIXTURE_FINGERPRINT, FIXTURE_UNREACHABLE_ADDRESS } from "./serversFixture";
 
 const REQ = { address: "10.0.0.20", port: 22, user: "ops", name: "Fixture Box", role: null, production: true };
 
@@ -71,16 +71,4 @@ test("unknown drafts are DRAFT_NOT_FOUND; deleting removes the draft", async () 
   assert.ok(d.ok);
   assert.ok((await c.deleteDraft(d.data.id)).ok);
   assert.ok(!(await c.getDraft(d.data.id)).ok);
-});
-
-test("the real client sends the contract's routes, no body on bodiless calls, and never throws", async () => {
-  const seen: Array<{ url: string; method?: string }> = [];
-  const fetchImpl = (async (url: string, init?: RequestInit) => { seen.push({ url, ...(init?.method ? { method: init.method } : {}) }); return new Response("{}", { status: 409 }); }) as unknown as typeof fetch;
-  const c = createServersClient(fetchImpl);
-  const r = await c.scanHostKey("abc");
-  assert.deepEqual(r, { ok: false, error: { error: "INVALID_RESPONSE" } });
-  await c.deleteDraft("abc");
-  assert.deepEqual(seen, [{ url: "/api/servers/drafts/abc/host-key", method: "POST" }, { url: "/api/servers/drafts/abc", method: "DELETE" }]);
-  const down = createServersClient((async () => { throw new Error("x"); }) as unknown as typeof fetch);
-  assert.deepEqual(await down.getDraft("a"), { ok: false, error: { error: "NETWORK" } });
 });

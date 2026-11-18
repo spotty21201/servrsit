@@ -11,6 +11,7 @@ export type Route =
   | { readonly name: "connect" }
   | { readonly name: "findings" }
   | { readonly name: "fixtureOverview" }
+  | { readonly name: "fixtureConnect" }
   | { readonly name: "baselines" }
   | { readonly name: "settings" }
   | { readonly name: "activity" };
@@ -22,6 +23,7 @@ export function matchRoute(pathname: string): Route {
   if (clean === "/fixtures/clock") return { name: "fixtureClock" };
   if (clean === "/servers/new") return { name: "connect" };
   if (clean === "/findings") return { name: "findings" };
+  if (clean === "/fixtures/connect") return { name: "fixtureConnect" };
   if (clean === "/fixtures/overview") return { name: "fixtureOverview" };
   if (clean === "/baselines") return { name: "baselines" };
   if (clean === "/settings") return { name: "settings" };

@@ -31,6 +31,7 @@ test("server detail and connect routes", () => {
 });
 
 test("findings and activity routes", () => {
+  assert.deepEqual(matchRoute("/fixtures/connect"), { name: "fixtureConnect" });
   assert.deepEqual(matchRoute("/baselines"), { name: "baselines" });
   assert.deepEqual(matchRoute("/settings"), { name: "settings" });
   assert.deepEqual(matchRoute("/findings"), { name: "findings" });

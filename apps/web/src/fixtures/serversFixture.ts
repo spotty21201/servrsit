@@ -1,97 +1,18 @@
 /**
- * Server registration client (T-068, aligned to the T-069 contract).
+ * [FIXTURE] In-memory model of the T-069 registration contract, for previews and
+ * tests (T-080). The Connect screen uses Coder's real client
+ * (apps/web/src/api/servers.ts); this fixture implements the same
+ * `ServersClient` interface so /fixtures/connect can show every step, including
+ * the duplicate and unreachable paths, with no backend and no SSH.
  *
- * All request and response types come from @servrsit/contracts
- * (packages/contracts/src/servers.ts); nothing is copied locally. The
- * endpoints are CONTRACT ONLY at the moment (the API does not implement them
- * yet), so the Connect screen uses `createFixtureServersClient()`: an
- * in-memory model of the contract's state machine, with synthetic [FIXTURE]
- * data and the contract's error codes. `createServersClient()` is the real
- * HTTP client for the same interface; switching the screen to it is a
- * one-line change once Coder ships the routes. Coder owns apps/web/src/api/*
- * and may replace this file.
- *
- * Order enforced by the contract (and by the fixture): host key -> owner
- * confirms the fingerprint -> access key -> first check -> activate. Out of
- * order is STATE_CONFLICT. No call ever carries a private key or a password.
+ * Order enforced like the contract: host key -> owner confirms the fingerprint
+ * -> access key -> first check -> activate; out of order is STATE_CONFLICT.
+ * Everything is synthetic and shown under the [FIXTURE DATA] banner. No call
+ * carries a private key or a password.
  */
-import {
-  ActivateResponseSchema,
-  FirstCheckSchema,
-  ServerDraftSchema,
-  ServerRegistrationErrorSchema,
-  type ActivateResponse,
-  type FirstCheck,
-  type HostKeyConfirmRequest,
-  type ServerDraft,
-  type ServerDraftRequest,
-  type ServerRegistrationError,
-  type ServerRegistrationErrorCode,
-} from "@servrsit/contracts";
-import { csrfHeaders } from "../auth";
-import { gate } from "../../lib/fixtureState";
-
-export type ServersResult<T> =
-  | { readonly ok: true; readonly data: T }
-  | { readonly ok: false; readonly error: ServerRegistrationError | { readonly error: "NETWORK" | "INVALID_RESPONSE"; readonly reason?: undefined } };
-
-export interface ServersClient {
-  createDraft(req: ServerDraftRequest): Promise<ServersResult<ServerDraft>>;
-  getDraft(id: string): Promise<ServersResult<ServerDraft>>;
-  deleteDraft(id: string): Promise<ServersResult<null>>;
-  /** Read-only key scan. Fills hostKey. */
-  scanHostKey(id: string): Promise<ServersResult<ServerDraft>>;
-  /** The owner's typed/compared fingerprint; must equal hostKey.fingerprint exactly. */
-  confirmHostKey(id: string, body: HostKeyConfirmRequest): Promise<ServersResult<ServerDraft>>;
-  /** A key made for THIS server; only the public line is returned. */
-  issueAccessKey(id: string): Promise<ServersResult<ServerDraft>>;
-  startFirstCheck(id: string): Promise<ServersResult<FirstCheck>>;
-  getFirstCheck(id: string): Promise<ServersResult<FirstCheck>>;
-  activate(id: string): Promise<ServersResult<ActivateResponse>>;
-}
-
-// ── Real HTTP client (same interface; routes are not live yet) ───────────────
-
-interface Parser<T> { safeParse(v: unknown): { success: true; data: T } | { success: false } }
-
-export function createServersClient(fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis)): ServersClient {
-  async function call<T>(method: "GET" | "POST" | "DELETE", path: string, body: unknown, schema: Parser<T> | null): Promise<ServersResult<T>> {
-    try {
-      const r = await fetchImpl(path, {
-        method,
-        headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(method === "GET" ? {} : csrfHeaders()) },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      const text = r.status === 204 ? "" : await r.text();
-      if (text.length > 64 * 1024) return { ok: false, error: { error: "INVALID_RESPONSE" } };
-      let json: unknown = null;
-      try { json = text === "" ? null : JSON.parse(text); } catch { return { ok: false, error: { error: "INVALID_RESPONSE" } }; }
-      if (!r.ok) {
-        const e = ServerRegistrationErrorSchema.safeParse(json);
-        return e.success ? { ok: false, error: e.data } : { ok: false, error: { error: "INVALID_RESPONSE" } };
-      }
-      if (schema === null) return { ok: true, data: null as T };
-      const p = schema.safeParse(json);
-      return p.success ? { ok: true, data: p.data } : { ok: false, error: { error: "INVALID_RESPONSE" } };
-    } catch {
-      return { ok: false, error: { error: "NETWORK" } };
-    }
-  }
-  const e = encodeURIComponent;
-  return {
-    createDraft: (req) => call("POST", "/api/servers/drafts", req, ServerDraftSchema),
-    getDraft: (id) => call("GET", `/api/servers/drafts/${e(id)}`, undefined, ServerDraftSchema),
-    deleteDraft: (id) => call("DELETE", `/api/servers/drafts/${e(id)}`, undefined, null),
-    scanHostKey: (id) => call("POST", `/api/servers/drafts/${e(id)}/host-key`, undefined, ServerDraftSchema),
-    confirmHostKey: (id, body) => call("POST", `/api/servers/drafts/${e(id)}/host-key/confirm`, body, ServerDraftSchema),
-    issueAccessKey: (id) => call("POST", `/api/servers/drafts/${e(id)}/access-key`, undefined, ServerDraftSchema),
-    startFirstCheck: (id) => call("POST", `/api/servers/drafts/${e(id)}/first-check`, undefined, FirstCheckSchema),
-    getFirstCheck: (id) => call("GET", `/api/servers/drafts/${e(id)}/first-check`, undefined, FirstCheckSchema),
-    activate: (id) => call("POST", `/api/servers/drafts/${e(id)}/activate`, undefined, ActivateResponseSchema),
-  };
-}
+import type { ActivateResponse, FirstCheck, HostKeyConfirmRequest, ServerDraft, ServerDraftRequest, ServerRegistrationError, ServerRegistrationErrorCode } from "@servrsit/contracts";
+import type { ServersClient, ServersResult } from "../api/servers";
+import { gate } from "../lib/fixtureState";
 
 // ── [FIXTURE] in-memory model of the contract ────────────────────────────────
 
@@ -215,6 +136,9 @@ export function createFixtureServersClient(now: () => Date = () => new Date(), d
       if (s.finished && d.state === "checking") save({ ...d, state: "checked" });
       return { ok: true, data: s };
     },
+    // The Connect flow never renames or disconnects; the fixture has no server pages behind it.
+    async updateServer() { return fail("SERVER_NOT_FOUND"); },
+    async disconnect() { return fail("SERVER_NOT_FOUND"); },
     async activate(id) {
       await wait(delayMs);
       const d = find(id);
