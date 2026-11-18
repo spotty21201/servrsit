@@ -44,11 +44,11 @@ test("spans", () => {
   assert.equal(describeSpan(172_800), "2 days");
 });
 
-test("parseClock reads the /api/fleet body defensively", () => {
+test("parseClock validates against the contract schema", () => {
   assert.equal(parseClock({}), null);
   assert.equal(parseClock({ controlPlane: { clock: { status: "bogus" } } }), null);
-  const c = parseClock({ controlPlane: { clock: { status: "untrusted", offsetSeconds: 25200, reason: "x".repeat(500), basis: "https-date" } } });
+  assert.equal(parseClock({ controlPlane: { clock: { ...FIXTURE_CLOCKS["untrusted-fast"], reason: "x".repeat(500) } } }), null);
+  const c = parseClock({ controlPlane: { clock: FIXTURE_CLOCKS["untrusted-fast"], findings: [] } });
   assert.equal(c?.status, "untrusted");
   assert.equal(c?.offsetSeconds, 25_200);
-  assert.equal(c?.reason.length, 300);
 });

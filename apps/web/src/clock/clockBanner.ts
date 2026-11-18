@@ -12,6 +12,7 @@
  *
  * Plain wording only. No cheek: this is a failure state.
  */
+import { ControllerClockSchema } from "@servrsit/contracts";
 import type { ControllerClockView } from "./clockTypes";
 
 export const CLOCK_TOLERANCE_SECONDS = 120;
@@ -66,27 +67,13 @@ export function clockBanner(clock: ControllerClockView | null | undefined): Cloc
   };
 }
 
-/** Narrow an unknown JSON value to the clock shape, or null. Used on the raw /api/fleet body. */
+/** Read controlPlane.clock from a raw /api/fleet body with the contract schema; null when absent or invalid. */
 export function parseClock(json: unknown): ControllerClockView | null {
   if (typeof json !== "object" || json === null) return null;
   const cp = (json as { controlPlane?: unknown }).controlPlane;
   if (typeof cp !== "object" || cp === null) return null;
-  const c = (cp as { clock?: unknown }).clock;
-  if (typeof c !== "object" || c === null) return null;
-  const o = c as Record<string, unknown>;
-  const status = o["status"];
-  if (status !== "trusted" && status !== "untrusted" && status !== "not-checked") return null;
-  const offset = typeof o["offsetSeconds"] === "number" && Number.isFinite(o["offsetSeconds"]) ? o["offsetSeconds"] : null;
-  return {
-    status,
-    checkedAt: typeof o["checkedAt"] === "string" ? o["checkedAt"] : null,
-    ntpSynchronized: typeof o["ntpSynchronized"] === "boolean" ? o["ntpSynchronized"] : null,
-    offsetSeconds: offset,
-    uncertaintySeconds: typeof o["uncertaintySeconds"] === "number" ? o["uncertaintySeconds"] : null,
-    basis: o["basis"] === "https-date" || o["basis"] === "target-agreement" ? o["basis"] : "none",
-    sources: [],
-    reason: typeof o["reason"] === "string" ? o["reason"].slice(0, 300) : "",
-  };
+  const parsed = ControllerClockSchema.safeParse((cp as { clock?: unknown }).clock);
+  return parsed.success ? parsed.data : null;
 }
 
 /**
