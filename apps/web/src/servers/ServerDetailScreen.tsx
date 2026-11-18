@@ -35,7 +35,7 @@ function Fact({ label, v, children }: { label: string; v?: Shown; children?: Rea
     <div className={styles.fact}>
       <dt>{label}</dt>
       <dd>
-        {v && (v.why === null ? <span className={styles.value}>{v.value}</span> : <><span className={styles.dash} aria-label="no value">{DASH}</span> <span className={styles.why}>{v.why}</span></>)}
+        {v && (v.why === null ? <span className={styles.value}>{v.value}</span> : <><span className={styles.dash} aria-hidden="true">{DASH}</span><span className="sr-only">No value. </span> <span className={styles.why}>{v.why}</span></>)}
         {children}
       </dd>
     </div>
