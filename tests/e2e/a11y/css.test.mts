@@ -144,7 +144,12 @@ test("CSS-07 a visible focus indicator exists, is at least 2 px, and every rule 
     if (rules.some((r) => r.file === k.file && r.selector === base + ":focus-visible" && ring(r))) return "own :focus-visible outline";
     if (rules.some((r) => r.file === k.file && r.selector === base + ":focus-visible::after" && ring(r))) return "outline on ::after (stretched link)";
     if (rules.some((r) => r.file === k.file && /:focus-within/.test(r.selector) && ring(r))) return "outline on the container (:focus-within)";
-    const own = rules.find((r) => r.selector === k.selector && r.decls.some((d) => d.prop === "text-decoration-thickness") && r.decls.some((d) => d.prop === "background-color")); if (own) return "highlight + 3px underline";
+    const own = rules.find((r) => r.selector === k.selector && r.decls.some((d) => d.prop === "text-decoration-thickness") && r.decls.some((d) => d.prop === "background-color" || d.prop === "background")); if (own) return "highlight + 3px underline";
+    const cls = /\.([\w-]+):focus-visible$/.exec(k.selector)?.[1];
+    if (cls && rules.some((r) => r.file === k.file && r.selector.includes(`:has(.${cls}:focus-visible)`) && ring(r))) return "outline on the row (:has)";
+    // The skip-link target: <main tabindex=-1> is not interactive and only receives focus programmatically,
+    // so hiding its ring is the standard pattern. Allowed for exactly this selector, nothing broader.
+    if (k.selector === "main:focus" || k.selector === "main:focus-visible") return "skip-link target (non-interactive main)";
     return null;
   };
   const report = killers.map((k) => `${k.file} ${k.selector} -> ${replaced(k) ?? "NOTHING"}`);

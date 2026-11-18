@@ -16,12 +16,13 @@ import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(here, "../../../..");
+const ROOT = process.env.WEB_ROOT ?? join(here, "../../../..");
 const DIST = join(ROOT, "apps/web/dist");
 const { chromium } = createRequire(process.env.PW ?? "/tmp/pw/")("playwright-core");
 const AXE = readFileSync(join(here, "../node_modules/axe-core/axe.min.js"), "utf8");
 const ORIGIN = "http://127.0.0.1:5173";
 const OUT = process.env.OUT ?? "/tmp/a11y/browser-results.json";
+const ROOT_OVERRIDE = process.env.WEB_ROOT;
 
 // ------------------------------------------------------------------ mock API (same shapes as support/api.mts)
 const CSRF = "A".repeat(43);
@@ -70,6 +71,19 @@ const states = [
   { id: "op-unknown", path: "/operations/fixture-op-unknown", signedIn: true, ready: "h1" },
   { id: "clock-fixture", path: "/fixtures/clock", signedIn: true, ready: "h1" },
 ];
+// T-067..T-075 screens: added only when the checked-out web app has them (STATES=new runs only these).
+const NEW = [
+  { id: "server-detail", path: "/servers/11111111-1111-4111-a111-111111111111", signedIn: true, ready: "h1" },
+  { id: "server-unknown", path: "/servers/no-such-server", signedIn: true, ready: "main >> text=Server not found" },
+  { id: "connect", path: "/servers/new", signedIn: true, ready: "h1" },
+  { id: "connect-errors", path: "/servers/new", signedIn: true, ready: "h1", drive: async (p) => { await p.locator("main button[type=submit]").first().click(); await p.waitForTimeout(150); } },
+  { id: "findings", path: "/findings", signedIn: true, ready: "h1" },
+  { id: "activity", path: "/activity", signedIn: true, ready: "h1" },
+  { id: "baselines", path: "/baselines", signedIn: true, ready: "h1" },
+  { id: "settings", path: "/settings", signedIn: true, ready: "h1" },
+  { id: "overview-stress", path: "/fixtures/overview", signedIn: true, ready: "h1" },
+];
+if (existsSync(join(ROOT, "apps/web/src/settings"))) { if (process.env.STATES === "new") states.length = 0; states.push(...NEW); }
 const viewports = [
   { id: "desktop-1280", width: 1280, height: 800 }, { id: "tablet-1024", width: 1024, height: 768 }, { id: "tablet-768", width: 768, height: 1024 },
   { id: "mobile-390", width: 390, height: 844, touch: true }, { id: "narrow-320", width: 320, height: 640, touch: true },
@@ -103,10 +117,13 @@ async function tabWalk(page, max = 45) {
       return { tag: e.tagName.toLowerCase(), name: label, x: Math.round(r.x), y: Math.round(r.y + scrollY), w: Math.round(r.width), h: Math.round(r.height), outline: `${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor}`, shadow: cs.boxShadow !== "none", underline: cs.textDecorationLine, bg: cs.backgroundColor,
         // a control whose ring is drawn by a container (:focus-within), e.g. the Ask ServrSit console
         // WCAG 2.4.11 (AA, 2.2): is the focused control hidden under a sticky or fixed element that does not contain it?
-        obscured: (() => { const f = e.getBoundingClientRect(); if (!f.width || !f.height) return 0; let worst = 0;
-          for (const o of document.querySelectorAll("body *")) { const k = getComputedStyle(o); if ((k.position !== "sticky" && k.position !== "fixed") || o.contains(e) || e.contains(o)) continue;
-            const r = o.getBoundingClientRect(); const w = Math.min(f.right, r.right) - Math.max(f.left, r.left); const h = Math.min(f.bottom, r.bottom) - Math.max(f.top, r.top);
-            if (w > 0 && h > 0) worst = Math.max(worst, (w * h) / (f.width * f.height)); } return Math.round(worst * 100); })(),
+        // WCAG 2.4.11: sample 9 points of the focused box and ask the browser which element is on top at each
+        // (respects z-index and stacking). Percent of points where something that is not the control covers it.
+        obscured: (() => { const f = e.getBoundingClientRect(); if (!f.width || !f.height) return 0; let hidden = 0, n = 0;
+          for (const fx of [0.15, 0.5, 0.85]) for (const fy of [0.15, 0.5, 0.85]) { const x = f.left + f.width * fx, y = f.top + f.height * fy;
+            if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue; n++; const top = document.elementFromPoint(x, y);
+            if (top && top !== e && !e.contains(top) && !top.contains(e)) hidden++; }
+          return n ? Math.round((hidden / n) * 100) : 0; })(),
         container: (() => { const c = e.closest("[class*=console]"); if (!c) return null; const k = getComputedStyle(c); return `${k.outlineStyle} ${k.outlineWidth} ${k.outlineColor}`; })() };
     });
     if (!s) break; const key = `${s.tag}|${s.name}|${s.x}|${s.y}`;
@@ -131,7 +148,7 @@ for (const vp of viewports) for (const st0 of states) {
   await wire(page, st);
   try {
     await page.goto(ORIGIN + st.path, { waitUntil: "networkidle" });
-    if (st.ready) await page.waitForSelector(st.ready, { timeout: 5000 }); else await page.waitForSelector("h1", { timeout: 5000 });
+    await page.waitForSelector(st.ready ?? "h1", { timeout: 5000 });
     if (st.drive) await st.drive(page);
     await page.waitForTimeout(150);
     const m = await measure(page);

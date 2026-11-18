@@ -1,0 +1,749 @@
+{
+ "auth-checking": {
+  "violations": [],
+  "incomplete": [
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 26,
+  "title": "Checking your session \u00b7 ServrSit",
+  "h1": [
+   "ServrSit"
+  ]
+ },
+ "auth-unreachable": {
+  "violations": [],
+  "incomplete": [
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 28,
+  "title": "Can't reach ServrSit \u00b7 ServrSit",
+  "h1": [
+   "Can't reach ServrSit"
+  ]
+ },
+ "auth-password": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 32,
+  "title": "Sign in \u00b7 ServrSit",
+  "h1": [
+   "Sign in"
+  ]
+ },
+ "auth-password-error": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 32,
+  "title": "Sign in \u00b7 ServrSit",
+  "h1": [
+   "Sign in"
+  ]
+ },
+ "auth-lockout": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 32,
+  "title": "Sign in \u00b7 ServrSit",
+  "h1": [
+   "Sign in"
+  ]
+ },
+ "auth-code": {
+  "violations": [],
+  "incomplete": [
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 32,
+  "title": "Sign in: enter your code \u00b7 ServrSit",
+  "h1": [
+   "Enter your code"
+  ]
+ },
+ "auth-code-error": {
+  "violations": [],
+  "incomplete": [
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 32,
+  "title": "Sign in: enter your code \u00b7 ServrSit",
+  "h1": [
+   "Enter your code"
+  ]
+ },
+ "auth-recovery": {
+  "violations": [],
+  "incomplete": [
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 32,
+  "title": "Sign in: recovery code \u00b7 ServrSit",
+  "h1": [
+   "Use a recovery code"
+  ]
+ },
+ "auth-notice-signed-out": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 30,
+  "title": "Signed out, sign in \u00b7 ServrSit",
+  "h1": [
+   "Sign in"
+  ]
+ },
+ "auth-notice-expired": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 30,
+  "title": "Session ended, sign in \u00b7 ServrSit",
+  "h1": [
+   "Sign in"
+  ]
+ },
+ "setup-details": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Set up ServrSit: account \u00b7 ServrSit",
+  "h1": [
+   "Set up ServrSit"
+  ]
+ },
+ "setup-weak-password": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Set up ServrSit: account \u00b7 ServrSit",
+  "h1": [
+   "Set up ServrSit"
+  ]
+ },
+ "setup-error": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Set up ServrSit: account \u00b7 ServrSit",
+  "h1": [
+   "Set up ServrSit"
+  ]
+ },
+ "setup-enrol": {
+  "violations": [],
+  "incomplete": [
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 36,
+  "title": "Set up ServrSit: authenticator \u00b7 ServrSit",
+  "h1": [
+   "Add your authenticator"
+  ]
+ },
+ "setup-enrol-error": {
+  "violations": [],
+  "incomplete": [
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 36,
+  "title": "Set up ServrSit: authenticator \u00b7 ServrSit",
+  "h1": [
+   "Add your authenticator"
+  ]
+ },
+ "setup-codes": {
+  "violations": [],
+  "incomplete": [
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "Set up ServrSit: recovery codes \u00b7 ServrSit",
+  "h1": [
+   "Save your recovery codes"
+  ]
+ },
+ "overview": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 39,
+  "title": "Overview \u00b7 ServrSit",
+  "h1": [
+   "Your servers"
+  ]
+ },
+ "clock-fixture": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 31,
+  "title": "Clock banner states (fixture) \u00b7 ServrSit",
+  "h1": [
+   "Clock banner states"
+  ]
+ },
+ "overview-api-down": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 38,
+  "title": "Overview \u00b7 ServrSit",
+  "h1": [
+   "Your servers"
+  ]
+ },
+ "plan-ready": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Plan review: Update packages on Fixture Nabire \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Nabire"
+  ]
+ },
+ "plan-production": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 38,
+  "title": "Plan review: Update packages on Fixture Timika \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "plan-lost": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Plan review: Update packages on Fixture Merauke \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Merauke"
+  ]
+ },
+ "plan-changed": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Plan review: Update packages on Fixture Nabire \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Nabire"
+  ]
+ },
+ "plan-expired": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Plan review: Update packages on Fixture Nabire (This plan expired) \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Nabire"
+  ]
+ },
+ "plan-busy": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Plan review: Update packages on Fixture Sentani (This plan can't be approved) \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Sentani"
+  ]
+ },
+ "plan-writes-off": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Plan review: Update packages on Fixture Timika (Changes are switched off) \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "plan-production-acknowledged": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 38,
+  "title": "Plan review: Update packages on Fixture Timika \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "plan-production-submitting": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 38,
+  "title": "Plan review: Update packages on Fixture Timika \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-queued": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Update packages on Fixture Timika: Waiting to start \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-running": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Update packages on Fixture Timika: Working on Fixture Timika \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-running-stop": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Update packages on Fixture Timika: Working on Fixture Timika \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-verifying": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Update packages on Fixture Timika: Checking the result \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-succeeded": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Update packages on Fixture Timika: Completed and verified \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-succeeded-reboot": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Update packages on Fixture Timika: Completed and verified \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-partial": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Update packages on Fixture Timika: Some work completed \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-failed": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Update packages on Fixture Timika: Could not complete \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-cancelled": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Update packages on Fixture Timika: Cancelled \u2014 no work started \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-unknown": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Update packages on Fixture Timika: Result not yet confirmed \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "op-running-transcript-open": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 35,
+  "title": "Update packages on Fixture Timika: Working on Fixture Timika \u00b7 ServrSit",
+  "h1": [
+   "Update packages on Fixture Timika"
+  ]
+ },
+ "server-detail": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "Fixture One: server detail \u00b7 ServrSit",
+  "h1": [
+   "Fixture One"
+  ]
+ },
+ "server-detail-unreachable": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "Fixture Two: server detail \u00b7 ServrSit",
+  "h1": [
+   "Fixture Two"
+  ]
+ },
+ "server-detail-settings": {
+  "violations": [],
+  "incomplete": [
+   "aria-prohibited-attr",
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "Fixture One: server detail \u00b7 ServrSit",
+  "h1": [
+   "Fixture One"
+  ]
+ },
+ "server-detail-unknown": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 29,
+  "title": "Server not found \u00b7 ServrSit",
+  "h1": []
+ },
+ "connect-0": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 38,
+  "title": "Connect a server: step 1 of 4, Meet the server \u00b7 ServrSit",
+  "h1": [
+   "Connect a server"
+  ]
+ },
+ "connect-0-errors": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 38,
+  "title": "Connect a server: step 1 of 4, Meet the server \u00b7 ServrSit",
+  "h1": [
+   "Connect a server"
+  ]
+ },
+ "connect-1": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 38,
+  "title": "Connect a server: step 1 of 4, Meet the server \u00b7 ServrSit",
+  "h1": [
+   "Connect a server"
+  ]
+ },
+ "connect-2": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 38,
+  "title": "Connect a server: step 1 of 4, Meet the server \u00b7 ServrSit",
+  "h1": [
+   "Connect a server"
+  ]
+ },
+ "connect-3": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 38,
+  "title": "Connect a server: step 1 of 4, Meet the server \u00b7 ServrSit",
+  "h1": [
+   "Connect a server"
+  ]
+ },
+ "findings": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "Findings \u00b7 ServrSit",
+  "h1": [
+   "Findings"
+  ]
+ },
+ "findings-acknowledge": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 34,
+  "title": "Findings \u00b7 ServrSit",
+  "h1": [
+   "Findings"
+  ]
+ },
+ "activity": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 37,
+  "title": "Activity \u00b7 ServrSit",
+  "h1": [
+   "Activity"
+  ]
+ },
+ "activity-search-empty": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 37,
+  "title": "Activity \u00b7 ServrSit",
+  "h1": [
+   "Activity"
+  ]
+ },
+ "baselines-0": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 31,
+  "title": "Baselines: step 1 of 4, Choose reference \u00b7 ServrSit",
+  "h1": [
+   "Baselines and server setup"
+  ]
+ },
+ "baselines-1": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 31,
+  "title": "Baselines: step 1 of 4, Choose reference \u00b7 ServrSit",
+  "h1": [
+   "Baselines and server setup"
+  ]
+ },
+ "baselines-2": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 31,
+  "title": "Baselines: step 1 of 4, Choose reference \u00b7 ServrSit",
+  "h1": [
+   "Baselines and server setup"
+  ]
+ },
+ "baselines-3": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 31,
+  "title": "Baselines: step 1 of 4, Choose reference \u00b7 ServrSit",
+  "h1": [
+   "Baselines and server setup"
+  ]
+ },
+ "settings": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 31,
+  "title": "Settings \u00b7 ServrSit",
+  "h1": [
+   "Settings"
+  ]
+ },
+ "overview-list": {
+  "violations": [],
+  "incomplete": [
+   "label-content-name-mismatch",
+   "landmark-one-main",
+   "page-has-heading-one"
+  ],
+  "rulesPassed": 39,
+  "title": "Overview stress fixture (6 servers) \u00b7 ServrSit",
+  "h1": [
+   "Your servers"
+  ]
+ }
+}

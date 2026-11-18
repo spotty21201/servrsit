@@ -57,7 +57,7 @@ async function toEnrol(o: Record<string, Handler> = {}): Promise<Opened> {
 const planIds = ["ready", "production", "lost", "changed", "expired", "busy", "writes-off"];
 const opIds = ["queued", "running", "running-stop", "verifying", "succeeded", "succeeded-reboot", "partial", "failed", "cancelled", "unknown"];
 
-export const states: State[] = [
+const baseStates: State[] = [
   // ---------------------------------------------------------------- sign-in
   { id: "auth-checking", group: "auth", label: "checking the session", async open() { return app("/", { "GET /api/auth/session": () => "hang" }); } },
   { id: "auth-unreachable", group: "auth", label: "API unreachable", async open() { const x = await app("/", { "GET /api/auth/session": () => "network-error" }); await waitFor(() => /Can.t reach/.test(document.body.textContent ?? ""), "unreachable"); return x; } },
@@ -121,3 +121,6 @@ export const states: State[] = [
     const x = await app("/operations/fixture-op-running", authed); await waitFor(() => !!$("summary, button[aria-expanded]"), "transcript control");
     const t = $("summary, button[aria-expanded]")!; await click(t); await settle(); return x; } },
 ];
+
+import { states2 } from "./states2.mts";
+export const states: State[] = [...baseStates, ...states2];

@@ -30,5 +30,7 @@ export function installDom(url = "http://127.0.0.1:5173/"): InstanceType<typeof 
     define(k, k === "window" ? dom.window : w[k]);
   }
   define("IS_REACT_ACT_ENVIRONMENT", true);
+  // jsdom has no layout, so no scrollIntoView. A no-op that records the call; the browser pass checks the real behaviour.
+  (dom.window as any).HTMLElement.prototype.scrollIntoView = function (this: Element) { ((globalThis as any).__scrolledTo ??= []).push(this.id || this.tagName); };
   return dom;
 }

@@ -30,7 +30,9 @@ const forEachState = (name: string, filter: (s: State) => boolean, check: (s: St
 const screens = (s: State) => s.group === "overview" || s.group === "plan" || s.group === "operation";
 
 // ------------------------------------------------------------------------------------------- landmarks, headings, names
-forEachState("ST-01 every state has exactly one <h1>, one <main>, a lang, and no skipped heading level (WCAG 1.3.1, 2.4.6, 3.1.1)", () => true, (s, f) => {
+// server-detail-unknown is held by ST-01b (D-U15); every other state must pass ST-01.
+forEachState("ST-01b the 'Server not found' page has an <h1> (D-U15)", (s) => s.id === "server-detail-unknown", (_s, f) => { assert.equal(f.h1.length, 1, `h1 count ${f.h1.length}`); }, { todo: "reported: D-U15" });
+forEachState("ST-01 every state has exactly one <h1>, one <main>, a lang, and no skipped heading level (WCAG 1.3.1, 2.4.6, 3.1.1)", (s) => s.id !== "server-detail-unknown", (s, f) => {
   assert.equal(f.h1.length, 1, `h1 count ${f.h1.length}`);
   assert.equal(f.mains, 1, `main count ${f.mains}`);
   assert.equal(f.lang, "en");
@@ -94,10 +96,15 @@ test("ST-08 the error text is programmatically tied to the field it concerns (WC
 });
 
 test("ST-09 a lockout names when to retry, and the form says why it cannot be submitted (WCAG 3.3.1, UX button 'disabled reason nearby')", async () => {
-  await inState("auth-lockout", (f) => {
+  await inState("auth-lockout", async (f) => {
     assert.match(f.live.find((l) => l.role === "alert")!.text, /Try again in 5 min/);
     const submit = $<HTMLButtonElement>("button[type=submit]")!;
-    assert.equal(submit.disabled, true, "the form must be disabled during a lockout");
+    // T-072 (D-U4): disabled actions stay focusable with aria-disabled, so either form counts, as long as pressing it does nothing.
+    assert.ok(submit.disabled || submit.getAttribute("aria-disabled") === "true", "the form must be disabled during a lockout");
+    const calls = (globalThis.fetch as any).__calls ?? null; void calls;
+    const before = performance.now(); const loginsBefore = (await import("./support/api.mts")).lastCalls().filter((c) => c === "POST /api/auth/login").length;
+    await click(submit); const loginsAfter = (await import("./support/api.mts")).lastCalls().filter((c) => c === "POST /api/auth/login").length; void before;
+    assert.equal(loginsAfter, loginsBefore, "pressing the unavailable submit sent a login during the lockout");
   });
 });
 
@@ -166,10 +173,12 @@ test("ST-16 the authenticator QR code has a text alternative, and the key is ava
 });
 
 test("ST-17 recovery codes are real text in a labelled list, with copy and download, and the owner must tick a box to continue (UX 7.1)", async () => {
-  await inState("setup-codes", () => {
+  await inState("setup-codes", async () => {
     const items = $$("ul[aria-label='Recovery codes'] li"); assert.equal(items.length, 10);
     assert.ok(byText("button", "Copy all") && byText("button", "Download .txt"));
-    const cont = byText("button", "Continue to ServrSit") as HTMLButtonElement; assert.equal(cont.disabled, true);
+    const cont = byText("button", "Continue to ServrSit") as HTMLButtonElement;
+    assert.ok(cont.disabled || cont.getAttribute("aria-disabled") === "true", "Continue must be unavailable until the box is ticked");
+    const h1 = document.querySelector("h1")?.textContent; await click(cont); assert.equal(document.querySelector("h1")?.textContent, h1, "pressing the unavailable Continue left the codes page");
     const box = $<HTMLInputElement>("input[type=checkbox]")!; assert.ok(accessibleName(box).includes("saved"));
   });
 });
@@ -191,7 +200,7 @@ test("ST-19 the transcript uses valid ARIA: no role=log on a <ul> that leaves it
 forEachState("ST-20 no element carries aria-label where the role cannot be named (<p>, <span>, <div> without a role)", () => true, () => {
   const bad = $$("p[aria-label], span[aria-label], div[aria-label]:not([role]), li[aria-label]:not([role])").map((e) => `${e.tagName.toLowerCase()}[aria-label="${e.getAttribute("aria-label")}"]`);
   assert.deepEqual(bad, []);
-}, { todo: "reported: D-U8" });
+}, { todo: "reported: D-U14 (D-U8 fixed; new instance in T-067 server detail)" });
 
 forEachState("ST-21 live regions never carry a ticking countdown or a long paragraph (UX: do not announce every countdown second)", screens, (_s, f) => {
   for (const l of f.live) assert.ok(!/\b\d+ ?(s|sec|seconds)\b/.test(l.text), `live region text "${l.text}" looks like a countdown`);

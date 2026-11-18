@@ -23,9 +23,12 @@ function server(id: string, name: string, status: string, latestAttempt: unknown
 }
 
 export interface Installed { calls: string[]; restore(): void }
+let current: string[] = [];
+/** Calls recorded by the most recently installed fake API. */
+export const lastCalls = (): string[] => current;
 
 export function installFetch(overrides: Record<string, Handler> = {}): Installed {
-  const calls: string[] = [];
+  const calls: string[] = []; current = calls;
   const original = globalThis.fetch;
   const defaults: Record<string, Handler> = {
     "GET /api/auth/session": () => ({ json: { authenticated: false } }),
