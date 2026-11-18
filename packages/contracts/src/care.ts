@@ -8,6 +8,21 @@ import { z } from "zod";
 
 export const CARE_OPERATIONS = ["apply.packages.v1"] as const;
 
+/**
+ * T-057 (UX Spec §10.2): a production approval needs BOTH of these owner
+ * confirmations, each shown as its own unselected control with this exact
+ * text. They are recorded as the owner's confirmation, never as "backup
+ * verified".
+ */
+export const ACK_RECOVERY_ROUTE = "recovery-route-confirmed" as const;
+export const ACK_INTERRUPTION_RISK = "interruption-risk-understood" as const;
+export const PRODUCTION_ACKNOWLEDGEMENTS = [ACK_RECOVERY_ROUTE, ACK_INTERRUPTION_RISK] as const;
+export type ProductionAcknowledgement = (typeof PRODUCTION_ACKNOWLEDGEMENTS)[number];
+export const PRODUCTION_ACKNOWLEDGEMENT_TEXT: Readonly<Record<ProductionAcknowledgement, string>> = {
+  [ACK_RECOVERY_ROUTE]: "I have a way to recover this server if the change goes wrong (for example the provider's console or a snapshot).",
+  [ACK_INTERRUPTION_RISK]: "I understand this change can interrupt the services on this production server while it runs.",
+};
+
 export const PlanRequestSchema = z
   .object({
     operation: z.enum(CARE_OPERATIONS),

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   assertTransition, buildManifest, buildPlan, canonicalJson, CanonicalizationError, createSigner,
-  digestOf, isExpired, isSupportedOperation, PLAN_TTL_MS, PRODUCTION_ACK, signManifest,
+  digestOf, isExpired, isSupportedOperation, PLAN_TTL_MS, PRODUCTION_ACK, PRODUCTION_ACKS, signManifest,
   TransitionError, verifyManifestSignature, verifyPlanDigest, type OpState, type TransactionPreview,
 } from "./index.js";
 
@@ -73,8 +73,10 @@ test("expiry", () => {
   assert.equal(isExpired(p, new Date(NOW.getTime() + PLAN_TTL_MS)), true);
 });
 
-test("production servers require an explicit production acknowledgement", () => {
-  assert.deepEqual(plan().requiredAcknowledgements, [PRODUCTION_ACK]);
+test("T-057: production servers require both acknowledgements: a recovery route and the interruption risk", () => {
+  assert.deepEqual(plan().requiredAcknowledgements, ["recovery-route-confirmed", "interruption-risk-understood"]);
+  assert.deepEqual([...PRODUCTION_ACKS], ["recovery-route-confirmed", "interruption-risk-understood"]);
+  assert.equal(PRODUCTION_ACK, "recovery-route-confirmed", "the deprecated single constant is one of the two, not enough alone");
   assert.deepEqual(plan({ server: { ...server, production: false } }).requiredAcknowledgements, []);
 });
 

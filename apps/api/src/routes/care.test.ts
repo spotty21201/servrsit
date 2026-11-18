@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createSigner, PRODUCTION_ACK } from "@servrsit/domain";
+import { createSigner, PRODUCTION_ACK, PRODUCTION_ACKS } from "@servrsit/domain";
 import { MemoryIntentStore, SqliteCareStore } from "@servrsit/store";
 import { Dispatcher, SimulatedTarget, type WriteTarget } from "@servrsit/worker";
 import { buildServer } from "../server.js";
@@ -202,14 +202,20 @@ test("invariant 4 via the API: a stale version, a wrong digest and an expired pl
   } finally { await h.app.close(); }
 });
 
-test("production servers require the explicit production acknowledgement", async () => {
+test("T-057: production servers require both acknowledgements (recovery route and interruption risk)", async () => {
   const h = await start({ production: true });
   try {
     const p = await h.plan();
-    assert.deepEqual(p.requiredAcknowledgements, [PRODUCTION_ACK]);
+    assert.deepEqual(p.requiredAcknowledgements, [...PRODUCTION_ACKS]);
     const r = await h.approve(p);
     assert.deepEqual([r.statusCode, r.json()], [422, { error: "ACK_REQUIRED" }]);
-    assert.equal((await h.approve(p, { acknowledgements: [PRODUCTION_ACK] })).statusCode, 201);
+    // T-057: one of the two is not enough, whichever it is.
+    for (const one of PRODUCTION_ACKS) {
+      const r1 = await h.approve(p, { acknowledgements: [one] });
+      assert.deepEqual([r1.statusCode, r1.json()], [422, { error: "ACK_REQUIRED" }], one);
+    }
+    assert.deepEqual((await h.approve(p, { acknowledgements: [PRODUCTION_ACK] })).statusCode, 422, "the old single constant alone is refused");
+    assert.equal((await h.approve(p, { acknowledgements: [...PRODUCTION_ACKS] })).statusCode, 201);
   } finally { await h.app.close(); }
 });
 

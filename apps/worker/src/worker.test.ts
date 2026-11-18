@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { buildManifest, buildPlan, createSigner, PRODUCTION_ACK, signManifest, type Plan } from "@servrsit/domain";
+import { buildManifest, buildPlan, createSigner, PRODUCTION_ACKS, signManifest, type Plan } from "@servrsit/domain";
 import { MemoryIntentStore, SqliteCareStore, type StoredOperation } from "@servrsit/store";
 import { Dispatcher, SimulatedTarget, SshWriteTarget, WritesDisabledError, type WriteTarget } from "./index.js";
 
@@ -50,7 +50,7 @@ async function harness(opts: { writesEnabled?: boolean; production?: boolean; ta
   store.insertPlan(plan);
   const approved = store.approve({
     planId: plan.id, planVersion: 1, planDigest: plan.digest, idempotencyKey: "k1", owner: "owner",
-    acknowledgements: opts.production ? [PRODUCTION_ACK] : [], writesEnabled: true,
+    acknowledgements: opts.production ? [...PRODUCTION_ACKS] : [], writesEnabled: true,
     targetKind: opts.target === "ssh" ? "ssh" : "simulated", now: clock.now(), newId: () => randomUUID(),
   });
   if (approved.kind !== "created") throw new Error(`approval failed: ${JSON.stringify(approved)}`);

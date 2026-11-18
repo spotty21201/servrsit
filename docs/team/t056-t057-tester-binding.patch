@@ -1,0 +1,30 @@
+--- a/tests/e2e/care-loop/binding.mts
++++ b/tests/e2e/care-loop/binding.mts
+@@ -34,7 +34,7 @@
+ 
+ type App = Awaited<ReturnType<typeof buildServer>>;
+ import { Dispatcher, SimulatedTarget, TransportError, type WriteTarget } from "../../../apps/worker/src/index.ts";
+-import { createSigner, PRODUCTION_ACK } from "../../../packages/domain/src/index.ts";
++import { createSigner, PRODUCTION_ACKS } from "../../../packages/domain/src/index.ts";
+ import { MemoryIntentStore, SqliteAuthStore, SqliteCareStore, type OperationEvent, type StoredOperation } from "../../../packages/store/src/index.ts";
+ import {
+   ACK_RECOVERY,
+@@ -79,6 +79,8 @@
+   removalInPreview = false;
+   private seq = 0;
+   constructor(readonly sim: SimulatedTarget, serverId: string) { this.serverId = serverId; this.hostKeyFingerprint = (sim as unknown as { hostKeyFingerprint: string }).hostKeyFingerprint; }
++  /** T-056: forward the simulated machine's identity (host key + machine id). */
++  identity() { return this.sim.identity(); }
+ 
+   private rec(kind: Interaction["kind"], opId?: string): void { this.log.push({ seq: ++this.seq, kind, opId }); }
+ 
+@@ -289,7 +291,8 @@
+       planVersion: i.version,
+       ...(i.digest === undefined ? {} : { planDigest: i.digest }),
+       idempotencyKey: sha(i.idempotencyKey).slice(0, 32),
+-      acknowledgements: acks.includes(ACK_RECOVERY) && acks.includes(ACK_RISK) ? [PRODUCTION_ACK] : [],
++      // T-057: each abstract acknowledgement maps to its own product acknowledgement (both are required).
++      acknowledgements: [...(acks.includes(ACK_RECOVERY) ? [PRODUCTION_ACKS[0]!] : []), ...(acks.includes(ACK_RISK) ? [PRODUCTION_ACKS[1]!] : [])],
+       ...(i.extra ?? {}),
+     };
+     const r = await this.http("POST", `/api/plans/${i.planId}/approvals`, body, headers, { session: i.session !== "none", csrf: false });

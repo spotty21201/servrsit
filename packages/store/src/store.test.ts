@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import { buildPlan, PRODUCTION_ACK, TransitionError, type Plan, type TransactionPreview } from "@servrsit/domain";
+import { buildPlan, PRODUCTION_ACKS, TransitionError, type Plan, type TransactionPreview } from "@servrsit/domain";
 import { FileIntentStore, IntentConflictError, SqliteCareStore } from "./index.js";
 
 const NOW = new Date("2026-11-17T10:00:00.000Z");
@@ -30,7 +30,7 @@ function makePlan(over: Partial<Parameters<typeof buildPlan>[0]> = {}): Plan {
 
 const approveArgs = (plan: Plan, over: Record<string, unknown> = {}) => ({
   planId: plan.id, planVersion: plan.version, planDigest: plan.digest, idempotencyKey: "key-1",
-  owner: "owner-1", acknowledgements: [PRODUCTION_ACK], writesEnabled: true, targetKind: "simulated" as const,
+  owner: "owner-1", acknowledgements: [...PRODUCTION_ACKS], writesEnabled: true, targetKind: "simulated" as const,
   now: new Date(NOW.getTime() + 60_000), newId: () => randomUUID(), ...over,
 });
 

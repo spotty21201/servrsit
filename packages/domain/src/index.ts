@@ -9,6 +9,7 @@ export {
   PLAN_TTL_MS,
   planDigest,
   PRODUCTION_ACK,
+  PRODUCTION_ACKS,
   verifyPlanDigest,
 } from "./plan.js";
 export type { Blocker, BlockerCode, BuildPlanInput, ExcludedPackage, PackageChange, Plan, PlanServer, TransactionPreview } from "./plan.js";

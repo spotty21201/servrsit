@@ -15,7 +15,7 @@
  * (invariant 5: those need their own plans and approvals).
  */
 
-import { isUbuntuArchiveOrigin } from "@servrsit/contracts";
+import { ACK_RECOVERY_ROUTE, isUbuntuArchiveOrigin, PRODUCTION_ACKNOWLEDGEMENTS } from "@servrsit/contracts";
 import { digestOf } from "./canonical.js";
 import type { IdentityStatus } from "./identity.js";
 import type { OperationId } from "./catalog.js";
@@ -142,7 +142,13 @@ export interface Plan {
   readonly digest: string;
 }
 
-export const PRODUCTION_ACK = "production-impact" as const;
+/** T-057: both are required for a production server (UX Spec §10.2). */
+export const PRODUCTION_ACKS: readonly string[] = PRODUCTION_ACKNOWLEDGEMENTS;
+/**
+ * @deprecated Before T-057 there was one production acknowledgement. Kept so older imports load;
+ * on its own it no longer satisfies a production approval. Use PRODUCTION_ACKS.
+ */
+export const PRODUCTION_ACK = ACK_RECOVERY_ROUTE;
 
 const PACKAGE_NAME = /^[a-z0-9][a-z0-9+.-]{0,99}$/;
 const ARCH = /^[a-z0-9_-]{1,20}$/;
@@ -226,7 +232,7 @@ export function buildPlan(input: BuildPlanInput): Plan {
     verification: {
       expectInstalled: Object.fromEntries(packages.map((c) => [`${c.name}:${c.arch}`, c.to])),
     },
-    requiredAcknowledgements: input.server.production ? [PRODUCTION_ACK] : [],
+    requiredAcknowledgements: input.server.production ? [...PRODUCTION_ACKS] : [],
     createdAt: input.now.toISOString(),
     expiresAt: new Date(input.now.getTime() + PLAN_TTL_MS).toISOString(),
     blockers,
