@@ -1297,3 +1297,42 @@ Tester gate, their files unchanged (temporary copy, removed): zt01-real-hosts 12
 1. **Merge order:** `feat/coder/package-origins` contains T-061 and T-062 and does not depend on T-053, so it can merge before it. Both it and `feat/coder/owner-auth` append to this handoff file, so merging the second one has a trivial conflict at the end of the file: keep both sections.
 2. **Sentani's clock is 7 h slow.** Fixing it is a change on the server (time sync), which only the founder may authorize. ServrSit now corrects package ages for it and shows a warning.
 3. **Next in my queue:** T-054 through T-059 (not started). ZT-01 and the route inventory remain the standing gate.
+
+## T-066: auth defects D-A1..D-A4 (commit `41676cc`, branch `feat/coder/owner-auth`)
+
+Details are in ADR-017, "Amended by T-066".
+
+- **D-A1 (rate limit):** counted only after the body is valid, per source. A source is the trusted-device cookie (`servrsit_device`, set after a full sign-in), or else the address.
+- **D-A2 (lockout):**
+  - per source: 30 s doubling to 15 min;
+  - account: locks only on 20 failures in 15 min, for 15 min, escalating to 4 h, reset by the owner's sign-in;
+  - **trusted devices are exempt from the account lock**;
+  - one failure at expiry no longer extends a lock.
+- **D-A3 / D-A3b (clock steps):** stored times implausibly in the future are stale, so locks are released, sessions end and tickets expire. A future TOTP step is clamped. **Enrolment is refused while ServrSit's own clock is untrusted** (`CLOCK_UNTRUSTED`, 409). With Merauke 7 h fast, setup now says so plainly instead of failing at the code step.
+- **D-A4 (setup token):** valid until enrolment is confirmed.
+
+**Checks run (real output):**
+
+```
+pnpm -r test -> exit 0 (api 176 incl. auth 18 + auth-t066 11, web 81, ai 145); typecheck all 10 exit 0; key scan clean
+Tester, current files (temporary copy, not committed):
+  auth-extra: the five todo tests X-05, X-14, X-17, X-18, X-19 now PASS
+  routes-401 7/7, zt01 12/12, static-config 3/3, care-loop 36/5/1 (unchanged; F2-F5)
+```
+
+**Tester tests that now conflict on purpose:** they recorded the old behaviour, or the opposite of the T-066 decision.
+
+| Test | Why it now fails | Suggested change |
+|---|---|---|
+| AU-04b "lock not bypassed by another address" | D-A2: locks are per source by decision. | Assert that the account lock holds after 20 failures across addresses, and that a trusted device is exempt. |
+| X-04 "anonymous caller can lock the owner out" | It recorded the defect, and the owner is no longer locked by 6 failures. | Invert it, or retire it. |
+| X-05b "garbage counts toward the limit" | D-A1: invalid bodies are not counted. | Use valid-shaped wrong logins from one address. |
+| X-17b "premise: stuck after the step back" | The step-back lock-out is fixed. | Retire it. |
+
+Please remove the `todo` markers on X-05, X-14, X-17, X-18 and X-19 so they guard the fixes (Tester-owned files).
+
+**Limits:**
+
+- The owner on a new, untrusted browser can still be held by an account lock driven from many addresses. Their trusted browsers are not affected.
+- Clamping treats a clock step back of more than 16 min as stale state. A smaller step back extends a lock by that small amount.
+- O-A3 (Secure cookies on plain-HTTP Tailscale in production mode) is not addressed. It needs a browser test.

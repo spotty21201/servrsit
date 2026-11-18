@@ -166,7 +166,11 @@ export async function buildServer(options: BuildServerOptions = {}) {
   // needs a session, and every state-changing one also needs Origin + CSRF.
   // ---------------------------------------------------------------------------
   await fastify.register(fastifyCookie);
+  // T-066 D-A3: enrolment is refused while ServrSit's own clock is untrusted. The clock source is
+  // wired below, after the fleet service exists, so it is read through this late-bound function.
+  let clockStatus: () => string = () => "not-checked";
   const auth = new OwnerAuth({
+    clockTrusted: () => clockStatus() !== "untrusted",
     store: options.auth?.store ?? new SqliteAuthStore({ path: ":memory:" }),
     now: options.auth?.now,
     onSetupToken: options.auth?.onSetupToken,
@@ -196,6 +200,7 @@ export async function buildServer(options: BuildServerOptions = {}) {
       ...(clockMonitor === null ? {} : { controllerClock: () => clockMonitor.current() }),
     });
   const controllerClock = () => (mode === "fixture" ? NOT_CHECKED_CLOCK : service.controlPlane().clock);
+  clockStatus = () => controllerClock().status;
   await fastify.register(fleetPlugin, { mode, service, config });
   await fastify.register(assistantRoutes, {
     assistant: options.assistant ?? createAssistant(resolveAiConfig({ AI_PROVIDER: "none" })),

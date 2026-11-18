@@ -113,15 +113,16 @@ test("an unauthenticated POST gets 401 before any CSRF or validation answer", as
 
 // ---- setup ------------------------------------------------------------------------
 
-test("setup: the token works once; after enrolment setup is closed and a restart issues no new token", async () => {
+test("setup: the token works until enrolment is confirmed; after that setup is closed and a restart issues no new token", async () => {
   const store = new SqliteAuthStore({ path: ":memory:" });
   const h = await start({ store });
   try {
     const token = h.sink.token();
     const body = { setupToken: token, username: TEST_USERNAME, password: TEST_PASSWORD };
     assert.equal((await h.post("/api/auth/setup", body)).statusCode, 200);
+    // T-066 D-A4: until setup is confirmed, the same token can restart an abandoned enrolment.
     const again = await h.post("/api/auth/setup", body);
-    assert.deepEqual([again.statusCode, errorOf(again)], [403, "SETUP_UNAVAILABLE"], "the same token is refused the second time");
+    assert.equal(again.statusCode, 200, "the token restarts enrolment until it is confirmed");
     const wrong = await h.post("/api/auth/setup", { ...body, setupToken: "x".repeat(43) });
     assert.deepEqual([wrong.statusCode, errorOf(wrong)], [403, "SETUP_UNAVAILABLE"], "a wrong token gets the same answer");
 

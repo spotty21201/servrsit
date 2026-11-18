@@ -39,8 +39,18 @@ export const ABSOLUTE_TIMEOUT_MS = 8 * 60 * 60 * 1000;
 export const MFA_TICKET_MS = 5 * 60 * 1000;
 export const ENROLMENT_MS = 15 * 60 * 1000;
 export const MAX_TICKET_ATTEMPTS = 5;
-/** Failures allowed before the first lock. */
+/** Failures from one source (address or trusted device) before that source is locked. */
 export const LOCKOUT_THRESHOLD = 5;
+/** T-066 D-A2: the account itself locks only on sustained failures from all sources together. */
+export const ACCOUNT_LOCK_THRESHOLD = 20;
+export const ACCOUNT_WINDOW_MS = 15 * 60 * 1000;
+/** First account lock; each further account lock doubles, up to ACCOUNT_LOCK_MAX_MS, until the owner signs in. */
+export const ACCOUNT_LOCK_MS = 15 * 60 * 1000;
+export const ACCOUNT_LOCK_MAX_MS = 4 * 60 * 60 * 1000;
+/** T-066 D-A1/D-A2: a browser that completed a full sign-in keeps its own allowance. */
+export const TRUSTED_DEVICE_MS = 90 * 24 * 60 * 60 * 1000;
+const MAX_TRUSTED_DEVICES = 20;
+const MAX_TRACKED_SOURCES = 1000;
 const LOCK_BASE_MS = 30_000;
 const LOCK_MAX_MS = 15 * 60 * 1000;
 const TOTP_ISSUER = "ServrSit";
@@ -85,6 +95,15 @@ export interface NewSession {
   /** The cookie value. Never stored, never logged. */
   readonly id: string;
   readonly info: SessionInfo;
+  /** T-066: a new trusted-device cookie value, when this browser was not trusted yet. */
+  readonly device: string | null;
+}
+
+/** Where an attempt came from (T-066). */
+export interface AttemptSource {
+  readonly address: string;
+  /** The trusted-device cookie, if the browser sent one. Checked against the store. */
+  readonly deviceCookie?: string | undefined;
 }
 
 export interface ResolvedSession {
@@ -99,24 +118,45 @@ export interface OwnerAuthOptions {
   readonly now?: (() => number) | undefined;
   /** Receives the one-time setup token at startup when no owner exists. Default: print to stderr. */
   readonly onSetupToken?: ((setupToken: string) => void) | undefined;
+  /** T-066 D-A3: false while ServrSit's own clock is untrusted (T-063). Enrolment is refused then. */
+  readonly clockTrusted?: (() => boolean) | undefined;
 }
 
 function printSetupToken(setupToken: string): void {
   process.stderr.write(
-    `\nServrSit first-run setup. No owner account exists yet.\nOne-time setup token (works once, replaced on restart):\n\n  ${setupToken}\n\n`,
+    `\nServrSit first-run setup. No owner account exists yet.\nSetup token (works until setup is confirmed; replaced on restart):\n\n  ${setupToken}\n\n`,
   );
 }
 
 export class OwnerAuth {
   private readonly store: SqliteAuthStore;
-  private readonly now: () => number;
+  /** Wall clock: TOTP codes are tied to it. */
+  private readonly wallNow: () => number;
   private readonly onSetupToken: (setupToken: string) => void;
+  private readonly clockTrusted: () => boolean;
   private dummyHash: string | null = null;
 
   constructor(options: OwnerAuthOptions) {
     this.store = options.store;
-    this.now = options.now ?? (() => Date.now());
+    this.wallNow = options.now ?? (() => Date.now());
     this.onSetupToken = options.onSetupToken ?? printSetupToken;
+    this.clockTrusted = options.clockTrusted ?? (() => true);
+  }
+
+  /**
+   * T-066 D-A3b: wall-clock time, with every stored time checked against it.
+   * When the clock steps back (time sync fixing a fast clock), stored times
+   * lie further in the future than they ever could: a lock longer than any
+   * lock, a session last seen ahead of now, a ticket longer than its life.
+   * Those are treated as stale (lock released, session ended, ticket expired),
+   * in memory and after a restart alike.
+   */
+  private now(): number {
+    return this.wallNow();
+  }
+
+  private wallIso(t: number): string {
+    return new Date(t).toISOString();
   }
 
   /** Call once at startup. Issues a fresh setup token if no owner exists. */
@@ -139,7 +179,10 @@ export class OwnerAuth {
     request: SetupStartRequest,
   ): Promise<AuthResult<{ ticket: string; totpSecret: string; otpauthUri: string; expiresInSeconds: number }>> {
     const now = this.now();
-    if (!this.store.consumeSetupToken(sha256(request.setupToken), now)) return fail("SETUP_UNAVAILABLE");
+    // T-066 D-A4: the token stays valid until setup is confirmed, so an abandoned enrolment can be restarted.
+    if (!this.store.setupTokenValid(sha256(request.setupToken))) return fail("SETUP_UNAVAILABLE");
+    // T-066 D-A3: a TOTP enrolment on a wrong clock would lock the owner out once the clock is fixed.
+    if (!this.clockTrusted()) return fail("CLOCK_UNTRUSTED");
     const secret = new Secret({ size: 20 });
     const ticket = token();
     this.store.createEnrolment(sha256(ticket), {
@@ -155,14 +198,15 @@ export class OwnerAuth {
   /** Step 2: prove the authenticator works. Creates the owner, the recovery codes and the first session. */
   confirmSetup(ticket: string | undefined, code: string): AuthResult<{ recoveryCodes: string[]; session: NewSession }> {
     if (ticket === undefined || !OPAQUE.test(ticket)) return fail("SETUP_UNAVAILABLE");
+    if (!this.clockTrusted()) return fail("CLOCK_UNTRUSTED");
     const ticketHash = sha256(ticket);
     const now = this.now();
     const e = this.store.enrolment(ticketHash);
-    if (e === null || e.expiresAt <= now || e.attempts >= MAX_TICKET_ATTEMPTS) {
+    if (e === null || e.expiresAt > now + ENROLMENT_MS + 60_000 || e.expiresAt <= now || e.attempts >= MAX_TICKET_ATTEMPTS) {
       if (e !== null) this.store.deleteEnrolment(ticketHash);
       return fail("SETUP_UNAVAILABLE");
     }
-    const counter = this.matchingCounter(e.totpSecret, e.username, code, now);
+    const counter = this.matchingCounter(e.totpSecret, e.username, code);
     if (counter === null) {
       this.store.bumpEnrolmentAttempts(ticketHash);
       return fail("INVALID_CODE");
@@ -170,54 +214,129 @@ export class OwnerAuth {
     const recoveryCodes = Array.from({ length: RECOVERY_CODE_COUNT }, newRecoveryCode);
     const hashes = recoveryCodes.map((c) => sha256(normaliseRecoveryCode(c)));
     if (!this.store.completeEnrolment(ticketHash, counter, hashes, now)) return fail("SETUP_UNAVAILABLE");
-    return { ok: true, value: { recoveryCodes, session: this.newSession(e.username) } };
+    return { ok: true, value: { recoveryCodes, session: this.newSession(e.username, null) } };
   }
 
   // ---- sign-in ----------------------------------------------------------------
 
-  private locked(now: number): AuthResult<never> | null {
-    const { lockedUntil } = this.store.lockout();
-    return lockedUntil > now ? fail("LOCKED_OUT", Math.max(1, Math.ceil((lockedUntil - now) / 1000))) : null;
+  // ---- sources, locks and trusted devices (T-066) --------------------------------
+
+  /** The key an attempt is counted under: its trusted device if valid, else its address. */
+  sourceKey(source: AttemptSource): { key: string; trusted: boolean; deviceHash: string | null } {
+    const c = source.deviceCookie;
+    if (c !== undefined && OPAQUE.test(c)) {
+      const h = sha256(c);
+      if (this.store.isTrustedDevice(h)) return { key: `device:${h}`, trusted: true, deviceHash: h };
+    }
+    return { key: `addr:${source.address}`, trusted: false, deviceHash: null };
   }
 
-  private failure<T>(error: AuthErrorCode, now: number): AuthResult<T> {
-    const state = this.store.recordFailure(now, lockDurationMs);
-    return state.lockedUntil > now ? fail("LOCKED_OUT", Math.max(1, Math.ceil((state.lockedUntil - now) / 1000))) : fail(error);
+  /** A stored lock far beyond any lock length was set before a clock step back (and a restart): ignore it. */
+  private lockOf(key: string, now: number): number {
+    const r = this.store.sourceFailures(key);
+    if (r.lockedUntil > now + Math.max(LOCK_MAX_MS, ACCOUNT_LOCK_MAX_MS) + 60_000) {
+      this.store.clearSourceFailures(key);
+      return 0;
+    }
+    return r.lockedUntil;
   }
+
+  private locked(source: AttemptSource, now: number): AuthResult<never> | null {
+    const { key, trusted } = this.sourceKey(source);
+    const own = this.lockOf(key, now);
+    const account = trusted ? 0 : this.lockOf("account", now);
+    const until = Math.max(own, account);
+    return until > now ? fail("LOCKED_OUT", Math.max(1, Math.ceil((until - now) / 1000))) : null;
+  }
+
+  /**
+   * Count a failure for its source (doubling lock from the 5th, capped at 15 min) and for the
+   * account: 20 failures in 15 min from all sources together lock it, for 15 min the first time
+   * and doubling per further account lock up to 4 h, until the owner signs in. Trusted devices are
+   * exempt from the account lock, so an anonymous caller cannot keep the owner out; someone who
+   * has the password and rotates addresses still gets about 200 code guesses a day.
+   */
+  private failure<T>(error: AuthErrorCode, source: AttemptSource, now: number): AuthResult<T> {
+    const { key } = this.sourceKey(source);
+    const own = this.store.sourceFailures(key);
+    const consecutive = own.consecutive + 1;
+    const ms = lockDurationMs(consecutive);
+    this.store.writeSourceFailures(key, { consecutive, lockedUntil: ms > 0 ? now + ms : 0, windowStart: now });
+    this.store.pruneSourceFailures(MAX_TRACKED_SOURCES);
+
+    const acc = this.store.sourceFailures("account");
+    const fresh = now - acc.windowStart > ACCOUNT_WINDOW_MS;
+    const count = fresh ? 1 : acc.consecutive + 1;
+    if (count >= ACCOUNT_LOCK_THRESHOLD && acc.lockedUntil <= now) {
+      // The count starts again: holding the lock needs another 20 failures, not one at expiry.
+      const level = this.store.sourceFailures("account-level").consecutive + 1;
+      this.store.writeSourceFailures("account-level", { consecutive: level, lockedUntil: 0, windowStart: now });
+      const ms = Math.min(ACCOUNT_LOCK_MAX_MS, ACCOUNT_LOCK_MS * 2 ** (level - 1));
+      this.store.writeSourceFailures("account", { consecutive: 0, lockedUntil: now + ms, windowStart: now });
+    } else {
+      this.store.writeSourceFailures("account", { consecutive: count, lockedUntil: acc.lockedUntil, windowStart: fresh ? now : acc.windowStart });
+    }
+    return this.locked(source, now) ?? fail(error);
+  }
+
+  /** After setup confirmation: trust the enrolling browser. Returns a new device cookie value, or null. */
+  trustThisDevice(source: AttemptSource): string | null {
+    return this.succeeded(source, this.now());
+  }
+
+  private succeeded(source: AttemptSource, now: number): string | null {
+    const { key, trusted, deviceHash } = this.sourceKey(source);
+    this.store.clearSourceFailures(key);
+    this.store.clearSourceFailures("account");
+    this.store.clearSourceFailures("account-level");
+    if (trusted && deviceHash !== null) {
+      this.store.touchTrustedDevice(deviceHash, now);
+      return null;
+    }
+    const device = token();
+    this.store.addTrustedDevice(sha256(device), now, MAX_TRUSTED_DEVICES);
+    return device;
+  }
+
+  // ---- sign-in ----------------------------------------------------------------
 
   /** Step 1: password. Returns a short-lived ticket for the TOTP step, never a session. */
-  async login(username: string, password: string): Promise<AuthResult<{ ticket: string }>> {
+  async login(username: string, password: string, source: AttemptSource): Promise<AuthResult<{ ticket: string }>> {
     const now = this.now();
-    const locked = this.locked(now);
+    const locked = this.locked(source, now);
     if (locked !== null) return locked;
     const owner = this.store.owner();
     const against = owner?.passwordHash ?? this.dummyHash;
     if (against === null) throw new Error("OwnerAuth.init() was not called");
     const passwordOk = await verify(against, password).catch(() => false);
     const usernameOk = owner !== null && sameText(username, owner.username);
-    if (!(owner !== null && passwordOk && usernameOk)) return this.failure("INVALID_CREDENTIALS", now);
+    if (!(owner !== null && passwordOk && usernameOk)) return this.failure("INVALID_CREDENTIALS", source, now);
     const ticket = token();
     this.store.createMfaTicket(sha256(ticket), now + MFA_TICKET_MS);
     return { ok: true, value: { ticket } };
   }
 
   /** Step 2: TOTP code or a recovery code. The only way to a session after setup. */
-  secondFactor(ticket: string | undefined, proof: { code: string } | { recoveryCode: string }): AuthResult<NewSession> {
+  secondFactor(ticket: string | undefined, proof: { code: string } | { recoveryCode: string }, source: AttemptSource): AuthResult<NewSession> {
     const now = this.now();
-    const locked = this.locked(now);
+    const locked = this.locked(source, now);
     if (locked !== null) return locked;
     if (ticket === undefined || !OPAQUE.test(ticket)) return fail("MFA_REQUIRED");
     const ticketHash = sha256(ticket);
     const t = this.store.mfaTicket(ticketHash);
     const owner = this.store.owner();
-    if (t === null || owner === null || t.expiresAt <= now || t.attempts >= MAX_TICKET_ATTEMPTS) {
+    const ticketFromTheFuture = t !== null && t.expiresAt > now + MFA_TICKET_MS + 60_000;
+    if (t === null || owner === null || ticketFromTheFuture || t.expiresAt <= now || t.attempts >= MAX_TICKET_ATTEMPTS) {
       if (t !== null) this.store.deleteMfaTicket(ticketHash);
       return fail("MFA_REQUIRED");
     }
 
     let ok: boolean;
     if ("code" in proof) {
-      const counter = this.matchingCounter(owner.totpSecret, owner.username, proof.code, now);
+      // T-066 D-A3: a step accepted while the clock was fast lies in the future after it is fixed.
+      const current = this.totp(owner.totpSecret, owner.username).counter({ timestamp: this.wallNow() });
+      if (owner.lastTotpCounter > current + 1) this.store.clampTotpCounter(current - 2);
+      const counter = this.matchingCounter(owner.totpSecret, owner.username, proof.code);
       // The atomic update refuses a step already used (a replay) or older than the last one.
       ok = counter !== null && this.store.acceptTotpCounter(counter);
     } else {
@@ -225,11 +344,11 @@ export class OwnerAuth {
     }
     if (!ok) {
       this.store.bumpMfaAttempts(ticketHash);
-      return this.failure("INVALID_CODE", now);
+      return this.failure("INVALID_CODE", source, now);
     }
     this.store.deleteMfaTicket(ticketHash);
-    this.store.resetFailures();
-    return { ok: true, value: this.newSession(owner.username) };
+    const device = this.succeeded(source, now);
+    return { ok: true, value: this.newSession(owner.username, device) };
   }
 
   private totp(secretBase32: string, username: string): TOTP {
@@ -237,8 +356,9 @@ export class OwnerAuth {
   }
 
   /** The time step `code` belongs to (current step +-1), or null. */
-  private matchingCounter(secretBase32: string, username: string, code: string, now: number): number | null {
+  private matchingCounter(secretBase32: string, username: string, code: string): number | null {
     if (!/^\d{6}$/.test(code)) return null;
+    const now = this.wallNow();
     const totp = this.totp(secretBase32, username);
     const delta = totp.validate({ token: code, timestamp: now, window: 1 });
     return delta === null ? null : totp.counter({ timestamp: now }) + delta;
@@ -252,18 +372,18 @@ export class OwnerAuth {
       username,
       csrfToken,
       csrfHeader: AUTH_CSRF_HEADER,
-      idleExpiresAt: new Date(Math.min(lastSeenAt + IDLE_TIMEOUT_MS, absoluteExpiresAt)).toISOString(),
-      absoluteExpiresAt: new Date(absoluteExpiresAt).toISOString(),
+      idleExpiresAt: this.wallIso(Math.min(lastSeenAt + IDLE_TIMEOUT_MS, absoluteExpiresAt)),
+      absoluteExpiresAt: this.wallIso(absoluteExpiresAt),
     };
   }
 
-  private newSession(username: string): NewSession {
+  private newSession(username: string, device: string | null): NewSession {
     const now = this.now();
     const id = token();
     const csrfToken = token();
     const absoluteExpiresAt = now + ABSOLUTE_TIMEOUT_MS;
     this.store.createSession(sha256(id), { csrfToken, createdAt: now, lastSeenAt: now, absoluteExpiresAt });
-    return { id, info: this.info(username, csrfToken, now, absoluteExpiresAt) };
+    return { id, info: this.info(username, csrfToken, now, absoluteExpiresAt), device };
   }
 
   /** The session for a cookie value, refreshed for idle time; null if missing, malformed or expired. */
@@ -274,7 +394,10 @@ export class OwnerAuth {
     const owner = this.store.owner();
     if (s === null || owner === null) return null;
     const now = this.now();
-    if (now >= s.absoluteExpiresAt || now >= s.lastSeenAt + IDLE_TIMEOUT_MS) {
+    // T-066 D-A3b: a session whose times lie in the future was made before a clock step back.
+    // How long it has really been idle cannot be known, so it ends.
+    const fromTheFuture = s.lastSeenAt > now + 60_000 || s.createdAt > now + 60_000;
+    if (fromTheFuture || now >= s.absoluteExpiresAt || now >= s.lastSeenAt + IDLE_TIMEOUT_MS) {
       this.store.deleteSession(idHash);
       return null;
     }

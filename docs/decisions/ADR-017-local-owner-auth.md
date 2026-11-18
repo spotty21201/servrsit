@@ -74,3 +74,19 @@ The API authenticates one owner itself, following the parts of §5 that do not d
 ## Exit
 
 Replace this with Cognito (§5) when AWS hosting is authorized. The guard, cookie, CSRF and session-lifetime code stays. `OwnerAuth`'s password and TOTP steps are swapped for the PKCE callback.
+
+## Amended by T-066 (Tester's test-report-ai-auth-001 §9.3)
+
+- **Rate limit (D-A1):** counted only after the body is valid, and per source: the browser's trusted-device cookie if it has one, otherwise its address. 10 per minute per source. An anonymous caller can no longer use up the owner's allowance.
+- **Trusted device (new):** a full sign-in or setup confirmation sets `servrsit_device` (HttpOnly, SameSite=Strict, Path=/api/auth, 90 days). Only its SHA-256 is stored, and at most 20 devices are kept. The device gives a browser its own allowance. It never replaces the password or TOTP code.
+- **Lockout (D-A2):**
+  - **Per source:** 5 failures lock that source for 30 s, doubling to 15 min.
+  - **Account:** 20 failures in 15 min from all sources together lock the account: 15 min at first, doubling with each further account lock up to 4 h, and reset by the owner's next sign-in. One failure at expiry no longer extends a lock.
+  - **Trusted devices are exempt from the account lock.**
+  - **Trade-off:** someone who already has the password and rotates addresses gets about 200 TOTP guesses a day instead of about 100. That is about 0.06 % a day against a 6-digit code.
+  - The owner on a new, untrusted browser can still be held by the account lock.
+- **Clock steps (D-A3, D-A3b):**
+  - Stored times that lie further in the future than they could are stale, because the clock stepped back. A lock longer than any lock is released; a session last seen ahead of now ends; a ticket longer than its lifetime expires. A last accepted TOTP step ahead of the current step is clamped.
+  - **Enrolment is refused while ServrSit's own clock is untrusted** (T-063, `CLOCK_UNTRUSTED`, 409), because a TOTP secret enrolled on a 7-hours-fast clock fails once the clock is fixed.
+  - I did not use a monotonic clock. A step back is only noticed when time is next read, so a monotonic-from-wall clock freezes locks instead of ending them.
+- **Setup token (D-A4):** valid until setup is confirmed, not until first use. An abandoned enrolment can be restarted with the same token. Confirmation deletes it. The startup message says so.
