@@ -16,6 +16,21 @@
 import { stripEscapeSequences } from "@servrsit/ssh";
 import { looksLikeSecret } from "./assistant.js";
 
+/**
+ * T-064 F1: the owner-context file never needs a credential, so it is stricter
+ * than chat. Any line that names a secret kind and then gives it a value
+ * ("x: ...", "x = ...", "x is ...") rejects the whole file.
+ */
+const SECRET_WORD = /(?:password|passwd|passphrase|passcode|token|secret|api[_ -]?key|access[_ -]?key|private[_ -]?key|auth[_ -]?key|credentials?)/i;
+export function pairsSecretWordWithValue(text: string): boolean {
+  return text.split("\n").some((line) => {
+    const m = SECRET_WORD.exec(line);
+    if (m === null) return false;
+    const after = line.slice(m.index + m[0].length);
+    return /^[A-Za-z0-9_]*\s*[=:]\s*\S/.test(after) || /^[^.]{0,40}?\b(?:is|was)\s+["']?\S{6,}/i.test(after);
+  });
+}
+
 export const OWNER_CONTEXT_MAX_BYTES = 4096;
 export const PLACEHOLDER_MARK = "TODO(owner)";
 
@@ -52,7 +67,7 @@ export function prepareOwnerContext(raw: string, knownSecrets: readonly string[]
   const cleaned = cleanText(raw);
   // The secret check runs on the WHOLE cleaned file, before any capping, so a
   // secret cannot hide past the 4 KB cut.
-  if (looksLikeSecret(cleaned, knownSecrets)) return { ok: false, reason: "secret" };
+  if (looksLikeSecret(cleaned, knownSecrets) || pairsSecretWordWithValue(cleaned)) return { ok: false, reason: "secret" };
 
   let dropped = 0;
   const kept = cleaned
