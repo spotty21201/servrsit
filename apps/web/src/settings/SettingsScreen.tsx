@@ -10,15 +10,19 @@
  *                  confirmation that names the server, lists queued and active
  *                  work, and says the remote key must be removed by you
  *
- * Runs on the [FIXTURE] settings client (api/stubs/settings.ts), so the
- * [FIXTURE DATA] banner is always shown and no real schedule, AI setting or
- * connection changes. Disconnect uses the T-069 `DisconnectResponse` contract.
+ * Runs on Coder's real settings client (api/settings.ts, T-079). The
+ * [FIXTURE DATA] banner shows on /fixtures/settings (sample client, nothing
+ * real changes) and whenever /api/fleet says it is in fixture mode. Disconnect
+ * uses the T-069 `DisconnectResponse` contract and is blocked while an
+ * operation on the server is unresolved.
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import type { DisconnectResponse } from "@servrsit/contracts";
+import type { AccessServer, DisconnectPreview, DisconnectResponse, SettingsData } from "@servrsit/contracts";
 import { copyText } from "../auth/copy";
 import { ReasonButton } from "../auth/AuthFrame";
-import { createFixtureSettingsClient, type AccessServer, type DisconnectPreview, type SettingsClient, type SettingsData } from "../api/stubs/settings";
+import { createSettingsClient, type SettingsClient, type SettingsClientError } from "../api/settings";
+import { useFleet } from "../api/useFleet";
+import { createFixtureSettingsClient } from "../fixtures/settingsFixture";
 import { CareShell, LoadFailure, ProductionLabel } from "../care/CareShell";
 import { useClock } from "../clock/ClockContext";
 import { SchedulerNotice } from "../findings/SchedulerNotice";
@@ -26,8 +30,8 @@ import { schedulerNotice } from "../findings/findingsViewModel";
 import { usePageTitle } from "../lib/pageTitle";
 import { formatClockWithAge, parseIso } from "../lib/time";
 import {
-  AI_OFF_NOTE, COLLECTED, DELETION_NOTE, describeDisconnect, describeNext, disconnectCopy, INTERVAL_LABEL, INTERVALS, isDefaultSchedule, isDirty, NOT_COLLECTED,
-  nextDailyRun, nextHealthRun, REFRESH_NOTE, RETENTION_NOTE, SCHEDULE_STATEMENT, SENT_TO_AI, TIME_ZONES, toScheduleDraft, validateSchedule, zoneName,
+  AI_OFF_NOTE, COLLECTED, DAILY_NOT_IN_EFFECT, DELETION_NOTE, describeDisconnect, describeNext, disconnectCopy, INTERVAL_LABEL, INTERVALS, isDefaultSchedule, isDirty, KEY_KIND_LABEL, NOT_COLLECTED,
+  nextDailyRun, nextHealthRun, REFRESH_NOTE, RETENTION_NOTE, SCHEDULE_STATEMENT, SENT_TO_AI, settingsErrorText, TIME_ZONES, toScheduleDraft, validateSchedule, zoneName,
   type ScheduleDraft,
 } from "./settingsLogic";
 import c from "../care/care.module.css";
@@ -37,8 +41,9 @@ import st from "./settings.module.css";
 type Confirm = { server: AccessServer; preview: DisconnectPreview } | null;
 type Done = { name: string; result: DisconnectResponse; preview: DisconnectPreview };
 
-export function SettingsScreen({ client: injected }: { client?: SettingsClient }) {
-  const client = useMemo(() => injected ?? createFixtureSettingsClient(), [injected]);
+export function SettingsScreen({ client: injected, fixture = false }: { client?: SettingsClient; fixture?: boolean }) {
+  const client = useMemo(() => injected ?? (fixture ? createFixtureSettingsClient() : createSettingsClient()), [injected, fixture]);
+  const fleet = useFleet({ pollMs: 0 });
   const ids = useId();
   const uncertain = useClock().view?.agesUncertain ?? false;
   const [data, setData] = useState<SettingsData | null>(null);
@@ -63,7 +68,7 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (confirm) confirmHeading.current?.focus(); }, [confirm]);
 
-  const fail = (): void => setProblem("That didn't go through. Nothing was changed.");
+  const fail = (r: { error: SettingsClientError; reason?: string }): void => setProblem(settingsErrorText(r.error, r.reason));
   const savedDraft = data ? toScheduleDraft(data.schedule) : null;
   const errors = draft ? validateSchedule(draft) : {};
   const dirty = savedDraft && draft ? isDirty(savedDraft, draft) : false;
@@ -74,7 +79,7 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
     setBusy(true); setProblem(null); setSaved(null);
     const r = await client.saveSchedule({ intervalMinutes: draft.intervalMinutes as 15, dailyTime: draft.dailyTime, timeZone: draft.timeZone });
     setBusy(false);
-    if (!r.ok) return fail();
+    if (!r.ok) return fail(r);
     setData(r.data); setDraft(toScheduleDraft(r.data.schedule)); setNow(new Date());
     setSaved("Schedule saved. It only changes when ServrSit looks, never what it may do.");
   }
@@ -84,7 +89,7 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
     setBusy(true); setProblem(null); setSaved(null);
     const r = await client.setPaused(!data.schedule.paused);
     setBusy(false);
-    if (!r.ok) return fail();
+    if (!r.ok) return fail(r);
     setData(r.data); setNow(new Date());
     setSaved(r.data.schedule.paused ? "Checks are paused. Nothing is being checked until you resume." : "Checks resumed. One current check runs, not a backlog of missed ones.");
   }
@@ -94,7 +99,7 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
     setBusy(true); setProblem(null); setSaved(null);
     const r = await client.setAi(!data.ai.enabled);
     setBusy(false);
-    if (!r.ok) return fail();
+    if (!r.ok) return fail(r);
     setData(r.data);
     setSaved(r.data.ai.enabled ? "AI explanations are on." : "AI explanations are off. No new AI requests will be sent.");
   }
@@ -103,7 +108,7 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
     setBusy(true); setProblem(null); setDone(null);
     const r = await client.previewDisconnect(server.id);
     setBusy(false);
-    if (!r.ok) return fail();
+    if (!r.ok) return fail(r);
     setConfirm({ server, preview: r.data });
   }
 
@@ -118,7 +123,7 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
     setBusy(true); setProblem(null);
     const r = await client.disconnect(confirm.server.id);
     setBusy(false);
-    if (!r.ok) return fail();
+    if (!r.ok) return fail(r);
     setDone({ name: confirm.server.name, result: r.data, preview: confirm.preview });
     setConfirm(null);
     await load();
@@ -131,10 +136,10 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
   const result = done ? describeDisconnect(done.name, done.result, done.preview) : null;
 
   return (
-    <CareShell fixture section="Settings">
+    <CareShell fixture={fixture || fleet.data?.mode === "fixture"} section="Settings">
       <header className={c.header}>
         <h1 className={c.title}>Settings</h1>
-        <p className={c.small}>Schedules, AI and data, and server access. Changes here use sample data for now and do not touch a real schedule or connection.</p>
+        <p className={c.small}>Schedules, AI and data, and server access.{fixture ? " This page uses sample data and does not touch a real schedule or connection." : ""}</p>
       </header>
 
       {error && !data && <LoadFailure title="Couldn't load settings" text="Nothing is shown until real data arrives. Your schedule and connections are unchanged." onRetry={() => void load()} heading={false} />}
@@ -152,7 +157,7 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
             <p className={c.small}>{SCHEDULE_STATEMENT}</p>
             <dl className={s.facts}>
               <div className={s.fact}><dt>Next health check</dt><dd>{describeNext(nextHealth, now, tz, uncertain)}</dd></div>
-              <div className={s.fact}><dt>Next daily check</dt><dd>{describeNext(nextDaily, now, tz, uncertain)}</dd></div>
+              <div className={s.fact}><dt>Next daily check</dt><dd>{data.schedule.dailyTimeInEffect ? describeNext(nextDaily, now, tz, uncertain) : <><span className={s.dash}>—</span> <span className={s.why}>Not scheduled yet.</span></>}</dd></div>
               <div className={s.fact}><dt>Time zone</dt><dd>{zoneName(tz, now)}</dd></div>
             </dl>
 
@@ -165,9 +170,9 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
                 <p id={`${ids}-int-h`} className={c.small}>Lightweight checks: load, memory, storage, services. Default is every 15 minutes.</p>
               </div>
               <div className={s.field}>
-                <label htmlFor={`${ids}-day`}>Daily deeper check at</label>
+                <label htmlFor={`${ids}-day`}>Daily deeper check at{data.schedule.dailyTimeInEffect ? "" : " (not used yet)"}</label>
                 <input id={`${ids}-day`} className={st.control} type="time" value={draft.dailyTime} onChange={(e) => setDraft({ ...draft, dailyTime: e.target.value })} aria-invalid={errors.dailyTime ? true : undefined} aria-describedby={`${ids}-day-h${errors.dailyTime ? ` ${ids}-day-e` : ""}`} />
-                <p id={`${ids}-day-h`} className={c.small}>Inventory and update information, once a day. Default is 03:00.</p>
+                <p id={`${ids}-day-h`} className={c.small}>{data.schedule.dailyTimeInEffect ? "Inventory and update information, once a day. Default is 03:00." : DAILY_NOT_IN_EFFECT}</p>
                 {errors.dailyTime && <p id={`${ids}-day-e`} className={s.errorText}>{errors.dailyTime}</p>}
               </div>
               <div className={s.field}>
@@ -189,10 +194,10 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
           <section className={c.panel} id="set-ai" aria-labelledby={`${ids}-ai`}>
             <h2 id={`${ids}-ai`} className={c.h2}>AI and data</h2>
             <label className={st.switch}>
-              <input type="checkbox" role="switch" checked={data.ai.enabled} disabled={busy} onChange={() => void toggleAi()} aria-describedby={`${ids}-ai-h`} />
+              <input type="checkbox" role="switch" checked={data.ai.enabled} aria-disabled={busy || (!data.ai.available && !data.ai.enabled) || undefined} onChange={() => { if (!busy && (data.ai.available || data.ai.enabled)) void toggleAi(); }} aria-describedby={`${ids}-ai-h`} />
               <span><span className={s.choiceTitle}>Use AI to explain results: {data.ai.enabled ? "On" : "Off"}</span></span>
             </label>
-            <p id={`${ids}-ai-h`} className={c.small}>{AI_OFF_NOTE}</p>
+            <p id={`${ids}-ai-h`} className={c.small}>{AI_OFF_NOTE}{!data.ai.available ? " No AI provider is configured on ServrSit, so AI cannot be turned on here." : ""}</p>
             <dl className={s.facts}>
               <div className={s.fact}><dt>Provider</dt><dd>{data.ai.providerLabel}</dd></div>
               <div className={s.fact}><dt>How it is reached</dt><dd>{data.ai.route}</dd></div>
@@ -201,11 +206,12 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
             <h3 className={s.h3}>What ServrSit collects</h3>
             <ul className={`${c.list} ${c.bullets}`}>{COLLECTED.map((t) => <li key={t}>{t}</li>)}<li>{NOT_COLLECTED}</li></ul>
             <h3 className={s.h3}>What is sent to the AI</h3>
-            <ul className={`${c.list} ${c.bullets}`}>{SENT_TO_AI.map((t) => <li key={t}>{t}</li>)}</ul>
+            <ul className={`${c.list} ${c.bullets}`}>{[data.ai.sends, ...SENT_TO_AI].map((t) => <li key={t}>{t}</li>)}</ul>
             <h3 className={s.h3}>How long it is kept</h3>
             <dl className={s.facts}>
               <div className={s.fact}><dt>Observations and chat</dt><dd>{data.retention.observationsDays} days</dd></div>
               <div className={s.fact}><dt>Operation records</dt><dd>{data.retention.operationRecordsDays} days</dd></div>
+              <div className={s.fact}><dt>Exports</dt><dd>{data.retention.exportsDays} days</dd></div>
             </dl>
             <p className={c.small}>{RETENTION_NOTE}</p>
             <h3 className={s.h3}>Export and deletion</h3>
@@ -224,7 +230,7 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
                     <div className={st.serverHead}><strong>{x.name}</strong>{x.production && <ProductionLabel />}{!x.connected && <span className={c.stateTag + " " + c.tagUnknown}>Disconnected</span>}</div>
                     <dl className={s.facts}>
                       <div className={s.fact}><dt>Access</dt><dd>Inspect only</dd></div>
-                      <div className={s.fact}><dt>Key in use</dt><dd>{x.keyKind}{x.keyKind === "owner key" && <span className={s.caveat}>A dedicated ServrSit key is recommended.</span>}</dd></div>
+                      <div className={s.fact}><dt>Key in use</dt><dd>{KEY_KIND_LABEL[x.keyKind]}{x.keyKind === "owner key" && <span className={s.caveat}>A dedicated ServrSit key is recommended.</span>}</dd></div>
                       <div className={s.fact}><dt>Host key confirmed</dt><dd>{at ? formatClockWithAge(at, now, tz, uncertain) : <><span className={s.dash}>—</span> <span className={s.why}>Not confirmed.</span></>}</dd></div>
                     </dl>
                     {x.connected
@@ -235,6 +241,7 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
                       return (
                         <div className={st.confirm} role="region" aria-labelledby={`${ids}-cf-h`}>
                           <h3 id={`${ids}-cf-h`} ref={confirmHeading} tabIndex={-1} className={s.h3}>{k.title}</h3>
+                          {k.blocked && <div className={`${c.notice} ${c.noticeAttention}`} role="status"><p className={c.noticeTitle}>Disconnecting is blocked</p><p>{k.blocked}</p></div>}
                           <h4 className={s.h4}>What stops</h4>
                           <ul className={`${c.list} ${c.bullets}`}>{k.stops.map((t) => <li key={t}>{t}</li>)}</ul>
                           <h4 className={s.h4}>Queued work</h4>
@@ -245,8 +252,8 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
                           <ul className={`${c.list} ${c.bullets}`}>{k.keep.map((t) => <li key={t}>{t}</li>)}</ul>
                           <div className={`${c.notice} ${c.noticeAttention}`}><p className={c.noticeTitle}>Your step on the server</p><p>{k.yourStep}</p></div>
                           <div className={c.row}>
-                            <button type="button" className={c.secondary} onClick={cancelDisconnect}>Cancel</button>
-                            <button type="button" className={st.danger} disabled={busy} onClick={() => void doDisconnect()}>{busy ? "Disconnecting" : k.confirmLabel}</button>
+                            <button type="button" className={c.secondary} onClick={cancelDisconnect}>{k.blocked ? "Close" : "Cancel"}</button>
+                            {!k.blocked && <button type="button" className={st.danger} disabled={busy} onClick={() => void doDisconnect()}>{busy ? "Disconnecting" : k.confirmLabel}</button>}
                           </div>
                         </div>
                       );

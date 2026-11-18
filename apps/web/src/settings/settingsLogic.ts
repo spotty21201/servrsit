@@ -10,10 +10,11 @@
  *     operation records) and says it is a proposal;
  *   - a disconnect never claims the remote key is gone.
  */
-import type { DisconnectResponse } from "@servrsit/contracts";
-import type { AccessServer, DisconnectPreview, ScheduleSettings } from "../api/stubs/settings";
-import { SCHEDULE_DEFAULTS } from "../api/stubs/settings";
+import { SCHEDULE_DEFAULTS, type AccessServer, type DisconnectPreview, type DisconnectResponse, type ScheduleSettings } from "@servrsit/contracts";
+import type { SettingsClientError } from "../api/settings";
 import { formatClock, formatUntil, isValidTimeZone, zoneLabel } from "../lib/time";
+
+const DEFAULT_ZONE = "Asia/Jakarta";
 
 export const INTERVALS = [5, 15, 30, 60] as const;
 export const INTERVAL_LABEL: Readonly<Record<number, string>> = { 5: "Every 5 minutes", 15: "Every 15 minutes", 30: "Every 30 minutes", 60: "Every hour" };
@@ -21,9 +22,10 @@ export const INTERVAL_LABEL: Readonly<Record<number, string>> = { 5: "Every 5 mi
 export const TIME_ZONES = ["Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura", "Asia/Singapore", "Australia/Sydney", "UTC", "Europe/London", "Europe/Berlin", "America/New_York", "America/Los_Angeles"] as const;
 
 export const SCHEDULE_STATEMENT = "Schedules only look at your servers. No schedule can install updates, restart a service, reboot or clean anything up. Those need a plan you approve.";
+export const DAILY_NOT_IN_EFFECT = "There is no separate daily check yet. Every check runs at the interval above, so this time is saved but not used.";
 export const REFRESH_NOTE = "Allow package-list refresh is off and not available yet. Without it, ServrSit shows how old the existing package information is.";
 export const AI_OFF_NOTE = "Turning AI off stops new AI requests. Checks, findings, plans, approvals and history keep working.";
-export const RETENTION_NOTE = "Proposed retention. Anything longer needs an explicit product decision.";
+export const RETENTION_NOTE = "These are the configured values. They cannot be changed here, and anything longer needs an explicit product decision.";
 export const DELETION_NOTE = "Self-service deletion of your data and account arrives with Stage B. When it does, active data is deleted within 30 days and backups expire within a further 30 days. Until then, nothing here deletes data.";
 
 export const COLLECTED = [
@@ -31,8 +33,8 @@ export const COLLECTED = [
   "ServrSit's own records: findings, plans, approvals, operation steps and times, your schedule and settings.",
 ];
 export const NOT_COLLECTED = "ServrSit does not collect the contents of home directories, repositories, databases or application files.";
+/** What is sent comes from the API (`ai.sends`); this is what the AI's text can and cannot do. */
 export const SENT_TO_AI = [
-  "Only cleaned facts from the list above, and your question. Never credentials, keys, passwords or file contents.",
   "AI text only explains. It never approves a change and is never proof of a server's state.",
 ];
 
@@ -59,7 +61,7 @@ export const isDirty = (saved: ScheduleDraft, draft: ScheduleDraft): boolean =>
   saved.intervalMinutes !== draft.intervalMinutes || saved.dailyTime !== draft.dailyTime || saved.timeZone !== draft.timeZone;
 
 export const isDefaultSchedule = (s: ScheduleDraft): boolean =>
-  s.intervalMinutes === SCHEDULE_DEFAULTS.intervalMinutes && s.dailyTime === SCHEDULE_DEFAULTS.dailyTime && s.timeZone === SCHEDULE_DEFAULTS.timeZone;
+  s.intervalMinutes === SCHEDULE_DEFAULTS.intervalMinutes && s.dailyTime === SCHEDULE_DEFAULTS.dailyTime && s.timeZone === DEFAULT_ZONE;
 
 // ── Next run ────────────────────────────────────────────────────────────────
 
@@ -113,6 +115,8 @@ export const zoneName = (tz: string, at: Date): string => `${tz} (${zoneLabel(tz
 export interface DisconnectCopy {
   readonly title: string;
   readonly stops: readonly string[];
+  /** Why disconnecting is blocked right now, or null when it is allowed. */
+  readonly blocked: string | null;
   readonly queued: readonly string[];
   readonly active: readonly string[];
   readonly keep: readonly string[];
@@ -121,6 +125,7 @@ export interface DisconnectCopy {
 }
 
 export function disconnectCopy(s: AccessServer, p: DisconnectPreview): DisconnectCopy {
+  const blocked = p.canDisconnect ? null : "This server has an operation that is not finished. Disconnecting is blocked until it finishes or its outcome is confirmed, because ServrSit cannot stop work that is already on the server.";
   return {
     title: `Disconnect ${s.name}?`,
     stops: [
@@ -128,15 +133,18 @@ export function disconnectCopy(s: AccessServer, p: DisconnectPreview): Disconnec
       "No new work will be started for it, and stored access is disabled.",
       "Reconnecting later needs valid access and a new host key verification.",
     ],
-    queued: p.queued.length === 0 ? ["No queued work."] : p.queued.map((w) => `${w.title}: will be cancelled.`),
-    active: p.active.length === 0 ? ["No work is running."] : p.active.map((w) => `${w.title}: ServrSit cannot stop it. It may keep running on the server.`),
+    blocked,
+    queued: p.queued.length === 0 ? ["No queued work."] : p.queued.map((w) => `${w.title}: waiting to start.`),
+    active: p.active.length === 0 ? ["No work is running."] : p.active.map((w) => `${w.title}: running. ServrSit cannot stop it.`),
     keep: [
       "Disconnecting does not delete the server or shut it down.",
       "Your records of past checks and operations stay in History until retention removes them.",
     ],
-    yourStep: s.keyKind === "dedicated ServrSit key"
-      ? "ServrSit cannot remove its key from the server. After you disconnect you will get the exact line and steps to remove it yourself."
-      : "ServrSit used your own key. After you disconnect you will get steps if you want to stop that key working.",
+    yourStep: s.keyKind === "owner key"
+      ? "ServrSit used your own key. After you disconnect you will get steps if you want to stop that key working."
+      : s.keyKind === "local"
+        ? "This server is reached without a key. There is nothing to remove on it."
+        : "ServrSit cannot remove its key from the server. After you disconnect you will get the exact line and steps to remove it yourself.",
     confirmLabel: `Disconnect ${s.name}`,
   };
 }
@@ -153,7 +161,6 @@ export function describeDisconnect(name: string, r: DisconnectResponse, preview:
   const done = [
     r.schedulesStopped ? "Every scheduled check for this server was stopped." : "",
     r.controllerKeyDeleted ? "ServrSit deleted the key it made for this server." : "ServrSit had no key of its own to delete for this server.",
-    preview.queued.length > 0 ? `${preview.queued.length} queued ${preview.queued.length === 1 ? "operation was" : "operations were"} cancelled.` : "",
   ].filter((x) => x !== "");
   const notDone = [
     r.remoteKeyRemoved ? "" : "ServrSit cannot confirm that its key line is gone from the server. Deleting its own saved copy does not remove the key on the server.",
@@ -165,4 +172,25 @@ export function describeDisconnect(name: string, r: DisconnectResponse, preview:
 
 export function toScheduleDraft(s: ScheduleSettings): ScheduleDraft {
   return { intervalMinutes: s.intervalMinutes, dailyTime: s.dailyTime, timeZone: s.timeZone };
+}
+
+export const KEY_KIND_LABEL: Readonly<Record<AccessServer["keyKind"], string>> = {
+  "dedicated ServrSit key": "Dedicated ServrSit key",
+  "owner key": "Your own key",
+  local: "None: ServrSit's own machine",
+};
+
+/** What to tell the owner when a settings call fails. A lost answer never claims nothing changed. */
+export function settingsErrorText(code: SettingsClientError, reason?: string): string {
+  const why = reason ? ` ${reason}` : "";
+  switch (code) {
+    case "INVALID_INPUT": return `ServrSit did not accept that value.${why} Nothing was changed.`;
+    case "NOT_FOUND":
+    case "SERVER_NOT_FOUND": return "ServrSit could not find that. Reload the page. Nothing was changed.";
+    case "NOT_ALLOWED": return `ServrSit will not do that.${why} Nothing was changed.`;
+    case "STATE_CONFLICT": return `That cannot be done right now.${why} Nothing was changed.`;
+    case "UNAUTHENTICATED": return "You are signed out. Sign in again, then repeat that.";
+    case "CSRF_INVALID": return "Your session needs a refresh. Reload the page, then repeat that. Nothing was changed.";
+    default: return "ServrSit did not get a clear answer, so the change may or may not have been made. Reload the page to see what is saved.";
+  }
 }
