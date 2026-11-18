@@ -45,6 +45,25 @@ const LocalHost = HostBase.extend({ access: z.literal("local") });
 
 export const HostConfigSchema = z.discriminatedUnion("access", [SshHost, LocalHost]);
 
+/**
+ * Where servers may be registered (T-069, Tech Spec §6.2). Absent means:
+ * port 22 only, public addresses allowed, no private route enrolled (so no
+ * private or CGNAT address can be registered), and no controller address,
+ * which means no access key can be issued until one is set.
+ */
+export const RegistrationConfigSchema = z
+  .object({
+    /** The address servers see ServrSit connect from. Goes into `from="..."`. */
+    controllerAddress: z.string().min(1).max(253).nullable().default(null),
+    allowedPorts: z.array(z.number().int().min(1).max(65535)).min(1).max(10).default([22]),
+    /** CIDRs, for example the owner's Tailscale range "100.64.0.0/10". */
+    enrolledRoutes: z.array(z.string().max(64)).max(20).default([]),
+    allowPublicAddresses: z.boolean().default(true),
+    operatorAddresses: z.array(z.string().max(64)).max(50).default([]),
+  })
+  .strict();
+export type RegistrationConfig = z.infer<typeof RegistrationConfigSchema>;
+
 export const FleetConfigSchema = z
   .object({
     healthIntervalMinutes: z.number().int().min(1).max(1440),
@@ -53,7 +72,13 @@ export const FleetConfigSchema = z
       .string()
       .default(DEFAULT_TIME_ZONE)
       .refine(isValidTimeZone, { message: "ownerTimeZone is not a valid IANA time zone" }),
-    hosts: z.array(HostConfigSchema).min(1).max(20),
+    /**
+     * T-069: imported into the server registry ONCE, the first time an empty
+     * registry starts. After that this list is not read; servers are added,
+     * renamed and disconnected through the API.
+     */
+    hosts: z.array(HostConfigSchema).max(20),
+    registration: RegistrationConfigSchema.default({}),
   })
   .superRefine((config, ctx) => {
     const ids = new Set<string>();
@@ -72,11 +97,20 @@ export const FleetConfigSchema = z
   });
 
 export type HostConfig = z.infer<typeof HostConfigSchema>;
+/**
+ * A host as the fleet service checks it. Registered servers (T-069) carry
+ * their own pinned known_hosts file; imported ones use the shared file.
+ */
+export type FleetHost = HostConfig & { readonly knownHostsFile?: string | undefined };
 export type SshHostConfig = z.infer<typeof SshHost>;
 export type FleetConfig = z.infer<typeof FleetConfigSchema>;
 
 export const DEFAULT_CONFIG_PATH = new URL("../../config/hosts.json", import.meta.url);
 export const DEFAULT_KNOWN_HOSTS_PATH = new URL("../../.data/known_hosts", import.meta.url);
+/** T-069: the server registry (gitignored). */
+export const DEFAULT_REGISTRY_PATH = new URL("../../.data/servers.db", import.meta.url);
+/** T-069: one 0700 directory per registered server, holding its key pair and pinned known_hosts (gitignored). */
+export const DEFAULT_SERVER_KEYS_DIR = new URL("../../.data/server-keys", import.meta.url);
 
 export async function loadFleetConfig(path: URL | string = DEFAULT_CONFIG_PATH): Promise<FleetConfig> {
   const raw = await readFile(path, "utf8");

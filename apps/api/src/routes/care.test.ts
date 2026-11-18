@@ -108,10 +108,14 @@ test("configuration cannot enable writes for a real server", () => {
 test("no API can set writesEnabled: no such routes, and request bodies cannot carry it", async () => {
   const h = await start();
   try {
-    for (const [method, url] of [["PATCH", `/api/servers/${NABIRE}`], ["PUT", `/api/servers/${NABIRE}`], ["POST", `/api/servers/${NABIRE}/writes`], ["PATCH", "/api/config"]] as const) {
+    for (const [method, url] of [["PUT", `/api/servers/${NABIRE}`], ["POST", `/api/servers/${NABIRE}/writes`], ["PATCH", "/api/config"]] as const) {
       const r = await h.app.inject({ method, url, headers: { "content-type": "application/json", cookie: h.owner.cookie, ...h.goodHeaders }, payload: JSON.stringify({ writesEnabled: true }) });
       assert.equal(r.statusCode, 404, `${method} ${url}`);
     }
+    // T-069: PATCH /api/servers/:id exists for name, role and production only; writesEnabled is refused.
+    const patch = await h.app.inject({ method: "PATCH", url: `/api/servers/${NABIRE}`, headers: { "content-type": "application/json", cookie: h.owner.cookie, ...h.goodHeaders }, payload: JSON.stringify({ writesEnabled: true }) });
+    assert.equal(patch.statusCode, 400);
+    assert.equal(patch.json().error, "INVALID_INPUT");
     assert.equal((await h.post("/api/plans", { operation: "apply.packages.v1", serverId: NABIRE, writesEnabled: true })).statusCode, 400);
     const p = await h.plan(NABIRE);
     assert.equal((await h.approve(p, { writesEnabled: true })).statusCode, 400);

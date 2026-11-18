@@ -1401,3 +1401,101 @@ Please remove the `todo` markers on X-05, X-14, X-17, X-18 and X-19 so they guar
 - The owner on a new, untrusted browser can still be held by an account lock driven from many addresses. Their trusted browsers are not affected.
 - Clamping treats a clock step back of more than 16 min as stale state. A smaller step back extends a lock by that small amount.
 - O-A3 (Secure cookies on plain-HTTP Tailscale in production mode) is not addressed. It needs a browser test.
+## T-069: server registration API (branch `feat/coder/server-registration`, from `integration/live-v1` at `9cfb554`)
+
+Commits: `37805b6` contract, `5610a48` implementation, `fa28545` CSRF interface for the owner-auth merge.
+
+**What it does.** The endpoints in `packages/contracts/src/servers.ts` now exist (`apps/api/src/routes/servers.ts`):
+
+1. **Draft.** The address is checked against Tech Spec §6.2 (`apps/api/src/servers/address.ts`). The draft holds no secret, records `duplicateOf` for an existing address and port, and probes TCP reachability.
+2. **Host key.** `ssh-keyscan` runs on the address that was just validated. It is read-only: a key exchange, no sign-in. The owner must type or compare the fingerprint, and it must match exactly. Only the confirmed key is written to that server's own `known_hosts`.
+3. **Access key.** `ssh-keygen` makes one ED25519 key per server in `apps/api/.data/server-keys/<id>/` (directory 0700, private file 0600). The code reads only `id_ed25519.pub`. The response holds `restrict,from="<controllerAddress>" ssh-ed25519 … servrsit-<name>` and never the private key or its path.
+4. **First check.** The fixed read-only collectors run with that key and that `known_hosts`. The result is reported as the contract's six steps, with ServrSit's own reason texts. A partial result can still be activated. A failure names the step that failed and marks the steps after it as not run.
+5. **Activate.** Refused while a server with the same address and port, or the same host key, is connected. Afterwards the fleet checks only the new server once, in live mode.
+6. **Rename/describe** (`PATCH`): name, role and production only. A `writesEnabled` field gets 400.
+7. **Disconnect.** Checks stop, and ServrSit's own key directory is deleted. The response always has `remoteKeyRemoved: false` and gives fixed steps for removing the line on the server. For an imported server, the owner's own key file is never touched (`controllerKeyDeleted: false`).
+
+**Registry.** `packages/store/src/servers.ts` (`SqliteServerStore`). The database itself enforces:
+
+- `writes_enabled` can only be 0;
+- server rows are never deleted;
+- a disconnected server cannot change;
+- names and address+port are unique among connected servers;
+- events are append-only.
+
+`hosts.json` is imported **once**, when the registry is empty. After that its host list is not read. The registry file is `apps/api/.data/servers.db` (or `SERVRSIT_REGISTRY_DB`). The fleet service, the care routes and the assistant now read servers from the registry on every pass.
+
+**Config.** `hosts.json` has a new optional `registration` block. I did not edit the real file. Defaults: port 22 only, public addresses allowed, no enrolled route, no controller address. **To register the founder's Tailscale servers, the founder must set** `registration.enrolledRoutes: ["100.64.0.0/10"]` and `registration.controllerAddress` (Merauke's Tailscale address). Without `controllerAddress` the access-key step returns 409.
+
+**Web client.** `apps/web/src/api/servers.ts` has the Designer stub's interface plus `updateServer` and `disconnect`. On owner-auth, pass `createServersClient({ csrf: { headers: async () => csrfHeaders() } })`, because the default reads `/api/csrf`. Extra error kinds: `TIMEOUT`, `CSRF_INVALID` (one retry with a fresh token), `UNAUTHENTICATED`.
+
+**Checks run:**
+
+```
+pnpm -r --workspace-concurrency=1 run test   exit 0: api 172, ai 156, web 83, ssh 50, store 19, worker 18, domain 17, infra 9
+typecheck: all 9 packages exit 0      key scan: clean      no private-key text in the diff
+```
+
+**Scratch merge with `feat/coder/owner-auth`** (throwaway worktree, removed):
+
+- API: 201/201.
+- Tester gates: `auth` 37/37, `auth-t066` 12/12, `auth-extra` 21/21, `routes-401` 7/7, `static-config` 3/3.
+- `zt01-real-hosts`: 12/13. **The route inventory test fails on purpose** because the eleven `/api/servers/...` routes are new. **The Tester must review and add them.** "Nothing started a process, opened a socket or resolved a name" still passes.
+- `care-loop`: 36/42. That is the same six failures (CL-03e, 04c, 07a–c, 09a) as `owner-auth` alone. They are fixed on `feat/coder/care-gaps`.
+
+**Merge notes (with owner-auth):**
+
+- `server.ts`: register `serverRoutes` with `csrf: null`, because the global guard checks session, CSRF and Origin. Use `owner: request.authSession.info.username`, as for care. Delete the `new CsrfGuard()` line.
+- `contracts/index.ts`: export both `auth.js` and `servers.js`.
+- `index.ts`: keep both stores.
+- `care.test.ts`: the writesEnabled test keeps the owner cookie on all four requests.
+- `servers.test.ts`: needs `setupTokenSink` + `enrolOwner`. The CSRF test then expects 401 without a session and 403 with a session but a bad token or Origin. I ran exactly this version.
+
+**Limits:**
+
+- **Keys are files on the controller,** not in Secrets Manager. AWS is not authorised. The key is not passphrase-protected, so the collector can run unattended. I did not add a core-dump limit for `ssh-keygen`.
+- **ssh resolves names itself after the policy check** (same limitation as before). The pinned key is the backstop.
+- **Identity is address+port and host key only.** Machine-id identity (T-056) is on `care-gaps`. Combine them when both merge.
+- **Not exercised against any real server.** Every scan, probe and collection in the tests is injected. Real `ssh-keygen` runs only in temporary directories.
+- **The first check's observation is not kept;** the fleet collects again right after activation.
+
+Next: T-076.
+
+## ADR-019: `integration/next` (= `integration/live-v1` at `7064f7e` + `feat/coder/owner-auth` + `feat/coder/server-registration`)
+
+Two merge commits. The conflicts were resolved like this:
+
+- **Auth guard on every route.** `apps/api/src/server.ts`: the T-053 guard (`installAuthGuard`) runs first and checks session, CSRF and Origin for every `/api` route. That includes care (`/api/plans`, `/api/operations/...`) and registration (`/api/servers/...`). `CsrfGuard` and `/api/csrf` are gone. Care and server routes take the owner from `request.authSession`. Server routes get `csrf: null` because the guard already checks.
+- **Clock.** The `ControllerClockMonitor` wiring (T-063) is kept. It feeds plans and approvals (`CONTROLLER_CLOCK_UNTRUSTED`) and the enrolment gate (`CLOCK_UNTRUSTED`, T-066).
+- **Fleet.** `FleetService` reads hosts from the registry. The T-056 machine-id comparison now runs over the registry's hosts.
+- **Care servers.** They come from the registry and keep `selectedServices` and `user` (T-059).
+- **Contracts index.** Exports both `auth.js` and `servers.js`.
+- **Entry point.** `index.ts` opens both stores: `auth.db` and `servers.db`.
+- **Tests.**
+  - The T-054..T-059 tests in `care.test.ts` and all of `servers.test.ts` now sign in with `setupTokenSink` + `enrolOwner`.
+  - The registration test now expects 401 without a session, and 403 with a session but a bad token or Origin.
+- **Web client.** `apps/web/src/api/servers.ts` now sends the session token from `./auth` (`csrfHeaders()`) by default. After a `CSRF_INVALID` it re-reads the session once.
+
+**Checks on `integration/next`:**
+
+```
+pnpm -r --workspace-concurrency=1 run test   exit 0
+  api 215, ai 156, web 87, ssh 51, domain 22, store 20, worker 19, infra 9
+typecheck: all 9 packages exit 0
+Tester suites (temporary copy of /projects/servrsit-tester @ 1c9d5a7, not committed):
+  auth 37/37, auth-t066 12/12, auth-extra 21/21, totp 5/5, auth self-check 29/29, routes-401 7/7
+  care-loop static-config 3/3, self-check 28/28, care-loop 41/42 (CL-09a: their binding lacks the T-059 kinds, known)
+  zt01-real-hosts 12/13 as committed. The route inventory fails on purpose: the 9 mutating /api/servers routes are new.
+```
+
+**The Tester must review and add these 9 routes to ZT-01's `expected` list:**
+
+- `DELETE /api/servers/drafts/:id`
+- `PATCH /api/servers/:id`
+- `POST /api/servers/:id/disconnect`
+- `POST /api/servers/drafts`
+- `POST /api/servers/drafts/:id/{host-key, host-key/confirm, access-key, first-check, activate}`
+
+Also compare the lists sorted on both sides (`[...expected].sort()`). With that change in my temporary copy, ZT-01 passes 13/13, including "nothing started a process, opened a socket or resolved a name". None of these routes can write to a server. They act on drafts, the registry and ServrSit's own key files. Their only server contact is the read-only key scan and first check.
+
+From here, T-076..T-079 are based on `integration/next`.
