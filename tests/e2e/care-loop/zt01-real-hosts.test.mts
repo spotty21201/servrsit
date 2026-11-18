@@ -21,7 +21,7 @@ import { syncBuiltinESMExports } from "node:module";
 import test, { after, before } from "node:test";
 import tls from "node:tls";
 import { DatabaseSync } from "node:sqlite";
-import { CSRF_HEADER, CsrfGuard } from "../../../apps/api/src/csrf.ts";
+import { enrolOwner, setupTokenSink, type SignedInOwner } from "../../../apps/api/src/auth/testing.ts";
 import { FleetConfigSchema, loadFleetConfig } from "../../../apps/api/src/fleet/config.ts";
 import { buildServer } from "../../../apps/api/src/server.ts";
 import { SshWriteTarget, WritesDisabledError } from "../../../apps/worker/src/index.ts";
@@ -50,7 +50,10 @@ function guard<T extends object>(obj: T, names: string[], label: string): void {
   }
 }
 
-const csrf = new CsrfGuard();
+// T-053: every request is made by a signed-in owner, enrolled through the real setup flow.
+const sink = setupTokenSink();
+let owner: SignedInOwner;
+let withCsrf: Record<string, string> = {};
 const store = new SqliteCareStore({ path: dbPath });
 type App = Awaited<ReturnType<typeof buildServer>>;
 let app: App;
@@ -63,7 +66,9 @@ const opsFor = (id: string): number => (readDb.prepare("SELECT count(*) AS n FRO
 before(async () => {
   const cfg = await loadFleetConfig();
   hosts = cfg.hosts.map((h) => ({ id: h.id, name: h.name, production: h.production }));
-  app = await buildServer({ logger: false, startChecks: false, care: { store, csrf } });
+  app = await buildServer({ logger: false, startChecks: false, auth: { onSetupToken: sink.onSetupToken }, care: { store } });
+  owner = await enrolOwner(app, sink.token());
+  withCsrf = owner.headers(true);
   readDb = new DatabaseSync(dbPath, { readOnly: true });
   guard(childProcess, ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"], "child_process");
   guard(net, ["connect", "createConnection"], "net");
@@ -79,12 +84,11 @@ after(async () => {
 });
 
 async function post(url: string, body?: unknown, headers: Record<string, string> = {}) {
-  const res = await app.inject({ method: "POST", url, payload: body as object | undefined, headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...headers } });
+  const res = await app.inject({ method: "POST", url, payload: body as object | undefined, headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...owner.headers(true), ...headers } });
   let json: Record<string, any> = {};
   try { json = res.body ? JSON.parse(res.body) : {}; } catch { json = {}; }
   return { status: res.statusCode, body: json };
 }
-const withCsrf = { [CSRF_HEADER]: csrf.token };
 
 test("the shipped config covers the four real hosts and none can be written to", () => {
   assert.deepEqual(hosts.map((h) => h.name).sort(), ["Merauke", "Nabire", "Sentani", "Timika"]);
@@ -177,6 +181,12 @@ test("ZT-01: route inventory. Every mutating route is known and reviewed (a new 
   }
   const expected = [
     "POST /api/assistant/messages",
+    // T-053: create or end the owner's session; they touch no server and no care record.
+    "POST /api/auth/login",
+    "POST /api/auth/logout",
+    "POST /api/auth/setup",
+    "POST /api/auth/setup/confirm",
+    "POST /api/auth/totp",
     "POST /api/plans",
     "POST /api/plans/:id/approvals",
     "POST /api/plans/:id/revisions",

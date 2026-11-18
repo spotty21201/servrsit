@@ -28,13 +28,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { CSRF_HEADER, CsrfGuard } from "../../../apps/api/src/csrf.ts";
+import { CSRF_HEADER } from "../../../apps/api/src/csrf.ts";
+import { enrolOwner, setupTokenSink, type SignedInOwner } from "../../../apps/api/src/auth/testing.ts";
 import { buildServer } from "../../../apps/api/src/server.ts";
 
 type App = Awaited<ReturnType<typeof buildServer>>;
 import { Dispatcher, SimulatedTarget, TransportError, type WriteTarget } from "../../../apps/worker/src/index.ts";
 import { createSigner, PRODUCTION_ACK } from "../../../packages/domain/src/index.ts";
-import { MemoryIntentStore, SqliteCareStore, type OperationEvent, type StoredOperation } from "../../../packages/store/src/index.ts";
+import { MemoryIntentStore, SqliteAuthStore, SqliteCareStore, type OperationEvent, type StoredOperation } from "../../../packages/store/src/index.ts";
 import {
   ACK_RECOVERY,
   ACK_RISK,
@@ -156,7 +157,10 @@ export class InProcessHarness implements Harness {
   private readonly readDb = new DatabaseSync(this.dbPath, { readOnly: true });
   private readonly intents = new MemoryIntentStore();
   private readonly signer = createSigner("key-1");
-  private readonly csrf = new CsrfGuard();
+  // T-053: one owner for the whole run. The auth store outlives app rebuilds, so the session does too.
+  private readonly authStore = new SqliteAuthStore({ path: ":memory:" });
+  private readonly sink = setupTokenSink();
+  private owner: SignedInOwner | null = null;
   private readonly servers = new Map<string, Entry>();
   private readonly targets = new Map<string, WriteTarget>();
   private app: App | null = null;
@@ -188,20 +192,24 @@ export class InProcessHarness implements Harness {
       logger: false,
       startChecks: false,
       now: this.clock.now,
+      auth: { store: this.authStore, onSetupToken: this.sink.onSetupToken },
       care: {
         store: this.store,
-        csrf: this.csrf,
         now: this.clock.now,
         simulated: [...this.servers.values()].map((e) => ({ server: e.care as never, target: e.rec })),
       },
     });
     this.dirty = false;
+    if (this.owner === null) this.owner = await enrolOwner(this.app, this.sink.token());
     return this.app;
   }
 
-  private async http(method: "GET" | "POST", url: string, body?: unknown, headers: Record<string, string> = {}) {
+  /** `auth.session` false sends no session cookie; `auth.csrf` false leaves the CSRF header to the caller. */
+  private async http(method: "GET" | "POST", url: string, body?: unknown, headers: Record<string, string> = {}, auth: { session: boolean; csrf: boolean } = { session: true, csrf: true }) {
     const app = await this.appInstance();
-    const res = await app.inject({ method, url, payload: body === undefined ? undefined : (body as object), headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...headers } });
+    const owner = this.owner!;
+    const authHeaders = !auth.session ? {} : method === "GET" || !auth.csrf ? { cookie: owner.cookie, origin: "http://127.0.0.1:5173" } : owner.headers(true);
+    const res = await app.inject({ method, url, payload: body === undefined ? undefined : (body as object), headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...authHeaders, ...headers } });
     let json: unknown = null;
     try { json = res.body.length ? JSON.parse(res.body) : null; } catch { json = null; }
     return { status: res.statusCode, body: asBody(json) };
@@ -266,8 +274,9 @@ export class InProcessHarness implements Harness {
   }
 
   async approve(i: ApproveInput): Promise<Res<{ operationId: string }>> {
+    await this.appInstance();
     const headers: Record<string, string> = { ...(i.extraHeaders ?? {}) };
-    const token = this.csrf.token;
+    const token = this.owner!.csrfToken;
     if (i.csrf !== "omit") headers[CSRF_HEADER] = i.csrf === "wrong" ? token.slice(0, -1) + (token.endsWith("0") ? "1" : "0") : token;
     const acks = i.acknowledgements ?? [];
     const body: Record<string, unknown> = {
@@ -277,7 +286,7 @@ export class InProcessHarness implements Harness {
       acknowledgements: acks.includes(ACK_RECOVERY) && acks.includes(ACK_RISK) ? [PRODUCTION_ACK] : [],
       ...(i.extra ?? {}),
     };
-    const r = await this.http("POST", `/api/plans/${i.planId}/approvals`, body, headers);
+    const r = await this.http("POST", `/api/plans/${i.planId}/approvals`, body, headers, { session: i.session !== "none", csrf: false });
     return r.status < 300 ? this.toRes(r.status, r.body, { operationId: String(r.body["operationId"]) }) : this.toRes(r.status, r.body);
   }
 
