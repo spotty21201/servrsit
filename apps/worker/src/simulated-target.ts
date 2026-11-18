@@ -25,7 +25,7 @@ import {
   type SignedManifest,
   type TransactionPreview,
 } from "@servrsit/domain";
-import { TransportError, type QueryResult, type RejectCode, type RemoteRecord, type SubmitResult, type WriteTarget } from "./target.js";
+import { TransportError, type QueryResult, type RejectCode, type RemoteRecord, type SubmitResult, type TargetIdentity, type WriteTarget } from "./target.js";
 
 export interface SimulatedFaults {
   /** The next submit never reaches the target (nothing is claimed). */
@@ -54,6 +54,13 @@ export interface SimulatedTargetOptions {
   readonly now: () => Date;
   /** How long a run takes in simulated time. */
   readonly runMs?: number;
+  /**
+   * [SIMULATED] T-056: the machine id this target reports. Without one, the target is its own
+   * machine: its identity is made unique to its serverId, so fixtures that reuse one host-key
+   * fingerprint for unrelated simulated servers are not mistaken for clones. Pass a machineId to
+   * model aliases and clones.
+   */
+  readonly machineId?: string;
 }
 
 interface LedgerEntry {
@@ -72,6 +79,8 @@ export class SimulatedTarget implements WriteTarget {
   readonly kind = "simulated" as const;
   readonly serverId: string;
   readonly hostKeyFingerprint: string;
+  readonly machineId: string;
+  private readonly explicitIdentity: boolean;
   readonly faults: SimulatedFaults = {};
   /** Every claim ever made, for tests: a second mutation would show up here. */
   readonly claims: string[] = [];
@@ -84,6 +93,8 @@ export class SimulatedTarget implements WriteTarget {
   constructor(private readonly options: SimulatedTargetOptions) {
     this.serverId = options.serverId;
     this.hostKeyFingerprint = options.hostKeyFingerprint;
+    this.machineId = options.machineId ?? `sim-machine-${options.serverId}`;
+    this.explicitIdentity = options.machineId !== undefined;
     this.installed = { ...options.installed };
     this.upgrades = [...options.upgrades];
   }
@@ -125,6 +136,12 @@ export class SimulatedTarget implements WriteTarget {
   /** Change the simulated machine between planning and approval (precondition test). */
   addUpgrade(change: PackageChange): void {
     this.upgrades.push(change);
+  }
+
+  /** T-056: [SIMULATED] identity, so aliases of one simulated machine can be detected. */
+  identity(): TargetIdentity {
+    if (this.explicitIdentity) return { hostKeyFingerprint: this.hostKeyFingerprint, machineId: this.machineId };
+    return { hostKeyFingerprint: `${this.hostKeyFingerprint}#${this.serverId}`, machineId: this.machineId };
   }
 
   async previewPackages(): Promise<TransactionPreview | null> {

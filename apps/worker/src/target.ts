@@ -52,10 +52,19 @@ export class TransportError extends Error {
   }
 }
 
+/** T-056: what identifies the machine, as observed. Null when the target has not been observed. */
+export interface TargetIdentity {
+  readonly hostKeyFingerprint: string;
+  /** /etc/machine-id, or null if it could not be read. Cloned images can share one. */
+  readonly machineId: string | null;
+}
+
 export interface WriteTarget {
   readonly kind: TargetKind;
   readonly serverId: string;
   readonly hostKeyFingerprint: string;
+  /** T-056: observed identity, or null when unknown. */
+  identity(): TargetIdentity | null;
   /** Read-only transaction preview. Null if none can be produced. */
   previewPackages(): Promise<TransactionPreview | null>;
   submit(signed: SignedManifest): Promise<SubmitResult>;

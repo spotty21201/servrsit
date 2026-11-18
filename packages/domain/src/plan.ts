@@ -17,6 +17,7 @@
 
 import { isUbuntuArchiveOrigin } from "@servrsit/contracts";
 import { digestOf } from "./canonical.js";
+import type { IdentityStatus } from "./identity.js";
 import type { OperationId } from "./catalog.js";
 
 export const PLAN_TTL_MS = 15 * 60_000;
@@ -44,6 +45,10 @@ export const BLOCKER_CODES = [
   "ONLY_EXCLUDED_PACKAGES",
   /** ServrSit's own clock is wrong or unverified, so expiries and freshness cannot be trusted (T-063). */
   "CONTROLLER_CLOCK_UNTRUSTED",
+  /** T-056: the machine's host key or machine id is unknown. */
+  "IDENTITY_UNVERIFIED",
+  /** T-056: another record shares exactly one of this machine's host key and machine id. */
+  "IDENTITY_AMBIGUOUS",
 ] as const;
 export type BlockerCode = (typeof BLOCKER_CODES)[number];
 
@@ -67,6 +72,9 @@ export const BLOCKER_MESSAGES: Readonly<Record<BlockerCode, string>> = {
     "The only pending updates come from sources outside Ubuntu's archive. Update plans leave those out by default.",
   CONTROLLER_CLOCK_UNTRUSTED:
     "ServrSit's own clock is wrong or unverified, so plan expiry and data freshness cannot be trusted. Fix the clock on the ServrSit machine first.",
+  IDENTITY_UNVERIFIED: "This server's identity is not confirmed (host key and machine id), so changes cannot be enabled.",
+  IDENTITY_AMBIGUOUS:
+    "Another server record shares part of this server's identity (its host key or its machine id, but not both). Changes stay blocked until that is resolved.",
 };
 
 export interface PackageChange {
@@ -157,6 +165,8 @@ export interface BuildPlanInput {
   readonly now: Date;
   /** T-063: false when ServrSit's own clock is untrusted. */
   readonly controllerClockTrusted: boolean;
+  /** T-056: the machine's identity. Checked only when writes are enabled. Absent: not checked. */
+  readonly identity?: IdentityStatus | undefined;
 }
 
 const block = (code: BlockerCode): Blocker => ({ code, message: BLOCKER_MESSAGES[code] });
@@ -170,6 +180,10 @@ export function buildPlan(input: BuildPlanInput): Plan {
   const blockers: Blocker[] = [];
   if (!input.server.writesEnabled) blockers.push(block("WRITES_DISABLED"));
   if (!input.controllerClockTrusted) blockers.push(block("CONTROLLER_CLOCK_UNTRUSTED"));
+  if (input.server.writesEnabled && input.identity !== undefined) {
+    if (input.identity.status === "unverified") blockers.push(block("IDENTITY_UNVERIFIED"));
+    if (input.identity.status === "ambiguous") blockers.push(block("IDENTITY_AMBIGUOUS"));
+  }
   if (input.unresolved === "outcome_unknown") blockers.push(block("OUTCOME_UNKNOWN"));
   else if (input.unresolved !== null) blockers.push(block("TARGET_BUSY"));
 

@@ -52,6 +52,8 @@ test("every collector command is on the reviewed allowlist", () => {
     /^test -e \/var\/run\/reboot-required$/,
     // T-061: prints the time; cannot set it (that needs -s or a date argument, and root).
     /^date \+%s$/,
+    // T-056: reads the machine id; changes nothing.
+    /^cat \/etc\/machine-id$/,
   ];
   for (const s of COLLECTOR_SECTIONS) {
     assert.ok(allowed.some((re) => re.test(s.command)), `unreviewed command: ${s.command}`);

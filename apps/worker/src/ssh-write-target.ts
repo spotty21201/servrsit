@@ -28,6 +28,11 @@ export class SshWriteTarget implements WriteTarget {
     readonly hostKeyFingerprint: string = "unverified",
   ) {}
 
+  /** T-056: not observed through this adapter; real servers' identity comes from inspection. */
+  identity(): null {
+    return null;
+  }
+
   /** No preview is requested from a real server: nothing new is run there. */
   async previewPackages(): Promise<TransactionPreview | null> {
     return null;

@@ -373,3 +373,68 @@ test("T-055: reconcile follows the ledger and never sends anything; real servers
     assert.equal(noCsrf.statusCode, 403);
   } finally { await h.app.close(); }
 });
+
+// ---- T-056: canonical identity ----------------------------------------------------------
+
+async function twoRecords(kind: "alias" | "ambiguous") {
+  const clock = new Clock();
+  const config = await loadFleetConfig();
+  const signer = createSigner("key-1");
+  const mkSim = (serverId: string, machineId: string) => new SimulatedTarget({
+    serverId, installationId: "inst", hostKeyFingerprint: "SHA256:same-host-key", machineId,
+    trustedKeys: { [signer.keyId]: signer.publicKeyPem },
+    installed: { "openssl:amd64": "3.0.13-0ubuntu3.4" },
+    upgrades: [{ name: "openssl", arch: "amd64", from: "3.0.13-0ubuntu3.4", to: "3.0.13-0ubuntu3.5" }],
+    now: clock.now, runMs: 1000,
+  });
+  const A = "00000000-0000-4000-8000-0000005e0a0a";
+  const B = "00000000-0000-4000-8000-0000005e0a0b";
+  const simA = mkSim(A, "machine-1");
+  // An alias is a second record of the SAME machine: it reaches the same simulated target.
+  const simB = kind === "alias" ? simA : mkSim(B, "machine-2");
+  const store = new SqliteCareStore({ path: join(mkdtempSync(join(tmpdir(), "servrsit-care-")), "care.db") });
+  const csrf = new CsrfGuard();
+  const fleet = new FleetService({ config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }) });
+  const app = await buildServer({
+    config, fleetService: fleet, startChecks: false, logger: false,
+    care: {
+      store, csrf, now: clock.now,
+      simulated: [
+        { server: { id: A, name: "Sim A", production: false, kind: "simulated", writesEnabled: true }, target: simA },
+        { server: { id: B, name: "Sim B alias", production: false, kind: "simulated", writesEnabled: true }, target: simB },
+      ],
+    },
+  });
+  const headers = { "content-type": "application/json", "x-csrf-token": csrf.token, origin: ORIGIN };
+  const plan = async (serverId: string) => (await app.inject({ method: "POST", url: "/api/plans", headers, payload: JSON.stringify({ operation: "apply.packages.v1", serverId }) })).json() as {
+    id: string; version: number; digest: string; blockers: Array<{ code: string }>;
+  };
+  const approve = (p: { id: string; version: number; digest: string }, key: string) =>
+    app.inject({ method: "POST", url: `/api/plans/${p.id}/approvals`, headers, payload: JSON.stringify({ planVersion: p.version, planDigest: p.digest, idempotencyKey: key, acknowledgements: [] }) });
+  return { app, store, A, B, plan, approve };
+}
+
+test("T-056 (F5): a second record of the same machine cannot bypass its lock (CL-03e)", async () => {
+  const h = await twoRecords("alias");
+  try {
+    const pa = await h.plan(h.A);
+    const pb = await h.plan(h.B);
+    assert.deepEqual([pa.blockers, pb.blockers], [[], []], "both records verify: same host key and machine id");
+    assert.equal((await h.approve(pa, "idem-key-alias-0001")).statusCode, 201);
+    const r = await h.approve(pb, "idem-key-alias-0002");
+    assert.equal(r.statusCode, 409);
+    assert.equal((r.json() as { error: string }).error, "TARGET_BUSY", "the alias shares the machine's lock");
+    assert.deepEqual((await h.plan(h.B)).blockers.map((b) => b.code), ["TARGET_BUSY"], "a new plan through the alias shows the machine is busy");
+    assert.equal(h.store.unresolvedFor(h.B), null);
+  } finally { await h.app.close(); }
+});
+
+test("T-056 (F5): two records sharing only the host key are ambiguous: write enablement is blocked for both", async () => {
+  const h = await twoRecords("ambiguous");
+  try {
+    for (const id of [h.A, h.B]) {
+      const p = await h.plan(id);
+      assert.deepEqual(p.blockers.map((b) => b.code), ["IDENTITY_AMBIGUOUS"], id);
+    }
+  } finally { await h.app.close(); }
+});

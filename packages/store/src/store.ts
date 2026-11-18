@@ -65,6 +65,11 @@ export interface ApproveInput {
   /** Current value of the server's write gate, from configuration (never from the request). */
   readonly writesEnabled: boolean;
   readonly targetKind: TargetKind;
+  /**
+   * T-056: the machine's canonical identity (host key + machine id). One unresolved operation per
+   * machine, enforced by a unique index, whatever record or display name it is approved through.
+   */
+  readonly canonicalId?: string | null | undefined;
   readonly now: Date;
   readonly newId: () => string;
 }
@@ -85,6 +90,8 @@ export interface CareStore {
   getPlan(id: string, version?: number): Plan | null;
   /** The single unresolved operation for a server, if any. */
   unresolvedFor(serverId: string): StoredOperation | null;
+  /** T-056: unresolved work on the same machine through any record. */
+  unresolvedForMachine(canonicalId: string): StoredOperation | null;
   /**
    * One transaction: checks, approval, operation (queued), "created" event and
    * dispatch-outbox entry. All or nothing.

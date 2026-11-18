@@ -139,6 +139,11 @@ export const InspectionObservationSchema = z.object({
     os: fieldSchema(OsInfoSchema),
     architecture: fieldSchema(z.string().max(32)),
     bootId: fieldSchema(z.string().uuid()),
+    /**
+     * T-056: /etc/machine-id. With the host key, it identifies the machine; cloned images can share
+     * one, so it is never enough alone. Optional: observations from before T-056 lack it.
+     */
+    machineId: fieldSchema(z.string().regex(/^[0-9a-f]{32}$/)).optional(),
     uptimeSeconds: fieldSchema(z.number().nonnegative()),
     load: fieldSchema(
       z.object({

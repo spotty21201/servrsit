@@ -67,6 +67,8 @@ CREATE TABLE IF NOT EXISTS operations (
   target_kind TEXT NOT NULL CHECK (target_kind IN ('simulated', 'ssh')),
   state TEXT NOT NULL CHECK (state IN ('queued','running','verifying','succeeded','partially_succeeded','failed','cancelled_before_start','outcome_unknown')),
   stop_requested INTEGER NOT NULL DEFAULT 0,
+  -- T-056: the machine this operation is on (host key + machine id). Null for operations from before T-056.
+  canonical_id TEXT,
   remote_operation_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -163,6 +165,12 @@ export class SqliteCareStore implements CareStore {
   constructor(private readonly options: SqliteCareStoreOptions) {
     this.db = new DatabaseSync(options.path);
     this.db.exec(SCHEMA);
+    // T-056: older files lack canonical_id; add it, then the per-machine lock.
+    const columns = this.db.prepare("PRAGMA table_info(operations)").all() as Array<{ name: string }>;
+    if (!columns.some((c) => c.name === "canonical_id")) this.db.exec("ALTER TABLE operations ADD COLUMN canonical_id TEXT");
+    this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS one_unresolved_per_machine
+      ON operations (canonical_id)
+      WHERE canonical_id IS NOT NULL AND state IN ${UNRESOLVED_SQL}`);
   }
 
   /** Run `fn` in one IMMEDIATE transaction; roll back on any throw. */
@@ -191,6 +199,13 @@ export class SqliteCareStore implements CareStore {
         : this.db.prepare("SELECT body FROM plans WHERE id = ? AND version = ?").get(id, version)
     ) as { body: string } | undefined;
     return row === undefined ? null : (JSON.parse(row.body) as Plan);
+  }
+
+  unresolvedForMachine(canonicalId: string): StoredOperation | null {
+    const row = this.db
+      .prepare(`SELECT * FROM operations WHERE canonical_id = ? AND state IN ${UNRESOLVED_SQL}`)
+      .get(canonicalId) as OperationRow | undefined;
+    return row === undefined ? null : toOperation(row);
   }
 
   unresolvedFor(serverId: string): StoredOperation | null {
@@ -234,7 +249,8 @@ export class SqliteCareStore implements CareStore {
       if (!latest.requiredAcknowledgements.every((a) => input.acknowledgements.includes(a))) {
         return { kind: "rejected", code: "ACK_REQUIRED" };
       }
-      const busy = this.unresolvedFor(latest.serverId);
+      // T-056: busy if this server, or any record of the same machine, has unresolved work.
+      const busy = this.unresolvedFor(latest.serverId) ?? (input.canonicalId == null ? null : this.unresolvedForMachine(input.canonicalId));
       if (busy !== null) return { kind: "rejected", code: busy.state === "outcome_unknown" ? "OUTCOME_UNKNOWN" : "TARGET_BUSY" };
 
       const at = input.now.toISOString();
@@ -244,8 +260,8 @@ export class SqliteCareStore implements CareStore {
         .prepare("INSERT INTO approvals (id, plan_id, plan_version, plan_digest, idempotency_key, owner, acknowledgements, approved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .run(approvalId, latest.id, latest.version, latest.digest, input.idempotencyKey, input.owner, JSON.stringify([...input.acknowledgements].sort()), at);
       this.db
-        .prepare("INSERT INTO operations (id, approval_id, plan_id, plan_version, server_id, operation, target_kind, state, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?)")
-        .run(operationId, approvalId, latest.id, latest.version, latest.serverId, latest.operation, input.targetKind, at, at);
+        .prepare("INSERT INTO operations (id, approval_id, plan_id, plan_version, server_id, operation, target_kind, state, canonical_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)")
+        .run(operationId, approvalId, latest.id, latest.version, latest.serverId, latest.operation, input.targetKind, input.canonicalId ?? null, at, at);
       this.insertEvent(operationId, "created", `owner:${input.owner}`, null, "queued", { approvalId, planDigest: latest.digest }, at);
       const intentDigest = `${latest.digest}#${operationId}`;
       this.db

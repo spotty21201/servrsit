@@ -20,7 +20,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ApprovalRequestSchema, PlanRequestSchema, type ControllerClock } from "@servrsit/contracts";
-import { buildPlan, type Plan } from "@servrsit/domain";
+import { buildPlan, resolveIdentities, type Plan } from "@servrsit/domain";
 import type { ApprovalRejection, CareStore, StoredOperation, TargetKind } from "@servrsit/store";
 import { Reconciler, type WriteTarget } from "@servrsit/worker";
 import { CSRF_HEADER, type CsrfGuard } from "../csrf.js";
@@ -84,6 +84,16 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
   const newId = o.newId ?? (() => randomUUID());
   const serverById = (id: string) => o.servers().find((s) => s.id === id);
   const clockStatus = () => o.controllerClock?.().status ?? "not-checked";
+  // T-056: identities across every record, from what each target reports (host key + machine id).
+  const identities = () =>
+    resolveIdentities(
+      o.servers().map((s) => {
+        // A target that does not report an identity (for example a test double) is unverified.
+        const t = o.targets.get(s.id);
+        const seen = t !== undefined && typeof t.identity === "function" ? t.identity() : null;
+        return { id: s.id, hostKeyFingerprint: seen?.hostKeyFingerprint ?? null, machineId: seen?.machineId ?? null };
+      }),
+    );
 
   fastify.setErrorHandler((error, request, reply) => {
     const status = (error as { statusCode?: number }).statusCode ?? 500;
@@ -97,7 +107,11 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     const target = o.targets.get(server.id);
     const preview =
       server.writesEnabled && server.kind === "simulated" && target !== undefined ? await target.previewPackages() : null;
-    const unresolved = o.store.unresolvedFor(server.id);
+    const identity = identities().get(server.id);
+    // T-056: busy if this record, or another record of the same machine, has unresolved work.
+    const unresolved =
+      o.store.unresolvedFor(server.id) ??
+      (identity?.status === "verified" ? o.store.unresolvedForMachine(identity.canonicalId) : null);
     const plan = buildPlan({
       id,
       version,
@@ -107,6 +121,7 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
       unresolved: unresolved === null ? null : (unresolved.state as "queued" | "running" | "verifying" | "outcome_unknown"),
       now: now(),
       controllerClockTrusted: clockStatus() !== "untrusted",
+      identity,
     });
     o.store.insertPlan(plan);
     return plan;
@@ -154,6 +169,13 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
       request.log.info({ planId: plan.id, result: "rejected", code: "CONTROLLER_CLOCK_UNTRUSTED" }, "care: approval");
       return reply.code(409).send({ error: "PLAN_BLOCKED", blockers: ["CONTROLLER_CLOCK_UNTRUSTED"] });
     }
+    // T-056: re-check identity at approval time; only a confirmed identity can be approved, and its
+    // canonical id carries the per-machine lock.
+    const identity = server.writesEnabled ? identities().get(server.id) : undefined;
+    if (identity !== undefined && identity.status !== "verified") {
+      const code = identity.status === "ambiguous" ? "IDENTITY_AMBIGUOUS" : "IDENTITY_UNVERIFIED";
+      return reply.code(409).send({ error: "PLAN_BLOCKED", blockers: [code] });
+    }
     // T-054 (F2, Tech Spec §9.2): re-check the target at approval time. If its package state is no
     // longer the state the plan was prepared from, the plan is stale. Same rule as planning: a
     // server whose writes are disabled, or a real one, is never contacted. A repeat of an approval
@@ -178,6 +200,7 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
       acknowledgements: parsed.data.acknowledgements,
       writesEnabled: server.writesEnabled,
       targetKind: server.kind,
+      canonicalId: identity?.status === "verified" ? identity.canonicalId : null,
       now: now(),
       newId,
     });

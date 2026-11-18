@@ -214,3 +214,29 @@ test("T-063: an untrusted controller clock blocks the plan with CONTROLLER_CLOCK
   assert.deepEqual(p.blockers.map((b) => b.code), ["CONTROLLER_CLOCK_UNTRUSTED"]);
   assert.match(p.blockers[0]!.message, /ServrSit's own clock/);
 });
+
+// ---- T-056: canonical identity -------------------------------------------------------
+
+test("T-056: same host key AND machine id is one machine; one shared attribute is ambiguous; a missing one is unverified", async () => {
+  const { resolveIdentities, canonicalIdOf } = await import("./index.js");
+  const m = resolveIdentities([
+    { id: "a", hostKeyFingerprint: "SHA256:k1", machineId: "m1" },
+    { id: "a-alias", hostKeyFingerprint: "SHA256:k1", machineId: "m1" },
+    { id: "clone", hostKeyFingerprint: "SHA256:k9", machineId: "m2" },
+    { id: "rebuilt", hostKeyFingerprint: "SHA256:k8", machineId: "m2" },
+    { id: "no-key", hostKeyFingerprint: null, machineId: "m3" },
+    { id: "no-mid", hostKeyFingerprint: "SHA256:k7", machineId: null },
+  ]);
+  assert.deepEqual(m.get("a"), { status: "verified", canonicalId: canonicalIdOf("SHA256:k1", "m1"), aliases: ["a-alias"] });
+  assert.equal(m.get("a-alias")?.status === "verified" && m.get("a-alias")?.status, "verified");
+  assert.deepEqual(m.get("clone"), { status: "ambiguous", conflictsWith: ["rebuilt"] });
+  assert.deepEqual(m.get("rebuilt"), { status: "ambiguous", conflictsWith: ["clone"] });
+  assert.deepEqual(m.get("no-key"), { status: "unverified", reason: "host-key-unknown" });
+  assert.deepEqual(m.get("no-mid"), { status: "unverified", reason: "machine-id-unknown" });
+});
+
+test("T-056: an unverified or ambiguous identity blocks a plan only when writes are enabled", () => {
+  assert.deepEqual(plan({ identity: { status: "ambiguous", conflictsWith: ["x"] } }).blockers.map((b) => b.code), ["IDENTITY_AMBIGUOUS"]);
+  assert.deepEqual(plan({ identity: { status: "unverified", reason: "machine-id-unknown" } }).blockers.map((b) => b.code), ["IDENTITY_UNVERIFIED"]);
+  assert.deepEqual(plan({ server: { ...server, writesEnabled: false }, preview: null, identity: { status: "unverified", reason: "host-key-unknown" } }).blockers.map((b) => b.code), ["WRITES_DISABLED"]);
+});
