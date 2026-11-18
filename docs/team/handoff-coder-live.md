@@ -1207,3 +1207,28 @@ I resolved exactly this way in the throwaway check above.
 - **Time sources:** the two HTTPS sources are fixed in code.
 - **Not covered yet:** the per-server explainer does not carry the `timesUncertain` note. T-064 O1 touches that path.
 - **Fixing Merauke's clock** is the founder's action (time sync failing to `123.235.232.172`). It needs sudo, which I do not use.
+
+## T-064: Tester's AI findings (branch `feat/coder/ai-hardening`, stacked on T-063)
+
+| Finding | Commit | What changed |
+|---|---|---|
+| **F1 (High)** secret detector blind spots | `b99d3e4` | Catches env-style names (`DB_PASSWORD=`, `GITHUB_TOKEN=`, `OPENAI_API_KEY=`; `_` defeated `\b`), "the sudo password for Sentani is …", and Tailscale, Stripe (`sk_live_`), Google `AIza`, npm, GitLab and Hugging Face keys. The owner-context file is stricter: a secret word followed by any value (`x: …`, `x = …`, `x is …`) rejects the whole file. The old "password is X" rule is narrowed to `=` and `:`, so "the password is required" is no longer refused. |
+| **F5** cut-off replies | `d472387` | `finish_reason: "length"` becomes reason `truncated_output`, with the notice "The AI's reply was cut off before it finished, so here are the checks directly." |
+| **F2** correct answers discarded | `a8d2eda` | Fixes: a name-only clause no longer carries into the next sentence; list numbering is ignored; "N of them" and "all N" are read as server counts; "on each" means every server; "up to date apart from one …" is an exception, not a zero; held-back packages are checked as held back (new `heldBack` in the model input); unit names that contain "-and-" stay whole; a nameless clause takes the server its own sentence names. |
+| **F3** missed phrasings | `a8d2eda` | New checks: "fully patched", "current", "nothing to update", "Updates: none", "none pending", "fine / looks good / up and running" (as health claims; "load and memory are fine" is not one), copular negation ("is not healthy" must be true), decimals per server, "has none" with no earlier noun (refused), and a named server outside the data (`out_of_scope`). |
+| **F4** tone | `a8d2eda` | A reply that contains bad news (failed, down, unreachable, outage, full, breach, ≥90 %, …) **and** a joke marker (yikes, oops, whoops, napping, lol, …) is withheld as `unsuitable_tone`: "The AI's reply joked about a problem, so here are the checks directly." A cheeky good-news line still passes. |
+| **O1** explainer | `a8d2eda` | `GuardedExplainer` runs the same fact and tone checks. It has no API route yet. |
+
+**The Tester's suites against this branch** (temporary copy; nothing of theirs committed). I added `host.clock`, `packages.metadataClock` and `packages.pendingOutsideUbuntu` to **the copy** of their `support/synthetic.mts`, because T-061/T-062 made those fields required. **They need the same fix,** or 8 `pipeline` tests fail with a TypeError.
+
+```
+owner-context 21/21 (was 20/21)   pipeline 11/11 (was 10/11)   fact-check 58/58 (was 47/58)
+coverage-probe 6/6 (was 0/6)      real-replay 10/10 (was 7/10: RC3, RC6 and RE2 are now accepted)
+```
+
+**Full run at `a8d2eda`:** `pnpm -r test` exit 0; ai 156, api 147, all others pass; typecheck exit 0; key scan clean.
+
+**Limits:**
+
+- **The checker is still lexical.** The out-of-scope check relies on capitalised names and a stop list. A sentence-initial capital is flagged only when its sentence names no known server.
+- **F6 is not addressed.** "Next check is due in 10 min" (minutes are exempt) is not checked.
