@@ -37,7 +37,7 @@ const add = (s: Scenario) => { S.push(s); };
 
 // ============================================================================ D. first check (FR-02, FR-03)
 add({ id: "SR-30", title: "route, authentication, timeout and bad-output failures get different codes, leave the draft retryable, and a fix lets the same draft succeed", spec: ["PRD FR-02: connection tests distinguish route failure, authentication failure, host-key mismatch", "Tech 6.4: a timeout records missing evidence rather than fabricating a measurement"],
-  async function run(h) {
+  async run(h) {
     const cases: [import("./support/world.mts").Behavior, string[]][] = [["unreachable", ["ROUTE_UNAVAILABLE"]], ["auth-fail", ["AUTH_FAILED"]], ["timeout", ["TIMEOUT"]], ["output-garbage", ["OUTPUT_INVALID", "COLLECTION_FAILED"]]];
     const seen = new Set<string>();
     for (const [i, [b, codes]] of cases.entries()) {
@@ -182,7 +182,7 @@ add({ id: "SR-51", title: "after disconnect nothing is scheduled or collected fo
     assert.equal(h.scheduler.collectionsFor(s.serverId), n0, "a collection ran after disconnect"); assert.equal(s.target.connections(), conns, "the controller connected to a disconnected server");
     const row = (await h.servers()).find((x) => x.id === s.serverId); if (row) assert.equal(row.status, "disconnected");
     const fleet = JSON.parse((await h.api({ method: "GET", path: "/api/fleet" })).raw); const f = fleet.servers?.find((x: any) => x.id === s.serverId); if (f) assert.notEqual(f.status, "fresh", "a disconnected server is shown as freshly checked");
-    if (h.has("care")) await assert.rejects(h.care.queueOperation(s.serverId), undefined, "a plan or operation was accepted for a disconnected server");
+    if (h.has("care")) await assert.rejects(h.care.queueOperation(s.serverId), "a plan or operation was accepted for a disconnected server");
   } });
 
 add({ id: "SR-52", title: "queued operations are cancelled before they are sent; a running one is reported, never killed or called cancelled", spec: ["PRD FR-03: queued operations are cancelled; the product reports any already-running action that may continue", "execution-security invariant 6: never treat disconnection as proof a command stopped"], needs: ["care"],
