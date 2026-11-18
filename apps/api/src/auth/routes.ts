@@ -24,7 +24,16 @@ import {
 } from "@servrsit/contracts";
 import { SlidingWindowLimiter } from "../assistant/rate-limit.js";
 import { CSRF_HEADER, originAllowed, STATE_CHANGING_METHODS } from "../csrf.js";
-import { ABSOLUTE_TIMEOUT_MS, ENROLMENT_MS, MFA_TICKET_MS, type AuthResult, type OwnerAuth, type ResolvedSession } from "./owner-auth.js";
+import {
+  ABSOLUTE_TIMEOUT_MS,
+  ENROLMENT_MS,
+  MFA_TICKET_MS,
+  TRUSTED_DEVICE_MS,
+  type AttemptSource,
+  type AuthResult,
+  type OwnerAuth,
+  type ResolvedSession,
+} from "./owner-auth.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -34,6 +43,8 @@ declare module "fastify" {
 }
 
 export const MFA_COOKIE = "servrsit_mfa";
+/** T-066: set after a full sign-in; this browser then keeps its own rate-limit and lockout allowance. */
+export const DEVICE_COOKIE = "servrsit_device";
 export const ENROL_COOKIE = "servrsit_enrol";
 export const AUTH_RATE_LIMIT = 10;
 export const AUTH_RATE_WINDOW_MS = 60_000;
@@ -58,6 +69,7 @@ const STATUS: Readonly<Record<AuthErrorCode, number>> = {
   INVALID_INPUT: 400,
   CSRF_INVALID: 403,
   SETUP_UNAVAILABLE: 403,
+  CLOCK_UNTRUSTED: 409,
 };
 
 function sendError(reply: FastifyReply, error: AuthErrorCode, retryAfterSeconds?: number): FastifyReply {
@@ -103,13 +115,28 @@ export interface AuthRouteOptions {
   readonly allowedOrigins?: readonly string[] | undefined;
   /** Force the Secure cookie attribute (production). Otherwise it follows the request protocol. */
   readonly secureCookies?: boolean | undefined;
+  /** For tests: one limiter for every source, replacing the per-source limits. */
   readonly limiter?: SlidingWindowLimiter | undefined;
   /** Milliseconds since the epoch, shared with OwnerAuth. For tests. */
   readonly now?: (() => number) | undefined;
 }
 
 export async function authRoutes(fastify: FastifyInstance, o: AuthRouteOptions): Promise<void> {
-  const limiter = o.limiter ?? new SlidingWindowLimiter(AUTH_RATE_LIMIT, AUTH_RATE_WINDOW_MS, o.now);
+  // T-066 D-A1: one allowance per source (trusted device, else address), so an anonymous caller
+  // cannot use up the owner's. Bounded: the map is cleared if it ever grows past MAX_LIMITERS.
+  const MAX_LIMITERS = 1000;
+  const limiters = new Map<string, SlidingWindowLimiter>();
+  const limiterFor = (key: string): SlidingWindowLimiter => {
+    if (o.limiter !== undefined) return o.limiter;
+    let l = limiters.get(key);
+    if (l === undefined) {
+      if (limiters.size >= MAX_LIMITERS) limiters.clear();
+      l = new SlidingWindowLimiter(AUTH_RATE_LIMIT, AUTH_RATE_WINDOW_MS, o.now);
+      limiters.set(key, l);
+    }
+    return l;
+  };
+  const sourceOf = (request: FastifyRequest): AttemptSource => ({ address: request.ip, deviceCookie: request.cookies[DEVICE_COOKIE] });
 
   const cookie = (request: FastifyRequest, reply: FastifyReply, name: string, value: string, path: string, maxAgeMs: number) =>
     reply.setCookie(name, value, {
@@ -130,17 +157,25 @@ export async function authRoutes(fastify: FastifyInstance, o: AuthRouteOptions):
     return reply.code(500).send({ error: "INTERNAL" });
   });
 
-  /** Origin check and rate limit for the session-creating POSTs. Returns true when the request may continue. */
+  /** Origin check for the session-creating POSTs. Returns true when the request may continue. */
   const admit = (request: FastifyRequest, reply: FastifyReply): boolean => {
     if (!originAllowed(request.headers, o.allowedOrigins)) {
       sendError(reply, "CSRF_INVALID");
       return false;
     }
-    if (!limiter.tryAcquire()) {
-      sendError(reply, "RATE_LIMITED", Math.max(1, Math.ceil(limiter.retryAfterMs() / 1000)));
-      return false;
-    }
     return true;
+  };
+
+  /** T-066 D-A1: counted only after the body is valid, against the request's own source. */
+  const withinLimit = (request: FastifyRequest, reply: FastifyReply): boolean => {
+    const limiter = limiterFor(o.auth.sourceKey(sourceOf(request)).key);
+    if (limiter.tryAcquire()) return true;
+    sendError(reply, "RATE_LIMITED", Math.max(1, Math.ceil(limiter.retryAfterMs() / 1000)));
+    return false;
+  };
+
+  const issueDevice = (request: FastifyRequest, reply: FastifyReply, device: string | null) => {
+    if (device !== null) cookie(request, reply, DEVICE_COOKIE, device, "/api/auth", TRUSTED_DEVICE_MS);
   };
 
   const outcome = (request: FastifyRequest, step: string, result: AuthResult<unknown>) =>
@@ -150,6 +185,7 @@ export async function authRoutes(fastify: FastifyInstance, o: AuthRouteOptions):
     if (!admit(request, reply)) return reply;
     const parsed = SetupStartRequestSchema.safeParse(request.body);
     if (!parsed.success) return sendError(reply, "INVALID_INPUT");
+    if (!withinLimit(request, reply)) return reply;
     const result = await o.auth.startSetup(parsed.data);
     outcome(request, "setup", result);
     if (!result.ok) return sendError(reply, result.error);
@@ -165,11 +201,13 @@ export async function authRoutes(fastify: FastifyInstance, o: AuthRouteOptions):
     if (!admit(request, reply)) return reply;
     const parsed = SetupConfirmRequestSchema.safeParse(request.body);
     if (!parsed.success) return sendError(reply, "INVALID_INPUT");
+    if (!withinLimit(request, reply)) return reply;
     const result = o.auth.confirmSetup(request.cookies[ENROL_COOKIE], parsed.data.code);
     outcome(request, "setup-confirm", result);
     if (!result.ok) return sendError(reply, result.error);
     clear(reply, ENROL_COOKIE, "/api/auth/setup");
     cookie(request, reply, AUTH_SESSION_COOKIE, result.value.session.id, "/", ABSOLUTE_TIMEOUT_MS);
+    issueDevice(request, reply, o.auth.trustThisDevice(sourceOf(request)));
     return reply.header("cache-control", "no-store").send({ recoveryCodes: result.value.recoveryCodes, session: result.value.session.info });
   });
 
@@ -177,7 +215,8 @@ export async function authRoutes(fastify: FastifyInstance, o: AuthRouteOptions):
     if (!admit(request, reply)) return reply;
     const parsed = LoginRequestSchema.safeParse(request.body);
     if (!parsed.success) return sendError(reply, "INVALID_INPUT");
-    const result = await o.auth.login(parsed.data.username, parsed.data.password);
+    if (!withinLimit(request, reply)) return reply;
+    const result = await o.auth.login(parsed.data.username, parsed.data.password, sourceOf(request));
     outcome(request, "password", result);
     if (!result.ok) return sendError(reply, result.error, result.retryAfterSeconds);
     cookie(request, reply, MFA_COOKIE, result.value.ticket, "/api/auth", MFA_TICKET_MS);
@@ -188,11 +227,13 @@ export async function authRoutes(fastify: FastifyInstance, o: AuthRouteOptions):
     if (!admit(request, reply)) return reply;
     const parsed = TotpRequestSchema.safeParse(request.body);
     if (!parsed.success) return sendError(reply, "INVALID_INPUT");
-    const result = o.auth.secondFactor(request.cookies[MFA_COOKIE], parsed.data);
+    if (!withinLimit(request, reply)) return reply;
+    const result = o.auth.secondFactor(request.cookies[MFA_COOKIE], parsed.data, sourceOf(request));
     outcome(request, "code" in parsed.data ? "totp" : "recovery-code", result);
     if (!result.ok) return sendError(reply, result.error, result.retryAfterSeconds);
     clear(reply, MFA_COOKIE, "/api/auth");
     cookie(request, reply, AUTH_SESSION_COOKIE, result.value.id, "/", ABSOLUTE_TIMEOUT_MS);
+    issueDevice(request, reply, result.value.device);
     return reply.header("cache-control", "no-store").send(result.value.info);
   });
 

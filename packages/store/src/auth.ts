@@ -14,7 +14,7 @@
  *  - at most one owner (primary key fixed to 1)
  *  - a TOTP time step is accepted at most once, and never an older one
  *    (conditional update)
- *  - a setup token and a recovery code work once (conditional update)
+ *  - a recovery code works once (conditional update); setup tokens are removed when enrolment completes
  */
 
 import { chmodSync, existsSync, mkdirSync } from "node:fs";
@@ -67,10 +67,19 @@ CREATE TABLE IF NOT EXISTS sessions (
   absolute_expires_at INTEGER NOT NULL
 ) STRICT;
 
-CREATE TABLE IF NOT EXISTS login_failures (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
+-- T-066: failures per source (address or trusted device), and one account-wide window.
+CREATE TABLE IF NOT EXISTS auth_failures (
+  source TEXT PRIMARY KEY,
   consecutive INTEGER NOT NULL,
-  locked_until INTEGER NOT NULL
+  locked_until INTEGER NOT NULL,
+  window_start INTEGER NOT NULL
+) STRICT;
+
+-- T-066: browsers that completed a full sign-in (SHA-256 of a random cookie value).
+CREATE TABLE IF NOT EXISTS trusted_devices (
+  id_hash TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL,
+  last_used_at INTEGER NOT NULL
 ) STRICT;
 `;
 
@@ -99,11 +108,6 @@ export interface SessionRecord {
   readonly createdAt: number;
   readonly lastSeenAt: number;
   readonly absoluteExpiresAt: number;
-}
-
-export interface LockoutState {
-  readonly consecutive: number;
-  readonly lockedUntil: number;
 }
 
 export interface SqliteAuthStoreOptions {
@@ -188,15 +192,6 @@ export class SqliteAuthStore {
     this.tx(() => {
       this.db.prepare("DELETE FROM setup_tokens").run();
       this.db.prepare("INSERT INTO setup_tokens (token_hash, created_at) VALUES (?, ?)").run(tokenHash, at);
-    });
-  }
-
-  /** Use a setup token. True once per token, and only while no owner exists. */
-  consumeSetupToken(tokenHash: string, at: number): boolean {
-    return this.tx(() => {
-      if (this.hasOwner()) return false;
-      const r = this.db.prepare("UPDATE setup_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL").run(at, tokenHash);
-      return Number(r.changes) === 1;
     });
   }
 
@@ -302,31 +297,61 @@ export class SqliteAuthStore {
     return (this.db.prepare("SELECT count(*) AS n FROM sessions").get() as { n: number }).n;
   }
 
-  // ---- failed sign-in attempts (one account, so one counter) -----------------
-
-  lockout(): LockoutState {
-    const r = this.db.prepare("SELECT consecutive, locked_until FROM login_failures WHERE id = 1").get() as
-      | { consecutive: number; locked_until: number }
-      | undefined;
-    return r === undefined ? { consecutive: 0, lockedUntil: 0 } : { consecutive: r.consecutive, lockedUntil: r.locked_until };
+  /** T-066 D-A3: after the clock stepped back, the last accepted TOTP step lies in the future; bring it back. */
+  clampTotpCounter(maxCounter: number): void {
+    this.db.prepare("UPDATE owner SET last_totp_counter = ? WHERE id = 1 AND last_totp_counter > ?").run(maxCounter, maxCounter);
   }
 
-  /** Count a failure; `lockFor(consecutive)` gives the lock length in ms (0 for none). */
-  recordFailure(now: number, lockFor: (consecutive: number) => number): LockoutState {
-    return this.tx(() => {
-      const consecutive = this.lockout().consecutive + 1;
-      const ms = lockFor(consecutive);
-      const lockedUntil = ms > 0 ? now + ms : 0;
+  /** T-066 D-A4: is this setup token current and unused? Does not use it up. */
+  setupTokenValid(tokenHash: string): boolean {
+    if (this.hasOwner()) return false;
+    return this.db.prepare("SELECT 1 AS x FROM setup_tokens WHERE token_hash = ? AND used_at IS NULL").get(tokenHash) !== undefined;
+  }
+
+  // ---- failed attempts per source (T-066) --------------------------------------
+
+  sourceFailures(source: string): { consecutive: number; lockedUntil: number; windowStart: number } {
+    const r = this.db.prepare("SELECT consecutive, locked_until, window_start FROM auth_failures WHERE source = ?").get(source) as
+      | { consecutive: number; locked_until: number; window_start: number }
+      | undefined;
+    return r === undefined ? { consecutive: 0, lockedUntil: 0, windowStart: 0 } : { consecutive: r.consecutive, lockedUntil: r.locked_until, windowStart: r.window_start };
+  }
+
+  writeSourceFailures(source: string, v: { consecutive: number; lockedUntil: number; windowStart: number }): void {
+    this.db
+      .prepare(
+        "INSERT INTO auth_failures (source, consecutive, locked_until, window_start) VALUES (?, ?, ?, ?) ON CONFLICT (source) DO UPDATE SET consecutive = excluded.consecutive, locked_until = excluded.locked_until, window_start = excluded.window_start",
+      )
+      .run(source, v.consecutive, v.lockedUntil, v.windowStart);
+  }
+
+  clearSourceFailures(source: string): void {
+    this.db.prepare("DELETE FROM auth_failures WHERE source = ?").run(source);
+  }
+
+  /** Keep the table bounded: forget the oldest sources beyond `max`. */
+  pruneSourceFailures(max: number): void {
+    this.db
+      .prepare("DELETE FROM auth_failures WHERE source NOT IN (SELECT source FROM auth_failures ORDER BY window_start DESC LIMIT ?) AND source NOT IN ('account', 'account-level')")
+      .run(max);
+  }
+
+  // ---- trusted devices (T-066) --------------------------------------------------
+
+  addTrustedDevice(idHash: string, at: number, max: number): void {
+    this.tx(() => {
+      this.db.prepare("INSERT OR REPLACE INTO trusted_devices (id_hash, created_at, last_used_at) VALUES (?, ?, ?)").run(idHash, at, at);
       this.db
-        .prepare(
-          "INSERT INTO login_failures (id, consecutive, locked_until) VALUES (1, ?, ?) ON CONFLICT (id) DO UPDATE SET consecutive = excluded.consecutive, locked_until = excluded.locked_until",
-        )
-        .run(consecutive, lockedUntil);
-      return { consecutive, lockedUntil };
+        .prepare("DELETE FROM trusted_devices WHERE id_hash NOT IN (SELECT id_hash FROM trusted_devices ORDER BY last_used_at DESC LIMIT ?)")
+        .run(max);
     });
   }
 
-  resetFailures(): void {
-    this.db.prepare("DELETE FROM login_failures").run();
+  isTrustedDevice(idHash: string): boolean {
+    return this.db.prepare("SELECT 1 AS x FROM trusted_devices WHERE id_hash = ?").get(idHash) !== undefined;
+  }
+
+  touchTrustedDevice(idHash: string, at: number): void {
+    this.db.prepare("UPDATE trusted_devices SET last_used_at = ? WHERE id_hash = ?").run(at, idHash);
   }
 }
