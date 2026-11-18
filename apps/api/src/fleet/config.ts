@@ -109,6 +109,10 @@ export const DEFAULT_CONFIG_PATH = new URL("../../config/hosts.json", import.met
 export const DEFAULT_KNOWN_HOSTS_PATH = new URL("../../.data/known_hosts", import.meta.url);
 /** T-069: the server registry (gitignored). */
 export const DEFAULT_REGISTRY_PATH = new URL("../../.data/servers.db", import.meta.url);
+/** T-076: finding records (gitignored). */
+export const DEFAULT_FINDINGS_PATH = new URL("../../.data/findings.db", import.meta.url);
+/** T-076/T-079: installation settings, such as the scheduler pause (gitignored). */
+export const DEFAULT_SETTINGS_PATH = new URL("../../.data/settings.db", import.meta.url);
 /** T-069: one 0700 directory per registered server, holding its key pair and pinned known_hosts (gitignored). */
 export const DEFAULT_SERVER_KEYS_DIR = new URL("../../.data/server-keys", import.meta.url);
 
