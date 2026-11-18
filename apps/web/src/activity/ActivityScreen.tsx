@@ -2,8 +2,9 @@
  * ActivityScreen — UX-10 Activity and export at /activity (UX Spec §14).
  *
  * Runs on Coder's real activity client (api/activity.ts, T-077). The
- * [FIXTURE DATA] banner is shown on /fixtures/activity, which uses the
- * in-memory fixture client. On the real page, work the API marks as simulated
+ * [FIXTURE DATA] banner is shown on /fixtures/activity (in-memory fixture
+ * client) and whenever /api/fleet says it is in fixture mode, because the
+ * activity response has no mode of its own. On the real page, work the API marks as simulated
  * carries a "Simulated" tag on its row.
  *
  * The default list shows operations and findings; routine checks are one
@@ -15,6 +16,7 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import type { ActivityResult, ActivityType, ExportFormat } from "@servrsit/contracts";
 import { createActivityClient, type ActivityClient, type ActivityClientError, type ActivityRecord, type ExportResult } from "../api/activity";
+import { useFleet } from "../api/useFleet";
 import { createFixtureActivityClient } from "../fixtures/activityFixture";
 import { CareShell, LoadFailure, ProductionLabel } from "../care/CareShell";
 import { useClock } from "../clock/ClockContext";
@@ -48,6 +50,7 @@ function expiryText(e: ExportResult, now: Date, tz: string, uncertain: boolean):
 
 export function ActivityScreen({ client: injected, fixture = false }: { client?: ActivityClient; fixture?: boolean }) {
   const client = useMemo(() => injected ?? (fixture ? createFixtureActivityClient() : createActivityClient()), [injected, fixture]);
+  const fleet = useFleet({ pollMs: 0 });
   const ids = useId();
   const tz = DEFAULT_OWNER_TIME_ZONE;
   const uncertain = useClock().view?.agesUncertain ?? false;
@@ -113,7 +116,7 @@ export function ActivityScreen({ client: injected, fixture = false }: { client?:
   }
 
   return (
-    <CareShell fixture={fixture} section="Activity">
+    <CareShell fixture={fixture || fleet.data?.mode === "fixture"} section="Activity">
       <header className={c.header}>
         <h1 className={c.title}>Activity</h1>
         <p className={c.small}>What ServrSit did and found, newest first. Times are in {tz}.</p>

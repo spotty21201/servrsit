@@ -12,8 +12,8 @@
  *                         canonical Plan review (/plans/:id)
  *
  * Runs on Coder's real baselines client (api/baselines.ts, T-078). The
- * [FIXTURE DATA] banner shows on /fixtures/baselines and whenever the API
- * lists a simulated server; simulated servers also carry a "Simulated" tag.
+ * [FIXTURE DATA] banner shows on /fixtures/baselines, when /api/fleet says
+ * it is in fixture mode, and whenever the API lists a simulated server; simulated servers also carry a "Simulated" tag.
  * Nothing here changes a server. A setup plan creates missing directories
  * only; missing packages are listed as not included. A plan for a real host
  * opens blocked by writesEnabled=false on the same Plan review screen used
@@ -21,6 +21,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createBaselinesClient, type Baseline, type BaselineServer, type BaselinesClient, type BaselinesClientError, type Candidate, type CandidatesResponse, type Comparison, type ComparisonRow, type HistoryEvent } from "../api/baselines";
+import { useFleet } from "../api/useFleet";
 import { createFixtureBaselinesClient } from "../fixtures/baselinesFixture";
 import { CareShell, LoadFailure, ProductionLabel } from "../care/CareShell";
 import { ReasonButton } from "../auth/AuthFrame";
@@ -75,6 +76,7 @@ function Row({ r, busy, onMark, onUnmark }: { r: ComparisonRow; busy: boolean; o
 
 export function BaselineScreen({ client: injected, fixture = false }: { client?: BaselinesClient; fixture?: boolean }) {
   const client = useMemo(() => injected ?? (fixture ? createFixtureBaselinesClient() : createBaselinesClient()), [injected, fixture]);
+  const fleet = useFleet({ pollMs: 0 });
   const ids = useId();
   const tz = DEFAULT_OWNER_TIME_ZONE;
   const uncertain = useClock().view?.agesUncertain ?? false;
@@ -168,7 +170,7 @@ export function BaselineScreen({ client: injected, fixture = false }: { client?:
   const back = (n: number): void => { setProblem(null); setStep(n); if (n < 2) { setRows(null); setHistory([]); setSeen(null); } };
 
   return (
-    <CareShell fixture={fixture || servers.some((x) => x.simulated)} section="Baselines">
+    <CareShell fixture={fixture || fleet.data?.mode === "fixture" || servers.some((x) => x.simulated)} section="Baselines">
       <header className={c.header}>
         <h1 className={c.title} ref={titleRef} tabIndex={-1}>Baselines and server setup</h1>
         <p className={c.small}>Step {step + 1} of 4: {STEPS[step]}. Comparing copies and deletes nothing. A setup only ever happens through a plan you approve.</p>
