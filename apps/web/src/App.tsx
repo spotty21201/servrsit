@@ -18,6 +18,7 @@ import { AuthGate } from "./auth/AuthGate";
 import { ClockProvider, useClock } from "./clock/ClockContext";
 import { FixtureClockPage } from "./clock/FixtureClockPage";
 import { matchRoute } from "./lib/router";
+import { FindingsScreen } from "./findings/FindingsScreen";
 import { ConnectScreen } from "./connect/ConnectScreen";
 import { ServerDetailScreen } from "./servers/ServerDetailScreen";
 import { PlanScreen } from "./care/PlanScreen";
@@ -38,6 +39,7 @@ export default function App() {
 function Routes() {
   const route = matchRoute(globalThis.location.pathname);
   if (route.name === "fixtureClock") return <FixtureClockPage />;
+  if (route.name === "findings") return <FindingsScreen />;
   if (route.name === "connect") return <ConnectScreen />;
   if (route.name === "server") return <ServerDetailScreen serverId={route.id} section={route.section} />;
   if (route.name === "plan") return <PlanScreen planId={route.id} />;

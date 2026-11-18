@@ -33,6 +33,7 @@ import { AttentionColumn } from "./AttentionColumn.js";
 import { RecentActivity } from "./RecentActivity.js";
 import { ChatBar } from "./ChatBar.js";
 import type { OverviewVM } from "./fleetViewModel.js";
+import { SchedulerNotice } from "../../findings/SchedulerNotice";
 import { SignOutButton } from "../../auth/SignOutButton";
 import { useSession } from "../../auth/session";
 import styles from "./OverviewScreen.module.css";
@@ -131,6 +132,8 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
             </header>
 
             {/* Data-state notices (inline, never a toast) */}
+            {vm.scheduler && <SchedulerNotice notice={vm.scheduler} />}
+
             {vm.phase === "loading" && (
               <p className={styles.stateNote} role="status">
                 Loading your servers…

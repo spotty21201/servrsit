@@ -14,6 +14,7 @@
 import type { Finding, FleetServer, FleetStatus } from "@servrsit/contracts";
 import type { FleetState } from "../../api/fleetState";
 import { formatClock, formatClockWithAge, formatRelative, parseIso, resolveTimeZone } from "../../lib/time";
+import { schedulerFromFleet, schedulerNotice, type SchedulerNoticeVM } from "../../findings/findingsViewModel";
 
 // ── View-model types ────────────────────────────────────────────────────────
 
@@ -78,6 +79,8 @@ export interface OverviewVM {
   /** Owner time zone (IANA) used for every time on the screen. */
   timeZone: string;
   receivedText: string | null;
+  /** "Check delayed" when the next check is overdue; null when checking looks normal or unknown. */
+  scheduler: SchedulerNoticeVM | null;
   nextCheckText: string | null;
   refreshing: boolean;
   /** Latest refresh failure (shown with or without data). */
@@ -292,6 +295,7 @@ export function toOverviewVM(state: FleetState, now: Date, agesUncertain = false
     anyFixture: counts.fixture > 0,
     counts,
     timeZone: tz,
+    scheduler: schedulerNotice(schedulerFromFleet(data, now), now, tz, u),
     receivedText: received ? formatClockWithAge(received, now, tz, u) : null,
     nextCheckText: nextCheck ? formatClock(nextCheck, now, tz) : null,
     refreshing: state.refreshing,

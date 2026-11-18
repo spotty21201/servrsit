@@ -29,3 +29,8 @@ test("server detail and connect routes", () => {
   assert.deepEqual(matchRoute("/servers/a/b/c"), { name: "overview" });
   assert.deepEqual(matchRoute("/servers/%3Cx%3E"), { name: "overview" });
 });
+
+test("findings and activity routes", () => {
+  assert.deepEqual(matchRoute("/findings"), { name: "findings" });
+  assert.deepEqual(matchRoute("/activity/"), { name: "activity" });
+});

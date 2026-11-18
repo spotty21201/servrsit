@@ -67,3 +67,11 @@ test("ServrSit's clock untrusted: relative ages carry ≈, clock times do not", 
   assert.equal(vm.servers[0]?.freshUntilText, "fresh until 15:30 WIB");
   assert.equal(toOverviewVM(ready(), NOW).servers[0]?.observedText, "Observed 10 min ago");
 });
+
+test("an overdue next check shows 'Check delayed' on the Overview; a normal one shows nothing", () => {
+  const late = toOverviewVM(ready(fixtureFleet({ nextCheckAt: "2026-11-17T08:00:00Z" })), NOW); // 10 min before NOW
+  assert.equal(late.scheduler?.title, "Check delayed");
+  assert.match(late.scheduler?.text ?? "", /not run/);
+  assert.equal(toOverviewVM(ready(fixtureFleet({ nextCheckAt: "2026-11-17T08:15:00Z" })), NOW).scheduler, null);
+  assert.equal(toOverviewVM(ready(), NOW).scheduler, null);
+});
