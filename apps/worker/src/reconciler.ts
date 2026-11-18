@@ -90,27 +90,60 @@ export class Reconciler {
     return this.transition(op, "verifying", via, { remoteState: "finished", exitCode: record.exitCode });
   }
 
-  /** Verifying: check installed versions independently (invariant 9). */
+  /** Verifying: check the result independently of the ledger (invariant 9), per kind. */
   async verify(op: StoredOperation, plan: Plan): Promise<StoredOperation> {
     const target = this.o.targets.get(op.serverId);
     if (target === undefined) return op;
-    const expected = plan.verification.expectInstalled;
-    const keys = Object.keys(expected);
-    let actual;
+    let verified: string[];
+    let notVerified: string[];
     try {
-      actual = await target.inspectInstalled(keys);
+      ({ verified, notVerified } = await this.check(target, plan));
     } catch (error) {
       if (!(error instanceof TransportError)) throw error;
+      // A rebooting server does not answer for a while: that is not evidence either way.
       this.transportError(op, "verification");
       return op;
     }
-    const verified = keys.filter((k) => actual[k] === expected[k]);
-    const notVerified = keys.filter((k) => actual[k] !== expected[k]);
     const exitCode = this.lastExitCode(op);
     const payload = { verified, notVerified, exitCode };
     if (notVerified.length === 0 && exitCode === 0) return this.transition(op, "succeeded", "verification_recorded", payload);
     if (verified.length === 0) return this.transition(op, "failed", "verification_recorded", payload);
     return this.transition(op, "partially_succeeded", "verification_recorded", payload);
+  }
+
+  /** What was expected, split into what the target shows and what it does not. */
+  private async check(target: WriteTarget, plan: Plan): Promise<{ verified: string[]; notVerified: string[] }> {
+    const split = (items: Array<[string, boolean]>) => ({
+      verified: items.filter(([, ok]) => ok).map(([k]) => k),
+      notVerified: items.filter(([, ok]) => !ok).map(([k]) => k),
+    });
+    switch (plan.operation) {
+      case "apply.packages.v1": {
+        const expected = plan.verification.expectInstalled;
+        const keys = Object.keys(expected);
+        const actual = await target.inspectInstalled(keys);
+        return split(keys.map((k) => [k, actual[k] === expected[k]]));
+      }
+      case "restart.service.v1": {
+        // Restarted means active AND started again: an unchanged start time is not a restart.
+        const s = await target.inspectService(plan.verification.unit);
+        return split([[plan.verification.unit, s.active && s.activeSince !== null && s.activeSince !== plan.verification.previousActiveSince]]);
+      }
+      case "reboot.host.v1": {
+        const b = await target.inspectBoot();
+        return split([["boot", b.bootId !== plan.verification.previousBootId]]);
+      }
+      case "prepare.directories.v1": {
+        const expected = plan.verification.expectDirectories;
+        const seen = await target.inspectDirectories(expected.map((d) => d.path));
+        return split(
+          expected.map((d) => {
+            const s = seen.find((x) => x.path === d.path);
+            return [d.path, s !== undefined && s.exists && s.isDirectory && s.owner === d.owner && s.group === d.group && s.mode === d.mode];
+          }),
+        );
+      }
+    }
   }
 
   private lastExitCode(op: StoredOperation): number | null {

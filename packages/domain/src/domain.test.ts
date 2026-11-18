@@ -61,8 +61,9 @@ test("invariant 5: a package plan never includes a service restart or a reboot",
   const p = plan();
   assert.equal(p.scope.includesServiceRestart, false);
   assert.equal(p.scope.includesReboot, false);
-  assert.equal(isSupportedOperation("restart.service.v1"), false);
-  assert.equal(isSupportedOperation("reboot.host.v1"), false);
+  // T-059: restart and reboot exist, but only as their own plans with their own approvals.
+  assert.equal(isSupportedOperation("restart.service.v1"), true);
+  assert.equal(isSupportedOperation("reboot.host.v1"), true);
   assert.equal(isSupportedOperation("run.shell"), false);
   assert.equal(isSupportedOperation("apply.packages.v1"), true);
 });
@@ -241,4 +242,48 @@ test("T-056: an unverified or ambiguous identity blocks a plan only when writes 
   assert.deepEqual(plan({ identity: { status: "ambiguous", conflictsWith: ["x"] } }).blockers.map((b) => b.code), ["IDENTITY_AMBIGUOUS"]);
   assert.deepEqual(plan({ identity: { status: "unverified", reason: "machine-id-unknown" } }).blockers.map((b) => b.code), ["IDENTITY_UNVERIFIED"]);
   assert.deepEqual(plan({ server: { ...server, writesEnabled: false }, preview: null, identity: { status: "unverified", reason: "host-key-unknown" } }).blockers.map((b) => b.code), ["WRITES_DISABLED"]);
+});
+
+
+// ---- T-059: restart, reboot and directory plans ---------------------------------------
+
+test("T-059: a restart plan is one selected unit, never a reboot; unknown or unselected units are blocked", async () => {
+  const { buildRestartPlan } = await import("./index.js");
+  const base = { id: "r1", version: 1, server, unresolved: null, now: NOW, controllerClockTrusted: true } as const;
+  const preview = { exists: true, active: true, activeSince: "2026-11-17T09:00:00.000Z", stateDigest: "sha256:svc" };
+  const p = buildRestartPlan({ ...base, unit: "nginx.service", selectedUnits: ["nginx.service"], preview });
+  assert.deepEqual([p.operation, p.scope, p.blockers], ["restart.service.v1", { unit: "nginx.service", includesServiceRestart: true, includesReboot: false }, []]);
+  assert.deepEqual(p.verification, { unit: "nginx.service", previousActiveSince: "2026-11-17T09:00:00.000Z" });
+  assert.deepEqual(p.requiredAcknowledgements, [...PRODUCTION_ACKS], "production needs both acknowledgements");
+  assert.ok(verifyPlanDigest(p));
+  const code = (q: { blockers: readonly { code: string }[] }) => q.blockers.map((b) => b.code);
+  assert.deepEqual(code(buildRestartPlan({ ...base, unit: "sshd.service", selectedUnits: ["nginx.service"], preview })), ["UNIT_NOT_SELECTED"]);
+  assert.deepEqual(code(buildRestartPlan({ ...base, unit: "nginx.service; reboot", selectedUnits: ["nginx.service; reboot"], preview })), ["UNIT_NOT_SELECTED"]);
+  assert.deepEqual(code(buildRestartPlan({ ...base, unit: "nginx.service", selectedUnits: ["nginx.service"], preview: { ...preview, exists: false } })), ["UNIT_NOT_FOUND"]);
+});
+
+test("T-059: a reboot plan is the whole machine, never a restart, verified by a new boot id", async () => {
+  const { buildRebootPlan } = await import("./index.js");
+  const p = buildRebootPlan({ id: "b1", version: 1, server, unresolved: null, now: NOW, controllerClockTrusted: true, preview: { bootId: "boot-1", stateDigest: "sha256:boot" } });
+  assert.deepEqual([p.operation, p.scope, p.verification, p.blockers], ["reboot.host.v1", { includesServiceRestart: false, includesReboot: true }, { previousBootId: "boot-1" }, []]);
+});
+
+test("T-059: directories only under /srv or the user's home, safe modes, existing paths left alone (Tech Spec 8.3)", async () => {
+  const { buildDirectoriesPlan, directoryAllowed } = await import("./index.js");
+  const d = (path: string, mode = "0750", owner = "spotty") => ({ path, owner, group: owner, mode });
+  for (const ok of ["/srv/app", "/srv/app/data", "/home/spotty/projects"]) assert.equal(directoryAllowed(d(ok), "spotty"), true, ok);
+  for (const bad of ["/etc/app", "/srv", "/home/other/x", "/home/spotty/.ssh", "/srv/../etc", "/srv/a//b", "srv/app", "/srv/app/", "/proc/x", "/srv/$(id)"]) {
+    assert.equal(directoryAllowed(d(bad), "spotty"), false, bad);
+  }
+  for (const mode of ["4750", "2750", "1777", "0777", "0757", "0640", "75x"]) assert.equal(directoryAllowed(d("/srv/app", mode), "spotty"), false, mode);
+  assert.equal(directoryAllowed(d("/srv/app", "0750", "Root!"), "spotty"), false);
+
+  const base = { id: "d1", version: 1, server, unresolved: null, now: NOW, controllerClockTrusted: true, user: "spotty" } as const;
+  const p = buildDirectoriesPlan({ ...base, requested: [d("/srv/b"), d("/srv/a")], preview: { existing: ["/srv/b"], stateDigest: "sha256:dirs" } });
+  assert.deepEqual([p.scope.directories.map((x) => x.path), p.scope.existing, p.blockers], [["/srv/a"], ["/srv/b"], []]);
+  assert.deepEqual(p.verification.expectDirectories, [d("/srv/a")]);
+  const allExist = buildDirectoriesPlan({ ...base, requested: [d("/srv/a")], preview: { existing: ["/srv/a"], stateDigest: "x" } });
+  assert.deepEqual(allExist.blockers.map((b) => b.code), ["NO_CHANGES"]);
+  const bad = buildDirectoriesPlan({ ...base, requested: [d("/srv/a"), d("/etc/x")], preview: { existing: [], stateDigest: "x" } });
+  assert.deepEqual(bad.blockers.map((b) => b.code), ["DIRECTORY_NOT_ALLOWED"], "one bad path blocks the whole plan");
 });

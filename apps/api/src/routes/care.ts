@@ -19,8 +19,17 @@
 
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { ApprovalRequestSchema, PlanRequestSchema, type ControllerClock } from "@servrsit/contracts";
-import { buildPlan, resolveIdentities, type Plan } from "@servrsit/domain";
+import { ApprovalRequestSchema, PlanRequestSchema, type ControllerClock, type PlanRequest } from "@servrsit/contracts";
+import {
+  buildDirectoriesPlan,
+  buildPlan,
+  buildRebootPlan,
+  buildRestartPlan,
+  directoryAllowed,
+  isRestartableUnitName,
+  resolveIdentities,
+  type Plan,
+} from "@servrsit/domain";
 import type { ApprovalRejection, CareStore, StoredOperation, TargetKind } from "@servrsit/store";
 import { Reconciler, TransportError, type WriteTarget } from "@servrsit/worker";
 import { CSRF_HEADER, type CsrfGuard } from "../csrf.js";
@@ -32,6 +41,10 @@ export interface CareServer {
   readonly kind: TargetKind;
   /** From configuration only. Always false for real servers. */
   readonly writesEnabled: boolean;
+  /** T-059: units the owner selected for this server; only these can be restarted. */
+  readonly selectedServices?: readonly string[] | undefined;
+  /** T-059: the login user, for directories under /home/<user>. */
+  readonly user?: string | undefined;
 }
 
 export interface CareRouteOptions {
@@ -104,29 +117,81 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     return reply.code(500).send({ statusCode: 500, error: "Internal Server Error", message: "Internal Server Error" });
   });
 
-  async function makePlan(id: string, version: number, server: CareServer): Promise<Plan> {
+  async function makePlan(id: string, version: number, server: CareServer, request: PlanRequest): Promise<Plan> {
     // Never contact a server whose writes are disabled, and never a real one.
     const target = o.targets.get(server.id);
-    const preview =
-      server.writesEnabled && server.kind === "simulated" && target !== undefined ? await target.previewPackages() : null;
+    const mayPreview = server.writesEnabled && server.kind === "simulated" && target !== undefined;
     const identity = identities().get(server.id);
     // T-056: busy if this record, or another record of the same machine, has unresolved work.
-    const unresolved =
+    const busy =
       o.store.unresolvedFor(server.id) ??
       (identity?.status === "verified" ? o.store.unresolvedForMachine(identity.canonicalId) : null);
-    const plan = buildPlan({
+    const common = {
       id,
       version,
-      operation: "apply.packages.v1",
       server: { id: server.id, production: server.production, writesEnabled: server.writesEnabled },
-      preview,
-      unresolved: unresolved === null ? null : (unresolved.state as "queued" | "running" | "verifying" | "outcome_unknown"),
+      unresolved: busy === null ? null : (busy.state as "queued" | "running" | "verifying" | "outcome_unknown"),
       now: now(),
       controllerClockTrusted: clockStatus() !== "untrusted",
       identity,
-    });
+    };
+    let plan: Plan;
+    switch (request.operation) {
+      case "apply.packages.v1":
+        plan = buildPlan({ ...common, operation: "apply.packages.v1", preview: mayPreview ? await target.previewPackages() : null });
+        break;
+      case "restart.service.v1": {
+        const selected = server.selectedServices ?? [];
+        // Only a selected, well-formed unit is ever named to the target.
+        const ask = mayPreview && selected.includes(request.unit) && isRestartableUnitName(request.unit);
+        plan = buildRestartPlan({ ...common, unit: request.unit, selectedUnits: selected, preview: ask ? await target.previewService(request.unit) : null });
+        break;
+      }
+      case "reboot.host.v1":
+        plan = buildRebootPlan({ ...common, preview: mayPreview ? await target.previewBoot() : null });
+        break;
+      case "prepare.directories.v1": {
+        const user = server.user ?? "";
+        const ask = mayPreview && request.directories.every((d) => directoryAllowed(d, user));
+        plan = buildDirectoriesPlan({
+          ...common,
+          requested: request.directories,
+          user,
+          preview: ask ? await target.previewDirectories(request.directories.map((d) => d.path)) : null,
+        });
+        break;
+      }
+    }
     o.store.insertPlan(plan);
     return plan;
+  }
+
+  /** The request a plan was made from, for a revision (same operation, same parameters). */
+  function requestOf(p: Plan): PlanRequest {
+    switch (p.operation) {
+      case "apply.packages.v1":
+        return { operation: p.operation, serverId: p.serverId };
+      case "restart.service.v1":
+        return { operation: p.operation, serverId: p.serverId, unit: p.scope.unit };
+      case "reboot.host.v1":
+        return { operation: p.operation, serverId: p.serverId };
+      case "prepare.directories.v1":
+        return { operation: p.operation, serverId: p.serverId, directories: [...p.scope.requested] };
+    }
+  }
+
+  /** The target's current state digest for the kind of work a plan describes (T-054 re-check). */
+  async function currentDigest(p: Plan, target: WriteTarget): Promise<string | null> {
+    switch (p.operation) {
+      case "apply.packages.v1":
+        return (await target.previewPackages())?.stateDigest ?? null;
+      case "restart.service.v1":
+        return (await target.previewService(p.scope.unit))?.stateDigest ?? null;
+      case "reboot.host.v1":
+        return (await target.previewBoot())?.stateDigest ?? null;
+      case "prepare.directories.v1":
+        return (await target.previewDirectories(p.scope.requested.map((d) => d.path)))?.stateDigest ?? null;
+    }
   }
 
   fastify.get("/api/csrf", async (_request, reply) =>
@@ -140,7 +205,7 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     if (server === undefined) return notFound(reply);
     let plan: Plan;
     try {
-      plan = await makePlan(newId(), 1, server);
+      plan = await makePlan(newId(), 1, server, parsed.data);
     } catch (error) {
       if (error instanceof TransportError) return routeUnavailable(reply);
       throw error;
@@ -156,7 +221,7 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     if (server === undefined) return notFound(reply);
     let plan: Plan;
     try {
-      plan = await makePlan(current.id, current.version + 1, server);
+      plan = await makePlan(current.id, current.version + 1, server, requestOf(current));
     } catch (error) {
       if (error instanceof TransportError) return routeUnavailable(reply);
       throw error;
@@ -198,14 +263,14 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     const replay = o.store.hasApproval(plan.id, parsed.data.planVersion);
     if (!replay && server.writesEnabled && server.kind === "simulated" && target !== undefined) {
       const latest = o.store.getPlan(plan.id);
-      let current;
+      let current: string | null = null;
       try {
-        current = await target.previewPackages();
+        current = latest === null ? null : await currentDigest(latest, target);
       } catch (error) {
         if (error instanceof TransportError) return routeUnavailable(reply);
         throw error;
       }
-      if (latest !== null && (current === null || current.stateDigest !== latest.preconditions.previewDigest)) {
+      if (latest !== null && (current === null || current !== latest.preconditions.previewDigest)) {
         request.log.info({ planId: plan.id, result: "rejected", code: "PLAN_CHANGED" }, "care: approval");
         return reply.code(409).send({ error: "PLAN_CHANGED" });
       }

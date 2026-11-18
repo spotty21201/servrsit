@@ -6,7 +6,7 @@
 
 import { z } from "zod";
 
-export const CARE_OPERATIONS = ["apply.packages.v1"] as const;
+export const CARE_OPERATIONS = ["apply.packages.v1", "restart.service.v1", "reboot.host.v1", "prepare.directories.v1"] as const;
 
 /**
  * T-057 (UX Spec §10.2): a production approval needs BOTH of these owner
@@ -23,12 +23,27 @@ export const PRODUCTION_ACKNOWLEDGEMENT_TEXT: Readonly<Record<ProductionAcknowle
   [ACK_INTERRUPTION_RISK]: "I understand this change can interrupt the services on this production server while it runs.",
 };
 
-export const PlanRequestSchema = z
+const ServerId = z.string().uuid();
+
+/** T-059: one directory to create. Shape only; the domain applies the path, owner and mode rules. */
+export const DirectorySpecSchema = z
   .object({
-    operation: z.enum(CARE_OPERATIONS),
-    serverId: z.string().uuid(),
+    path: z.string().min(2).max(255),
+    owner: z.string().max(32),
+    group: z.string().max(32),
+    mode: z.string().regex(/^0?[0-7]{3}$/),
   })
   .strict();
+
+/** A plan request names one operation and only that operation's parameters. */
+export const PlanRequestSchema = z.discriminatedUnion("operation", [
+  z.object({ operation: z.literal("apply.packages.v1"), serverId: ServerId }).strict(),
+  z.object({ operation: z.literal("restart.service.v1"), serverId: ServerId, unit: z.string().min(1).max(100) }).strict(),
+  z.object({ operation: z.literal("reboot.host.v1"), serverId: ServerId }).strict(),
+  z
+    .object({ operation: z.literal("prepare.directories.v1"), serverId: ServerId, directories: z.array(DirectorySpecSchema).min(1).max(20) })
+    .strict(),
+]);
 
 export const ApprovalRequestSchema = z
   .object({

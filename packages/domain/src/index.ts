@@ -1,5 +1,5 @@
 export { canonicalJson, CanonicalizationError, digestOf, sha256Hex } from "./canonical.js";
-export { CATALOG_VERSION, isSupportedOperation, NOT_IMPLEMENTED_OPERATIONS, OPERATION_IDS } from "./catalog.js";
+export { CATALOG_VERSION, isSupportedOperation, OPERATION_IDS } from "./catalog.js";
 export type { OperationId } from "./catalog.js";
 export {
   BLOCKER_CODES,
@@ -12,7 +12,7 @@ export {
   PRODUCTION_ACKS,
   verifyPlanDigest,
 } from "./plan.js";
-export type { Blocker, BlockerCode, BuildPlanInput, ExcludedPackage, PackageChange, Plan, PlanServer, TransactionPreview } from "./plan.js";
+export type { Blocker, BlockerCode, BuildPlanInput, ExcludedPackage, PackageChange, PackagesPlan, Plan, PlanServer, TransactionPreview } from "./plan.js";
 export {
   ALL_STATES,
   assertTransition,
@@ -28,3 +28,5 @@ export { createSigner, signManifest, verifyManifestSignature } from "./signature
 export type { SignedManifest, Signer } from "./signature.js";
 export { canonicalIdOf, resolveIdentities } from "./identity.js";
 export type { IdentityInput, IdentityStatus } from "./identity.js";
+export { buildDirectoriesPlan, buildRebootPlan, buildRestartPlan, directoryAllowed, isRestartableUnitName } from "./actions.js";
+export type { BootPreview, DirectoriesPlan, DirectoriesPreview, DirectorySpec, RebootPlan, RestartPlan, ServicePreview } from "./actions.js";

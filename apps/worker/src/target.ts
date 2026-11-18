@@ -11,7 +11,7 @@
  *  - inspectInstalled is a read-only, independent postcondition check.
  */
 
-import type { SignedManifest, TransactionPreview } from "@servrsit/domain";
+import type { BootPreview, DirectoriesPreview, ServicePreview, SignedManifest, TransactionPreview } from "@servrsit/domain";
 import type { TargetKind } from "@servrsit/store";
 
 export type RejectCode =
@@ -59,6 +59,24 @@ export interface TargetIdentity {
   readonly machineId: string | null;
 }
 
+/** T-059: observed state of one service unit. */
+export interface ServiceState {
+  readonly exists: boolean;
+  readonly active: boolean;
+  /** When the unit last became active, or null. A restart changes it. */
+  readonly activeSince: string | null;
+}
+
+/** T-059: what is at one requested directory path. */
+export interface DirectoryState {
+  readonly path: string;
+  readonly exists: boolean;
+  readonly isDirectory: boolean;
+  readonly owner: string | null;
+  readonly group: string | null;
+  readonly mode: string | null;
+}
+
 export interface WriteTarget {
   readonly kind: TargetKind;
   readonly serverId: string;
@@ -71,4 +89,12 @@ export interface WriteTarget {
   query(operationId: string): Promise<QueryResult>;
   /** Installed versions for "name:arch" keys. Independent of the ledger. */
   inspectInstalled(keys: readonly string[]): Promise<Readonly<Record<string, string | null>>>;
+  /** T-059: read-only previews for restart, reboot and directory plans. Null if none can be produced. */
+  previewService(unit: string): Promise<ServicePreview | null>;
+  previewBoot(): Promise<BootPreview | null>;
+  previewDirectories(paths: readonly string[]): Promise<DirectoriesPreview | null>;
+  /** T-059: independent post-condition checks (invariant 9), never the ledger's word. */
+  inspectService(unit: string): Promise<ServiceState>;
+  inspectBoot(): Promise<{ readonly bootId: string }>;
+  inspectDirectories(paths: readonly string[]): Promise<readonly DirectoryState[]>;
 }

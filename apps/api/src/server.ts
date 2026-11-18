@@ -95,6 +95,8 @@ function careWiring(config: FleetConfig, care: CareOptions | undefined) {
     production: h.production,
     kind: "ssh",
     writesEnabled: h.writesEnabled,
+    selectedServices: [...h.importantServices],
+    ...(h.access === "ssh" ? { user: h.user } : {}),
   }));
   if (real.some((s) => s.writesEnabled)) throw new Error("writesEnabled must be false for real servers (ADR-014)");
   const targets = new Map<string, WriteTarget>(real.map((s) => [s.id, new SshWriteTarget(s.id)]));

@@ -21,11 +21,24 @@ import {
   digestOf,
   MANIFEST_SCHEMA_VERSION,
   verifyManifestSignature,
+  type BootPreview,
+  type DirectoriesPreview,
   type PackageChange,
+  type ServicePreview,
   type SignedManifest,
   type TransactionPreview,
 } from "@servrsit/domain";
-import { TransportError, type QueryResult, type RejectCode, type RemoteRecord, type SubmitResult, type TargetIdentity, type WriteTarget } from "./target.js";
+import {
+  TransportError,
+  type DirectoryState,
+  type QueryResult,
+  type RejectCode,
+  type RemoteRecord,
+  type ServiceState,
+  type SubmitResult,
+  type TargetIdentity,
+  type WriteTarget,
+} from "./target.js";
 
 export interface SimulatedFaults {
   /** The next submit never reaches the target (nothing is claimed). */
@@ -36,6 +49,12 @@ export interface SimulatedFaults {
   failQueries?: number;
   /** T-058: the next N previews fail with a transport error (target unreachable while planning). */
   failPreviews?: number;
+  /** T-059: a restart leaves the unit inactive (the restart did not work). */
+  restartLeavesInactive?: boolean;
+  /** T-059: a reboot does not happen (same boot id afterwards). */
+  rebootKeepsBootId?: boolean;
+  /** T-059: these directory paths fail to be created. */
+  directoryCreateFails?: string[];
   /** The next N inspections fail with a transport error. */
   failInspections?: number;
   /** Packages that the run reports as done but does NOT actually change (postcondition test). */
@@ -63,6 +82,12 @@ export interface SimulatedTargetOptions {
    * model aliases and clones.
    */
   readonly machineId?: string;
+  /** [SIMULATED] T-059: service units on this machine. */
+  readonly services?: Readonly<Record<string, { readonly active: boolean }>>;
+  /** [SIMULATED] T-059: the current boot id. */
+  readonly bootId?: string;
+  /** [SIMULATED] T-059: paths that already exist (directories, with owner/group/mode). */
+  readonly directories?: Readonly<Record<string, { readonly owner: string; readonly group: string; readonly mode: string }>>;
 }
 
 interface LedgerEntry {
@@ -91,6 +116,10 @@ export class SimulatedTarget implements WriteTarget {
   private readonly ledger = new Map<string, LedgerEntry>();
   private readonly installed: Record<string, string>;
   private upgrades: PackageChange[];
+  private readonly services = new Map<string, { active: boolean; activeSince: string | null }>();
+  private bootId: string;
+  private reboots = 0;
+  private readonly directories = new Map<string, { owner: string; group: string; mode: string }>();
 
   constructor(private readonly options: SimulatedTargetOptions) {
     this.serverId = options.serverId;
@@ -99,6 +128,115 @@ export class SimulatedTarget implements WriteTarget {
     this.explicitIdentity = options.machineId !== undefined;
     this.installed = { ...options.installed };
     this.upgrades = [...options.upgrades];
+    const started = new Date(options.now().getTime() - 3600_000).toISOString();
+    for (const [unit, s] of Object.entries(options.services ?? {})) this.services.set(unit, { active: s.active, activeSince: s.active ? started : null });
+    this.bootId = options.bootId ?? `sim-boot-${options.serverId}`;
+    for (const [path, d] of Object.entries(options.directories ?? {})) this.directories.set(path, { ...d });
+  }
+
+  // ---- T-059: per-kind state and digests -------------------------------------------
+
+  private serviceDigest(unit: string): string {
+    return digestOf({ unit, service: this.services.get(unit) ?? null });
+  }
+
+  private bootDigest(): string {
+    return digestOf({ bootId: this.bootId });
+  }
+
+  private directoriesDigest(paths: readonly string[]): string {
+    return digestOf({ existing: [...paths].sort().filter((p) => this.directories.has(p)) });
+  }
+
+  /** The precondition digest for the kind of work a manifest asks for. */
+  private digestFor(m: SignedManifest["manifest"]): string {
+    const scope = m.scope as { unit?: string; requested?: ReadonlyArray<{ path: string }> };
+    switch (m.operation) {
+      case "restart.service.v1":
+        return this.serviceDigest(scope.unit ?? "");
+      case "reboot.host.v1":
+        return this.bootDigest();
+      case "prepare.directories.v1":
+        return this.directoriesDigest((scope.requested ?? []).map((d) => d.path));
+      default:
+        return this.stateDigest();
+    }
+  }
+
+  private failIfPartitioned(): void {
+    if ((this.faults.failPreviews ?? 0) > 0) {
+      this.faults.failPreviews = (this.faults.failPreviews ?? 0) - 1;
+      throw new TransportError("query");
+    }
+  }
+
+  async previewService(unit: string): Promise<ServicePreview | null> {
+    this.failIfPartitioned();
+    this.settle();
+    const s = this.services.get(unit);
+    return { exists: s !== undefined, active: s?.active ?? false, activeSince: s?.activeSince ?? null, stateDigest: this.serviceDigest(unit) };
+  }
+
+  async previewBoot(): Promise<BootPreview | null> {
+    this.failIfPartitioned();
+    this.settle();
+    return { bootId: this.bootId, stateDigest: this.bootDigest() };
+  }
+
+  async previewDirectories(paths: readonly string[]): Promise<DirectoriesPreview | null> {
+    this.failIfPartitioned();
+    this.settle();
+    return { existing: paths.filter((p) => this.directories.has(p)), stateDigest: this.directoriesDigest(paths) };
+  }
+
+  async inspectService(unit: string): Promise<ServiceState> {
+    this.failInspection();
+    this.settle();
+    const s = this.services.get(unit);
+    return { exists: s !== undefined, active: s?.active ?? false, activeSince: s?.activeSince ?? null };
+  }
+
+  async inspectBoot(): Promise<{ readonly bootId: string }> {
+    this.failInspection();
+    this.settle();
+    return { bootId: this.bootId };
+  }
+
+  async inspectDirectories(paths: readonly string[]): Promise<readonly DirectoryState[]> {
+    this.failInspection();
+    this.settle();
+    return paths.map((path) => {
+      const d = this.directories.get(path);
+      return { path, exists: d !== undefined, isDirectory: d !== undefined, owner: d?.owner ?? null, group: d?.group ?? null, mode: d?.mode ?? null };
+    });
+  }
+
+  private failInspection(): void {
+    if ((this.faults.failInspections ?? 0) > 0) {
+      this.faults.failInspections = (this.faults.failInspections ?? 0) - 1;
+      throw new TransportError("inspect");
+    }
+  }
+
+  /** Apply a finished run of a non-package kind. Never overwrites or reowns an existing path. */
+  private applyAction(m: SignedManifest["manifest"], finishedAt: string): void {
+    const scope = m.scope as { unit?: string; directories?: ReadonlyArray<{ path: string; owner: string; group: string; mode: string }> };
+    if (m.operation === "restart.service.v1" && scope.unit !== undefined) {
+      const before = this.services.get(scope.unit);
+      if (before === undefined) return;
+      this.services.set(scope.unit, this.faults.restartLeavesInactive === true ? { active: false, activeSince: before.activeSince } : { active: true, activeSince: finishedAt });
+    } else if (m.operation === "reboot.host.v1") {
+      if (this.faults.rebootKeepsBootId === true) return;
+      this.reboots += 1;
+      this.bootId = `sim-boot-${this.serverId}-r${this.reboots}`;
+      for (const [unit, s] of this.services) this.services.set(unit, s.active ? { active: true, activeSince: finishedAt } : s);
+    } else if (m.operation === "prepare.directories.v1") {
+      const fails = new Set(this.faults.directoryCreateFails ?? []);
+      for (const d of scope.directories ?? []) {
+        if (this.directories.has(d.path) || fails.has(d.path)) continue;
+        this.directories.set(d.path, { owner: d.owner, group: d.group, mode: d.mode });
+      }
+    }
   }
 
   private stateDigest(): string {
@@ -109,12 +247,17 @@ export class SimulatedTarget implements WriteTarget {
     const now = this.options.now().getTime();
     for (const entry of this.ledger.values()) {
       if (entry.finished || now < entry.startedAt + (this.options.runMs ?? 1000)) continue;
-      const unchanged = new Set(this.faults.silentlyUnchanged ?? []);
-      for (const c of entry.signed.manifest.scope.packages) {
-        const key = `${c.name}:${c.arch}`;
-        if (!unchanged.has(key)) this.installed[key] = c.to;
+      const m = entry.signed.manifest;
+      if (m.operation === "apply.packages.v1" && "packages" in m.scope) {
+        const unchanged = new Set(this.faults.silentlyUnchanged ?? []);
+        for (const c of m.scope.packages) {
+          const key = `${c.name}:${c.arch}`;
+          if (!unchanged.has(key)) this.installed[key] = c.to;
+        }
+        this.upgrades = this.upgrades.filter((u) => this.installed[`${u.name}:${u.arch}`] !== u.to);
+      } else {
+        this.applyAction(m, new Date(entry.startedAt + (this.options.runMs ?? 1000)).toISOString());
       }
-      this.upgrades = this.upgrades.filter((u) => this.installed[`${u.name}:${u.arch}`] !== u.to);
       entry.finished = true;
       entry.exitCode = this.faults.exitCode ?? 0;
     }
@@ -147,10 +290,7 @@ export class SimulatedTarget implements WriteTarget {
   }
 
   async previewPackages(): Promise<TransactionPreview | null> {
-    if ((this.faults.failPreviews ?? 0) > 0) {
-      this.faults.failPreviews = (this.faults.failPreviews ?? 0) - 1;
-      throw new TransportError("query");
-    }
+    this.failIfPartitioned();
     this.settle();
     return {
       // [SIMULATED] A fixture upgrade without an origin is labelled as Ubuntu's archive (T-062).
@@ -166,7 +306,7 @@ export class SimulatedTarget implements WriteTarget {
   private verify(signed: SignedManifest, now: number): RejectCode | null {
     const m = signed.manifest;
     if (m.schemaVersion !== MANIFEST_SCHEMA_VERSION) return "UNSUPPORTED_SCHEMA";
-    if (m.operation !== "apply.packages.v1") return "UNSUPPORTED_OPERATION";
+    if (!["apply.packages.v1", "restart.service.v1", "reboot.host.v1", "prepare.directories.v1"].includes(m.operation)) return "UNSUPPORTED_OPERATION";
     if (this.options.trustedKeys[signed.keyId] === undefined) return "UNKNOWN_KEY";
     if (!verifyManifestSignature(signed, this.options.trustedKeys)) return "INVALID_SIGNATURE";
     if (
@@ -200,7 +340,7 @@ export class SimulatedTarget implements WriteTarget {
     const invalid = this.verify(signed, now);
     if (invalid !== null) return { status: "rejected", code: invalid };
     if (this.activeOperation() !== null) return { status: "rejected", code: "TARGET_BUSY" };
-    if (signed.manifest.preconditionDigest !== this.stateDigest()) return { status: "rejected", code: "PRECONDITION_CHANGED" };
+    if (signed.manifest.preconditionDigest !== this.digestFor(signed.manifest)) return { status: "rejected", code: "PRECONDITION_CHANGED" };
 
     // Atomic claim (single-threaded here; the real helper uses an exclusive
     // create in its root-owned ledger).
@@ -233,10 +373,7 @@ export class SimulatedTarget implements WriteTarget {
   }
 
   async inspectInstalled(keys: readonly string[]): Promise<Readonly<Record<string, string | null>>> {
-    if ((this.faults.failInspections ?? 0) > 0) {
-      this.faults.failInspections = (this.faults.failInspections ?? 0) - 1;
-      throw new TransportError("inspect");
-    }
+    this.failInspection();
     this.settle();
     return Object.fromEntries(keys.map((k) => [k, this.installed[k] ?? null]));
   }

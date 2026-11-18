@@ -33,6 +33,31 @@ export class SshWriteTarget implements WriteTarget {
     return null;
   }
 
+  /** T-059: no preview of any kind is requested from a real server. */
+  async previewService(): Promise<null> {
+    return null;
+  }
+
+  async previewBoot(): Promise<null> {
+    return null;
+  }
+
+  async previewDirectories(): Promise<null> {
+    return null;
+  }
+
+  async inspectService(): Promise<never> {
+    throw new WritesDisabledError();
+  }
+
+  async inspectBoot(): Promise<never> {
+    throw new WritesDisabledError();
+  }
+
+  async inspectDirectories(): Promise<never> {
+    throw new WritesDisabledError();
+  }
+
   /** No preview is requested from a real server: nothing new is run there. */
   async previewPackages(): Promise<TransactionPreview | null> {
     return null;
