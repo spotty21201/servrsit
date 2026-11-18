@@ -40,6 +40,8 @@ export interface OutboxEntry {
   readonly intentDigest: string;
   readonly status: "pending" | "leased" | "done";
   readonly attempts: number;
+  /** T-058: consecutive steps that hit a transport error (0 after progress). */
+  readonly backoffLevel: number;
   readonly leaseOwner: string | null;
   readonly leaseUntil: string | null;
 }
@@ -124,6 +126,8 @@ export interface CareStore {
   completeOutbox(id: string, worker: string): void;
   /** Give a leased entry back for another round (the work is not finished). */
   releaseOutbox(id: string, worker: string): void;
+  /** T-058: keep the entry out of reach until `until` (backoff after a transport error). */
+  deferOutbox(id: string, worker: string, until: Date): void;
   close(): void;
 }
 

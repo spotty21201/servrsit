@@ -50,6 +50,8 @@ export const CARE_ERROR_CODES = [
   "PLAN_BLOCKED",
   "WRITES_DISABLED",
   "ACK_REQUIRED",
+  /** T-058: the target could not be reached while preparing or checking a plan (503). */
+  "ROUTE_UNAVAILABLE",
   "TARGET_BUSY",
   "OUTCOME_UNKNOWN",
   "ALREADY_APPROVED",

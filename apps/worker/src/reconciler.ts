@@ -18,6 +18,8 @@ export interface ReconcilerOptions {
   /** Who is recorded on events, for example "worker:w1" or "owner:api". */
   readonly actor: string;
   readonly now: () => Date;
+  /** T-058: told whenever a step could not reach the target (the caller backs off). */
+  readonly onTransportError?: (() => void) | undefined;
 }
 
 export class Reconciler {
@@ -29,6 +31,18 @@ export class Reconciler {
 
   private event(op: StoredOperation, type: Parameters<CareStore["appendEvent"]>[1], payload: Record<string, unknown>): void {
     this.o.store.appendEvent(op.id, type, this.o.actor, payload, this.o.now());
+  }
+
+  /**
+   * T-058: a transport error is recorded once per run of identical failures, not on every retry,
+   * so an outage cannot grow the append-only event table without bound.
+   */
+  transportError(op: StoredOperation, during: string): void {
+    this.o.onTransportError?.();
+    const events = this.o.store.listEvents(op.id);
+    const last = events[events.length - 1];
+    if (last !== undefined && last.type === "transport_error" && last.payload["during"] === during) return;
+    this.event(op, "transport_error", { during });
   }
 
   /** The ledger shows the target accepted the operation. */
@@ -52,9 +66,10 @@ export class Reconciler {
       if (!(error instanceof TransportError)) throw error;
       // Invariant 6: a lost connection is not evidence the work stopped.
       if (op.state === "running") {
+        this.o.onTransportError?.();
         return this.transition(op, "outcome_unknown", "outcome_unknown", { reason: "the ledger could not be queried" });
       }
-      this.event(op, "transport_error", { during: "reconcile" });
+      this.transportError(op, "reconcile");
       return op;
     }
 
@@ -86,7 +101,7 @@ export class Reconciler {
       actual = await target.inspectInstalled(keys);
     } catch (error) {
       if (!(error instanceof TransportError)) throw error;
-      this.event(op, "transport_error", { during: "verification" });
+      this.transportError(op, "verification");
       return op;
     }
     const verified = keys.filter((k) => actual[k] === expected[k]);
@@ -127,7 +142,7 @@ export class Reconciler {
           return q.found ? this.accepted(op, q.record, "reconciled") : op;
         } catch (error) {
           if (!(error instanceof TransportError)) throw error;
-          this.event(op, "transport_error", { during: "reconcile" });
+          this.transportError(op, "reconcile");
           return op;
         }
       }

@@ -22,7 +22,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ApprovalRequestSchema, PlanRequestSchema, type ControllerClock } from "@servrsit/contracts";
 import { buildPlan, resolveIdentities, type Plan } from "@servrsit/domain";
 import type { ApprovalRejection, CareStore, StoredOperation, TargetKind } from "@servrsit/store";
-import { Reconciler, type WriteTarget } from "@servrsit/worker";
+import { Reconciler, TransportError, type WriteTarget } from "@servrsit/worker";
 import { CSRF_HEADER, type CsrfGuard } from "../csrf.js";
 
 export interface CareServer {
@@ -78,6 +78,8 @@ function operationView(op: StoredOperation, store: CareStore) {
 
 const invalid = (reply: FastifyReply) => reply.code(400).send({ error: "INVALID_INPUT" });
 const notFound = (reply: FastifyReply) => reply.code(404).send({ error: "NOT_FOUND" });
+/** T-058 (O2, Tech Spec §13): the target could not be reached while preparing or checking a plan. Nothing is stored. */
+const routeUnavailable = (reply: FastifyReply) => reply.code(503).header("retry-after", "30").send({ error: "ROUTE_UNAVAILABLE" });
 
 export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions): Promise<void> {
   const now = o.now ?? (() => new Date());
@@ -136,7 +138,13 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     if (!parsed.success) return invalid(reply);
     const server = serverById(parsed.data.serverId);
     if (server === undefined) return notFound(reply);
-    const plan = await makePlan(newId(), 1, server);
+    let plan: Plan;
+    try {
+      plan = await makePlan(newId(), 1, server);
+    } catch (error) {
+      if (error instanceof TransportError) return routeUnavailable(reply);
+      throw error;
+    }
     request.log.info({ planId: plan.id, blockers: plan.blockers.map((b) => b.code), kind: server.kind }, "care: plan created");
     return reply.code(201).send(planView(plan, server));
   });
@@ -146,7 +154,13 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     if (current === null) return notFound(reply);
     const server = serverById(current.serverId);
     if (server === undefined) return notFound(reply);
-    const plan = await makePlan(current.id, current.version + 1, server);
+    let plan: Plan;
+    try {
+      plan = await makePlan(current.id, current.version + 1, server);
+    } catch (error) {
+      if (error instanceof TransportError) return routeUnavailable(reply);
+      throw error;
+    }
     return reply.code(201).send(planView(plan, server));
   });
 
@@ -184,7 +198,13 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     const replay = o.store.hasApproval(plan.id, parsed.data.planVersion);
     if (!replay && server.writesEnabled && server.kind === "simulated" && target !== undefined) {
       const latest = o.store.getPlan(plan.id);
-      const current = await target.previewPackages();
+      let current;
+      try {
+        current = await target.previewPackages();
+      } catch (error) {
+        if (error instanceof TransportError) return routeUnavailable(reply);
+        throw error;
+      }
       if (latest !== null && (current === null || current.stateDigest !== latest.preconditions.previewDigest)) {
         request.log.info({ planId: plan.id, result: "rejected", code: "PLAN_CHANGED" }, "care: approval");
         return reply.code(409).send({ error: "PLAN_CHANGED" });

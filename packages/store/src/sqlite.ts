@@ -168,6 +168,11 @@ export class SqliteCareStore implements CareStore {
     // T-056: older files lack canonical_id; add it, then the per-machine lock.
     const columns = this.db.prepare("PRAGMA table_info(operations)").all() as Array<{ name: string }>;
     if (!columns.some((c) => c.name === "canonical_id")) this.db.exec("ALTER TABLE operations ADD COLUMN canonical_id TEXT");
+    // T-058: consecutive transport-error steps for an outbox entry, for backoff.
+    const outboxColumns = this.db.prepare("PRAGMA table_info(dispatch_outbox)").all() as Array<{ name: string }>;
+    if (!outboxColumns.some((c) => c.name === "backoff_level")) {
+      this.db.exec("ALTER TABLE dispatch_outbox ADD COLUMN backoff_level INTEGER NOT NULL DEFAULT 0");
+    }
     this.db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS one_unresolved_per_machine
       ON operations (canonical_id)
       WHERE canonical_id IS NOT NULL AND state IN ${UNRESOLVED_SQL}`);
@@ -356,7 +361,7 @@ export class SqliteCareStore implements CareStore {
       const at = now.toISOString();
       const row = this.db
         .prepare("SELECT * FROM dispatch_outbox WHERE status = 'pending' OR (status = 'leased' AND lease_until <= ?) ORDER BY created_at LIMIT 1")
-        .get(at) as { id: string; operation_id: string; intent_digest: string; status: string; attempts: number } | undefined;
+        .get(at) as { id: string; operation_id: string; intent_digest: string; status: string; attempts: number; backoff_level: number } | undefined;
       if (row === undefined) return null;
       const until = new Date(now.getTime() + leaseMs).toISOString();
       this.db
@@ -368,6 +373,7 @@ export class SqliteCareStore implements CareStore {
         intentDigest: row.intent_digest,
         status: "leased",
         attempts: row.attempts + 1,
+        backoffLevel: row.backoff_level,
         leaseOwner: worker,
         leaseUntil: until,
       };
@@ -380,8 +386,14 @@ export class SqliteCareStore implements CareStore {
 
   releaseOutbox(id: string, worker: string): void {
     this.db
-      .prepare("UPDATE dispatch_outbox SET status = 'pending', lease_owner = NULL, lease_until = NULL WHERE id = ? AND lease_owner = ? AND status = 'leased'")
+      .prepare("UPDATE dispatch_outbox SET status = 'pending', lease_owner = NULL, lease_until = NULL, backoff_level = 0 WHERE id = ? AND lease_owner = ? AND status = 'leased'")
       .run(id, worker);
+  }
+
+  deferOutbox(id: string, worker: string, until: Date): void {
+    this.db
+      .prepare("UPDATE dispatch_outbox SET lease_owner = 'backoff', lease_until = ?, backoff_level = backoff_level + 1 WHERE id = ? AND lease_owner = ? AND status = 'leased'")
+      .run(until.toISOString(), id, worker);
   }
 
   close(): void {

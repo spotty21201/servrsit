@@ -444,3 +444,21 @@ test("T-056 (F5): two records sharing only the host key are ambiguous: write ena
     }
   } finally { await h.app.close(); }
 });
+
+
+// ---- T-058 (O2): unreachable target while planning ---------------------------------------
+
+test("T-058 (O2): a target unreachable while planning or at the approval re-check is 503 ROUTE_UNAVAILABLE; nothing is stored", async () => {
+  const h = await start();
+  try {
+    h.sim.faults.failPreviews = 1;
+    const r = await h.post("/api/plans", { operation: "apply.packages.v1", serverId: SIM });
+    assert.deepEqual([r.statusCode, r.json(), r.headers["retry-after"]], [503, { error: "ROUTE_UNAVAILABLE" }, "30"]);
+    const p = await h.plan();
+    h.sim.faults.failPreviews = 1;
+    const a = await h.approve(p);
+    assert.deepEqual([a.statusCode, a.json()], [503, { error: "ROUTE_UNAVAILABLE" }]);
+    assert.equal(h.store.unresolvedFor(SIM), null, "nothing was approved");
+    assert.equal((await h.approve(p)).statusCode, 201, "once the target answers again, the same plan can be approved");
+  } finally { await h.app.close(); }
+});

@@ -1,4 +1,4 @@
-export { Dispatcher } from "./dispatcher.js";
+export { BACKOFF_BASE_MS, BACKOFF_MAX_MS, backoffMs, Dispatcher } from "./dispatcher.js";
 export type { DispatcherOptions, StepResult } from "./dispatcher.js";
 export { Reconciler } from "./reconciler.js";
 export type { ReconcilerOptions } from "./reconciler.js";

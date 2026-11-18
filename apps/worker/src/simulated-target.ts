@@ -34,6 +34,8 @@ export interface SimulatedFaults {
   loseNextSubmitAck?: boolean;
   /** The next N queries fail with a transport error. */
   failQueries?: number;
+  /** T-058: the next N previews fail with a transport error (target unreachable while planning). */
+  failPreviews?: number;
   /** The next N inspections fail with a transport error. */
   failInspections?: number;
   /** Packages that the run reports as done but does NOT actually change (postcondition test). */
@@ -145,6 +147,10 @@ export class SimulatedTarget implements WriteTarget {
   }
 
   async previewPackages(): Promise<TransactionPreview | null> {
+    if ((this.faults.failPreviews ?? 0) > 0) {
+      this.faults.failPreviews = (this.faults.failPreviews ?? 0) - 1;
+      throw new TransportError("query");
+    }
     this.settle();
     return {
       // [SIMULATED] A fixture upgrade without an origin is labelled as Ubuntu's archive (T-062).
