@@ -241,6 +241,17 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 **Authorized:** Orchestrator continues pending tasks 2–8 without further check-ins: design, code, tests, merges into `integration/live-v1`, read-only inspection of the four servers.
 **Not covered (still require founder):** any write on a real server (updates, restarts, reboots, files, helper install), any spending (AWS, domains), changes to keys/authorized_keys, Tailscale changes, exposing anything beyond the tailnet, and product-scope changes. Decisions made during the run are logged here and summarised for the founder.
 
+## ADR-018 — Login merge sequencing
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-17 |
+| **Status** | [AGENT DECISION] (within ADR-016) |
+
+**Decision:** Keep owner login (T-053, branch `feat/coder/owner-auth`) and login screens (T-065) out of `integration/live-v1` until (1) the founder has fixed Merauke's clock (founder-actions.md item 1) and (2) T-066 lands. Then merge, and the founder enrols.
+
+**Reason:** Enrolling while the controller clock is 7 h fast leaves TOTP unusable after the correction (D-A3), and an un-merged login keeps the founder's current dev UI working. Risk accepted meanwhile: the dev API stays open on loopback and, via the Vite proxy, to the founder's tailnet (F8). Writes remain disabled on all real hosts.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |

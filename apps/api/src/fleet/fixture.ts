@@ -13,6 +13,7 @@
  * with the same rules as live mode.
  */
 
+import { NOT_CHECKED_CLOCK } from "../clock/controller-clock.js";
 import { ok, unavailable, type InspectionObservation } from "@servrsit/ssh";
 import type { FleetConfig } from "./config.js";
 import { evaluateFindings } from "./findings.js";
@@ -171,6 +172,7 @@ export function buildFixtureFleet(config: FleetConfig, now: Date): FleetResponse
     healthIntervalMinutes: config.healthIntervalMinutes,
     ownerTimeZone: config.ownerTimeZone,
     nextCheckAt: null,
+    controlPlane: { clock: { ...NOT_CHECKED_CLOCK, reason: "[FIXTURE DATA] Fixture mode does not check ServrSit's own clock." }, findings: [] },
     servers: [fresh, partial, unreachable, noData],
   };
 }

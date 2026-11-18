@@ -10,6 +10,8 @@
  * - Overlapping refreshes coalesce into one.
  */
 
+import type { ControlPlane, ControllerClock } from "@servrsit/contracts";
+import { attributeToController, controllerClockFindings, NOT_CHECKED_CLOCK } from "../clock/controller-clock.js";
 import {
   collectLocal,
   collectViaSsh,
@@ -33,6 +35,8 @@ export interface FleetServiceOptions {
   readonly pinChecker?: PinChecker | undefined;
   readonly now?: (() => Date) | undefined;
   readonly log?: { info: (o: object, m: string) => void; warn: (o: object, m: string) => void } | undefined;
+  /** T-063: ServrSit's own clock, as last checked. Absent means not checked (tests). */
+  readonly controllerClock?: (() => ControllerClock) | undefined;
 }
 
 interface ServerState {
@@ -146,9 +150,21 @@ export class FleetService {
     if (this.running !== null) await this.running;
   }
 
+  /** T-063: the controller clock, with skew attributed to it when most targets agree. */
+  controlPlane(): ControlPlane {
+    const targets: Array<{ skewSeconds: number; uncertaintySeconds: number }> = [];
+    for (const state of this.states.values()) {
+      const c = state.lastSuccess?.observation.host.clock;
+      if (c?.status === "ok") targets.push({ skewSeconds: c.value.skewSeconds, uncertaintySeconds: c.value.uncertaintySeconds });
+    }
+    const clock = attributeToController(this.options.controllerClock?.() ?? NOT_CHECKED_CLOCK, targets);
+    return { clock, findings: controllerClockFindings(clock) };
+  }
+
   snapshot(): FleetResponse {
     const now = this.now();
-    const servers = this.options.config.hosts.map((host) => this.serverView(host, now));
+    const controlPlane = this.controlPlane();
+    const servers = this.options.config.hosts.map((host) => this.serverView(host, now, controlPlane.clock));
     const next =
       this.timer === null
         ? null
@@ -159,11 +175,12 @@ export class FleetService {
       healthIntervalMinutes: this.options.config.healthIntervalMinutes,
       ownerTimeZone: this.options.config.ownerTimeZone,
       nextCheckAt: next,
+      controlPlane,
       servers,
     };
   }
 
-  private serverView(host: HostConfig, now: Date): FleetServer {
+  private serverView(host: HostConfig, now: Date, controllerClock: ControllerClock): FleetServer {
     const state = this.states.get(host.id);
     if (state === undefined) throw new Error(`no state for ${host.id}`);
     const success = state.lastSuccess;
@@ -201,6 +218,7 @@ export class FleetService {
               consecutiveFailures: state.consecutiveFailures,
             },
       findings: evaluateFindings({
+        controllerClock,
         current: success?.observation ?? null,
         previous: state.previousSuccess,
         consecutiveFailures: state.consecutiveFailures,

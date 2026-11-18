@@ -42,6 +42,8 @@ export const BLOCKER_CODES = [
   "PACKAGE_LOCKED",
   /** Every pending update comes from outside Ubuntu's archive, and those are excluded by default (T-062). */
   "ONLY_EXCLUDED_PACKAGES",
+  /** ServrSit's own clock is wrong or unverified, so expiries and freshness cannot be trusted (T-063). */
+  "CONTROLLER_CLOCK_UNTRUSTED",
 ] as const;
 export type BlockerCode = (typeof BLOCKER_CODES)[number];
 
@@ -63,6 +65,8 @@ export const BLOCKER_MESSAGES: Readonly<Record<BlockerCode, string>> = {
   PACKAGE_LOCKED: "The package manager is in use by another process.",
   ONLY_EXCLUDED_PACKAGES:
     "The only pending updates come from sources outside Ubuntu's archive. Update plans leave those out by default.",
+  CONTROLLER_CLOCK_UNTRUSTED:
+    "ServrSit's own clock is wrong or unverified, so plan expiry and data freshness cannot be trusted. Fix the clock on the ServrSit machine first.",
 };
 
 export interface PackageChange {
@@ -151,6 +155,8 @@ export interface BuildPlanInput {
   /** State of this server's unresolved operation, if any. */
   readonly unresolved: "queued" | "running" | "verifying" | "outcome_unknown" | null;
   readonly now: Date;
+  /** T-063: false when ServrSit's own clock is untrusted. */
+  readonly controllerClockTrusted: boolean;
 }
 
 const block = (code: BlockerCode): Blocker => ({ code, message: BLOCKER_MESSAGES[code] });
@@ -163,6 +169,7 @@ export function planDigest(plan: Omit<Plan, "digest">): string {
 export function buildPlan(input: BuildPlanInput): Plan {
   const blockers: Blocker[] = [];
   if (!input.server.writesEnabled) blockers.push(block("WRITES_DISABLED"));
+  if (!input.controllerClockTrusted) blockers.push(block("CONTROLLER_CLOCK_UNTRUSTED"));
   if (input.unresolved === "outcome_unknown") blockers.push(block("OUTCOME_UNKNOWN"));
   else if (input.unresolved !== null) blockers.push(block("TARGET_BUSY"));
 
