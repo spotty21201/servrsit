@@ -112,6 +112,8 @@ export const AuthErrorCodeSchema = z.enum([
   "CSRF_INVALID",
   /** Setup token wrong, already used, or setup already done. */
   "SETUP_UNAVAILABLE",
+  /** T-066: ServrSit's own clock is untrusted (T-063), so a TOTP enrolment would not work once it is fixed. */
+  "CLOCK_UNTRUSTED",
 ]);
 export type AuthErrorCode = z.infer<typeof AuthErrorCodeSchema>;
 

@@ -280,8 +280,10 @@ const CLOCK = (status: "trusted" | "untrusted"): ControllerClock => ({
 });
 
 test("T-063 via the API: an untrusted controller clock blocks planning, and approval is re-checked against it", async () => {
-  const clock = { value: CLOCK("untrusted") };
+  // Enrol while the clock is trusted (T-066 refuses enrolment on an untrusted clock), then it goes wrong.
+  const clock = { value: CLOCK("trusted") };
   const h = await start({ clock });
+  clock.value = CLOCK("untrusted");
   try {
     const blocked = await h.plan();
     assert.deepEqual(blocked.blockers.map((b) => b.code), ["CONTROLLER_CLOCK_UNTRUSTED"]);
