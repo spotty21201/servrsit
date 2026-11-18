@@ -194,3 +194,61 @@ test("responder: a matching AI answer is returned as AI with no mismatch", async
   assert.equal(r.reason, null);
   assert.equal(r.factMismatch, null);
 });
+
+// ---- T-064 F2/F3/F4/O1 (Tester's test-report-ai-auth-001) ----------------------------
+
+const merauke1Held = () =>
+  server({ name: "Merauke", production: false, findings: [] }, { ...obs({ pending: 0 }), packages: { ...obs({ pending: 0 }).packages, heldBackCount: ok(1) } });
+
+test("T-064 F2: correct answers the old checker discarded are now kept", () => {
+  assertPass("Nabire and Merauke are both quiet. Merauke's disk is 40% full.");
+  assertPass("1. Nabire has 1 update pending.\n2. Merauke has 0.");
+  assertPass("Nabire is up to date apart from one waiting update.");
+  assertPass("Two of the servers were checked. One of them has pending updates.");
+  assertPass("All 2 were checked.");
+  assertPass("Merauke has no pending updates, though one package is held back.", [nabire(), merauke1Held()]);
+});
+
+test("T-064 F3: other ways to say 'nothing pending' are checked", () => {
+  for (const text of ["Nabire is fully patched.", "Nothing is waiting to be installed on Nabire.", "Nabire is current.", "Updates: none for Nabire.", "You don't need to update Nabire.", "Nabire has none pending."]) {
+    assertFail(text, "pending_updates");
+  }
+  assertPass("Merauke is fully patched.");
+});
+
+test("T-064 F3: 'fine', 'up and running' and negated status words are checked; metrics being fine is not a health claim", () => {
+  const servers = [nabire(), merauke(), timikaUnreachable()];
+  assertFail("Timika is fine.", "status_word", servers);
+  assertFail("Timika is up and running.", "status_word", servers);
+  assertFail("Nabire is not fresh.", "status_word", servers);
+  assertPass("Timika is not healthy.", servers);
+  assertPass("Nabire's load and memory are fine.", servers);
+});
+
+test("T-064 F3: a decimal on the wrong server, 'has none' with no noun, and a server outside the data are rejected", () => {
+  assertFail("Merauke's load is 0.46 and Nabire's is 0.46.", "unattributed_number", [nabire(), server({ name: "Merauke" }, { ...obs({ pending: 0 }), host: { ...obs({ pending: 0 }).host, load: ok({ one: 0.9, five: 0.1, fifteen: 0.1 }) } })]);
+  assertFail("Nabire has none.", "unattributed_number");
+  assertFail("Nabire has 1 pending update and Sentani has six.", "out_of_scope");
+  assertFail("Timika has no failed services.", "out_of_scope");
+});
+
+test("T-064 F4: a joke in a reply that carries bad news is withheld; a cheeky good-news line is not", async () => {
+  const { jokesAboutBadNews } = await import("./fact-check.js");
+  for (const t of ["Timika's disk is at 96%. Yikes!", "Sentani seems to be napping. Can't reach it right now.", "nginx.service failed. Oopsie.", "Disk is 97% full, whoops."]) {
+    assert.equal(jokesAboutBadNews(t), true, t);
+  }
+  assert.equal(jokesAboutBadNews("Merauke is up to date and snoozing happily."), false);
+  assert.equal(jokesAboutBadNews("Timika's nginx.service has failed. Check its logs."), false);
+  const r = await new AssistantResponder(fixedProvider("Timika is unreachable. Yikes, it seems to be napping.")).respond("How is Timika?", [timikaUnreachable()], CTX);
+  assert.deepEqual([r.source, r.reason], ["deterministic", "unsuitable_tone"]);
+});
+
+test("T-064 O1: the per-server explainer runs the same fact and tone checks", async () => {
+  const { GuardedExplainer } = await import("./explainer.js");
+  const wrong = new GuardedExplainer({ ...fixedProvider("x"), call: async () => ({ ok: true, text: "Nabire has 5 pending updates.", returnedModel: "m", httpStatus: 200 }) });
+  assert.deepEqual([(await wrong.explain("n1", nabire())).source, (await wrong.explain("n2", nabire())).reason], ["deterministic", "fact_mismatch"]);
+  const joke = new GuardedExplainer({ ...fixedProvider("x"), call: async () => ({ ok: true, text: "Timika is unreachable. Whoops!", returnedModel: "m", httpStatus: 200 }) });
+  assert.equal((await joke.explain("t1", timikaUnreachable())).reason, "unsuitable_tone");
+  const right = new GuardedExplainer({ ...fixedProvider("x"), call: async () => ({ ok: true, text: "Nabire has 1 pending update.", returnedModel: "m", httpStatus: 200 }) });
+  assert.equal((await right.explain("n3", nabire())).source, "openai_compatible");
+});

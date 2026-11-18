@@ -22,7 +22,7 @@ import {
   type AiUnavailableReason,
   type ModelProvider,
 } from "./explainer.js";
-import { checkFacts, type FactMismatch } from "./fact-check.js";
+import { checkFacts, jokesAboutBadNews, type FactMismatch } from "./fact-check.js";
 import { buildAiInput, type AiServerInput, type ExplainableServer } from "./input.js";
 import { TIME_AND_PACKAGE_RULES, timeContextFor } from "./prompt.js";
 import { controllerClockWarning, timesAreQuoted, type TimeContext } from "./time.js";
@@ -298,6 +298,8 @@ export class AssistantResponder {
     // T-051: every claim must match the checks for the server it is about. Tone does not loosen this.
     const facts = checkFacts(final.text, inputs, user);
     if (!facts.ok) return { ...fallback("fact_mismatch", outcome.httpStatus, latencyMs), factMismatch: facts.mismatch };
+    // T-064 F4: never cheeky about failures, outages, data loss or security (ADR-015).
+    if (jokesAboutBadNews(final.text)) return fallback("unsuitable_tone", outcome.httpStatus, latencyMs);
 
     return {
       kind,

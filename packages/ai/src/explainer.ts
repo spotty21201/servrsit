@@ -16,6 +16,7 @@
 import { createHash } from "node:crypto";
 import { sanitizeText, stripEscapeSequences } from "@servrsit/ssh";
 import { deterministicExplanation } from "./deterministic.js";
+import { checkFacts, jokesAboutBadNews } from "./fact-check.js";
 import { buildAiInput, type AiServerInput, type ExplainableServer } from "./input.js";
 import { buildPrompt } from "./prompt.js";
 import { DEFAULT_TIME_ZONE, timesAreQuoted, type TimeContext } from "./time.js";
@@ -44,7 +45,8 @@ export type AiUnavailableReason =
   | "not_supported"
   | "unverified_time"
   | "fact_mismatch"
-  | "truncated_output";
+  | "truncated_output"
+  | "unsuitable_tone";
 
 export interface ExplainMeta {
   readonly provider: ProviderId | "none";
@@ -170,8 +172,16 @@ export class GuardedExplainer implements Explainer {
     if (UNSAFE_OUTPUT.test(outcome.text)) {
       return this.fallback(server, ctx, "unsafe_output", outcome.httpStatus, latencyMs, outcome.returnedModel);
     }
-    if (!timesAreQuoted(outcome.text, buildPrompt(input, ctx)).ok) {
+    const prompt = buildPrompt(input, ctx);
+    if (!timesAreQuoted(outcome.text, prompt).ok) {
       return this.fallback(server, ctx, "unverified_time", outcome.httpStatus, latencyMs, outcome.returnedModel);
+    }
+    // T-064 O1: the per-server explanation gets the same fact and tone checks as the assistant.
+    if (!checkFacts(text, [input], prompt).ok) {
+      return this.fallback(server, ctx, "fact_mismatch", outcome.httpStatus, latencyMs, outcome.returnedModel);
+    }
+    if (jokesAboutBadNews(text)) {
+      return this.fallback(server, ctx, "unsuitable_tone", outcome.httpStatus, latencyMs, outcome.returnedModel);
     }
 
     const result: ExplainResult = {
