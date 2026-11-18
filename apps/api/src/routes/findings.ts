@@ -65,6 +65,20 @@ export function schedulerStatus(o: Pick<FindingRouteOptions, "mode" | "settings"
   return { status: "running", nextRunAt: s.nextRunAt?.toISOString() ?? null };
 }
 
+/** Pause background checks (persisted). Shared by /api/scheduler and /api/settings. */
+export function pauseScheduler(o: Pick<FindingRouteOptions, "settings" | "service">, actor: string, reason: string | undefined, at: Date): void {
+  if (o.settings.get<PausedSetting>(PAUSE_KEY) === null) {
+    o.settings.set(PAUSE_KEY, { since: at.toISOString(), reason: reason ?? DEFAULT_PAUSE_REASON }, actor, at);
+  }
+  o.service.pause();
+}
+
+/** Resume: one current check now, then the interval. */
+export function resumeScheduler(o: Pick<FindingRouteOptions, "settings" | "service">, actor: string, at: Date): void {
+  if (o.settings.get<PausedSetting>(PAUSE_KEY) !== null) o.settings.clear(PAUSE_KEY, actor, at);
+  o.service.resume();
+}
+
 export async function findingRoutes(fastify: FastifyInstance, o: FindingRouteOptions): Promise<void> {
   const now = o.now ?? (() => new Date());
 
@@ -116,19 +130,14 @@ export async function findingRoutes(fastify: FastifyInstance, o: FindingRouteOpt
     const parsed = SchedulerPauseRequestSchema.safeParse(request.body ?? {});
     if (!parsed.success) return error(reply, 400, "INVALID_INPUT");
     if (o.mode === "fixture") return error(reply, 409, "UNAVAILABLE", "Fixture mode: no checks run.");
-    if (o.settings.get<PausedSetting>(PAUSE_KEY) === null) {
-      const at = now();
-      o.settings.set(PAUSE_KEY, { since: at.toISOString(), reason: parsed.data.reason ?? DEFAULT_PAUSE_REASON }, `owner:${o.owner(request)}`, at);
-    }
-    o.service.pause();
+    pauseScheduler(o, `owner:${o.owner(request)}`, parsed.data.reason, now());
     request.log.info({ scheduler: "paused" }, "findings: scheduler paused");
     return reply.header("cache-control", "no-store").send(schedulerStatus(o, now()));
   });
 
   fastify.post("/api/scheduler/resume", { bodyLimit: 256 }, async (request, reply) => {
     if (o.mode === "fixture") return error(reply, 409, "UNAVAILABLE", "Fixture mode: no checks run.");
-    if (o.settings.get<PausedSetting>(PAUSE_KEY) !== null) o.settings.clear(PAUSE_KEY, `owner:${o.owner(request)}`, now());
-    o.service.resume();
+    resumeScheduler(o, `owner:${o.owner(request)}`, now());
     request.log.info({ scheduler: "resumed" }, "findings: scheduler resumed");
     return reply.header("cache-control", "no-store").send(schedulerStatus(o, now()));
   });
