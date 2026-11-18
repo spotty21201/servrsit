@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DisconnectResponseSchema } from "@servrsit/contracts";
-import { createFixtureSettingsClient, SCHEDULE_DEFAULTS } from "../api/stubs/settings";
+import { DisconnectResponseSchema, SCHEDULE_DEFAULTS } from "@servrsit/contracts";
+import { createFixtureSettingsClient } from "../fixtures/settingsFixture";
 import {
-  describeDisconnect, describeNext, disconnectCopy, isDefaultSchedule, isDirty, nextDailyRun, nextHealthRun, SCHEDULE_STATEMENT, validateSchedule, zonedToUtc,
+  describeDisconnect, describeNext, KEY_KIND_LABEL, settingsErrorText, disconnectCopy, isDefaultSchedule, isDirty, nextDailyRun, nextHealthRun, SCHEDULE_STATEMENT, validateSchedule, zonedToUtc,
 } from "./settingsLogic";
 
 const NOW = new Date("2026-11-17T03:00:00Z"); // 10:00 WIB
@@ -11,7 +11,7 @@ const TZ = "Asia/Jakarta";
 const mk = () => createFixtureSettingsClient(() => NOW);
 
 test("defaults are 15 minutes, 03:00, Asia/Jakarta, and are detected as defaults", () => {
-  assert.deepEqual(SCHEDULE_DEFAULTS, { intervalMinutes: 15, dailyTime: "03:00", timeZone: "Asia/Jakarta" });
+  assert.deepEqual(SCHEDULE_DEFAULTS, { intervalMinutes: 15, dailyTime: "03:00" });
   assert.equal(isDefaultSchedule({ intervalMinutes: 15, dailyTime: "03:00", timeZone: "Asia/Jakarta" }), true);
   assert.equal(isDefaultSchedule({ intervalMinutes: 30, dailyTime: "03:00", timeZone: "Asia/Jakarta" }), false);
 });
@@ -66,44 +66,63 @@ test("fixture client: save, pause and AI are separate actions; invalid schedules
   assert.ok(r.ok && r.data.schedule.pausedSince === null);
   const ai = await c.setAi(false);
   assert.ok(ai.ok && ai.data.ai.enabled === false && ai.data.schedule.intervalMinutes === 30);
-  assert.deepEqual(await c.saveSchedule({ intervalMinutes: 30, dailyTime: "99:99", timeZone: "UTC" }), { ok: false, error: "INVALID" });
+  assert.deepEqual(await c.saveSchedule({ intervalMinutes: 30, dailyTime: "99:99", timeZone: "UTC" }), { ok: false, error: "INVALID_INPUT" });
 });
 
-test("disconnect: the confirmation names the server and lists queued and active work", async () => {
+test("disconnect: the confirmation names the server; running work blocks it and says why", async () => {
   const c = mk();
   const g = await c.get();
   assert.ok(g.ok);
   const web = g.data.servers.find((x) => x.id === "s-web1")!;
   const pv = await c.previewDisconnect("s-web1");
-  assert.ok(pv.ok);
+  assert.ok(pv.ok && pv.data.canDisconnect === false);
   const copy = disconnectCopy(web, pv.data);
   assert.equal(copy.title, "Disconnect Fixture Web-1?");
   assert.equal(copy.confirmLabel, "Disconnect Fixture Web-1");
-  assert.match(copy.queued[0]!, /Update packages \(waiting to start\): will be cancelled/);
-  assert.match(copy.active[0]!, /ServrSit cannot stop it\. It may keep running/);
+  assert.match(copy.blocked ?? "", /not finished/);
+  assert.match(copy.active[0]!, /Update packages: running\. ServrSit cannot stop it/);
   assert.ok(copy.keep.some((t) => /does not delete the server or shut it down/.test(t)));
   assert.match(copy.yourStep, /cannot remove its key from the server/);
+  const queued = disconnectCopy(web, { queued: [{ id: "q", title: "Update packages" }], active: [], canDisconnect: false });
+  assert.match(queued.queued[0]!, /waiting to start/);
+  assert.notEqual(queued.blocked, null);
   const quiet = disconnectCopy(g.data.servers[1]!, (await c.previewDisconnect("s-dev2") as { ok: true; data: never }).data);
-  assert.deepEqual([quiet.queued[0], quiet.active[0]], ["No queued work.", "No work is running."]);
+  assert.deepEqual([quiet.queued[0], quiet.active[0], quiet.blocked], ["No queued work.", "No work is running.", null]);
 });
 
-test("disconnect result: contract-shaped, never claims the remote key is gone, reports running work that may continue", async () => {
+test("the fixture refuses to disconnect a server with running work", async () => {
+  const r = await mk().disconnect("s-web1");
+  assert.ok(!r.ok && r.error === "STATE_CONFLICT");
+});
+
+test("disconnect result: contract-shaped, never claims the remote key is gone", async () => {
   const c = mk();
-  const pv = await c.previewDisconnect("s-web1");
-  const r = await c.disconnect("s-web1");
+  const pv = await c.previewDisconnect("s-dev2");
+  const r = await c.disconnect("s-dev2");
   assert.ok(pv.ok && r.ok);
   assert.equal(DisconnectResponseSchema.safeParse(r.data).success, true);
   assert.equal(r.data.remoteKeyRemoved, false);
-  const d = describeDisconnect("Fixture Web-1", r.data, pv.data);
-  assert.equal(d.headline, "Fixture Web-1 is disconnected");
-  assert.ok(d.done.includes("1 queued operation was cancelled."));
+  const d = describeDisconnect("Fixture Dev-2", r.data, pv.data);
+  assert.equal(d.headline, "Fixture Dev-2 is disconnected");
   assert.ok(d.notDone.some((t) => /cannot confirm that its key line is gone from the server/.test(t)));
-  assert.ok(d.notDone.some((t) => /1 action was already running and may continue/.test(t)));
   assert.ok(d.notDone.some((t) => /not deleted or shut down/.test(t)));
   assert.ok(d.line?.startsWith("restrict,from="));
   assert.doesNotMatch(JSON.stringify(d), /has been removed|is removed|key was removed/i);
-  // an owner key: nothing of ServrSit's own to delete, and still no claim about the server
   const own = await c.disconnect("s-old");
   assert.ok(own.ok && own.data.controllerKeyDeleted === false && own.data.authorizedKeysLine === null);
-  assert.ok(describeDisconnect("Fixture Old-1", own.data, { queued: [], active: [] }).done.includes("ServrSit had no key of its own to delete for this server."));
+  assert.ok(describeDisconnect("Fixture Old-1", own.data, { queued: [], active: [], canDisconnect: true }).done.includes("ServrSit had no key of its own to delete for this server."));
+});
+
+test("key kinds are labelled, including a local machine", () => {
+  assert.equal(KEY_KIND_LABEL["local"], "None: ServrSit's own machine");
+  assert.equal(KEY_KIND_LABEL["owner key"], "Your own key");
+});
+
+test("error wording: a lost answer never says nothing was changed", () => {
+  for (const code of ["NETWORK", "TIMEOUT", "INVALID_RESPONSE"] as const) {
+    assert.match(settingsErrorText(code), /may or may not/);
+    assert.doesNotMatch(settingsErrorText(code), /Nothing was changed/);
+  }
+  assert.match(settingsErrorText("NOT_ALLOWED", "No AI provider is configured."), /No AI provider is configured\. Nothing was changed/);
+  assert.match(settingsErrorText("STATE_CONFLICT", "An operation is not resolved."), /cannot be done right now/);
 });

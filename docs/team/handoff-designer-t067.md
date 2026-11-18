@@ -148,4 +148,27 @@ Next: T-078 (baselines), T-079 (settings).
 - Steps 2 to 4 against the real API: fixture fleet mode refuses inventory (503), so save, compare, mark intentional and setup plan are covered by the fixture client and `api/baselines.test.ts` only.
 - A real setup plan opens `/plans/:planId`, but Plan review still runs on the care stub (`api/stubs/care.ts`); there is no real care client in `apps/web/src/api/`. Until Coder provides one, a real plan id will show "not found" there. Please confirm which task adds it.
 
-**Settings (T-079):** `apps/web/src/api/settings.ts` is not on `integration/next` yet, so the settings stub stays.
+**Settings (T-079):** landed on `integration/next` after this commit; see addendum 7.
+
+## Addendum 7: T-080 part 4 (settings on the real T-079 client)
+
+**Merge:** `integration/next` merged again (T-079), no conflicts.
+
+**Changed**
+- `SettingsScreen` uses `api/settings.ts`. The stub became `src/fixtures/settingsFixture.ts` and backs `/fixtures/settings` (banner always on). `api/stubs/` now holds only `care.ts`.
+- Real page banner: `/api/settings` has no mode field, so the screen reads `mode` from `/api/fleet` (one fetch, no polling) and shows `[FIXTURE DATA]` when it says fixture.
+- Contract-driven changes:
+  - `dailyTimeInEffect: false`: the daily time is labelled "(not used yet)" with the API's reason, and "Next daily check" reads "Not scheduled yet" instead of a computed time.
+  - AI: the "what is sent" line comes from `ai.sends`. The switch refuses to turn on when `ai.available` is false and says why.
+  - Retention shows the exports row. `keyKind: "local"` is labelled.
+  - Disconnect: `canDisconnect: false` (any queued or running operation) shows "Disconnecting is blocked" with the reason, offers Close only, and has no confirm button. The old "queued work will be cancelled" wording is gone, because the API blocks instead of cancelling.
+  - Error wording from `settingsErrorText`. Lost answers never say "Nothing was changed".
+
+**Checks**
+- `pnpm typecheck`, `pnpm test` (204 pass, 0 fail), `pnpm build`: clean.
+- Browser, own API (:3005 fixture fleet) and preview (:5174): real `/settings` loads and passes axe (wcag2a/aa/21aa, 0 violations); saving a schedule returned 200 and persisted; Pause was refused by the API ("Fixture mode: no checks run") and the screen showed that refusal; the disconnect confirmation opened for a real-API server (axe 0). `/fixtures/settings`: blocked disconnect (no confirm button) and a completed disconnect of Fixture Dev-2 (axe 0). Evidence: `docs/team/evidence/t080/settings-*`.
+
+**Not verified / for Coder**
+- An actual disconnect on the real API (it would delete a key and stop schedules); covered by `api/settings.test.ts` and the fixture only.
+- `SettingsData` and `ActivityResponse` have no `mode`; the settings page borrows it from `/api/fleet`. Consider adding it to both.
+- Plan review (`/plans/:id`) and operation pages still run on `api/stubs/care.ts`. A setup plan created by T-078 on the real API will not open there until a real care client exists.
