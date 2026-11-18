@@ -208,6 +208,11 @@ function toCard(s: FleetServer, index: number, now: Date, tz: string, u: boolean
   };
 }
 
+/** The card view model for one server; the Server detail header reuses it so both screens agree. */
+export function toServerCard(s: FleetServer, index: number, now: Date, tz: string, agesUncertain = false): ServerCardVM {
+  return toCard(s, index, now, tz, agesUncertain);
+}
+
 /** Status-derived attention rows (things the owner must act on or know). */
 const ATTENTION_STATUSES: ReadonlySet<FleetStatus> = new Set<FleetStatus>([
   "unreachable",
