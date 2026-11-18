@@ -39,6 +39,8 @@ export const FACT_MISMATCHES = [
   "memory_percent",
   "status_word",
   "server_count",
+  "held_back",
+  "out_of_scope",
   "unattributed_number",
 ] as const;
 export type FactMismatch = (typeof FACT_MISMATCHES)[number];
@@ -86,6 +88,31 @@ const PENDING_COUNT_AFTER = /\b(?:updates?|upgrades?)\s*(?:pending|waiting|avail
 const PENDING_NONE = /(?:n't|\bnot|\bnever)\s+(?:have\s+|got\s+|need\s+|show\s+)?any\s+(?:\w+\s+){0,2}(?:updates?|upgrades?)\b/;
 const PENDING_SOME = /\b(?:has|have|there (?:are|is)|with)\s+(?:some\s+)?(?:pending|available|outstanding|waiting)\s+(?:package\s+)?(?:updates?|upgrades?)\b/;
 const UP_TO_DATE = /\bup[ -]to[ -]date\b/;
+/** T-064 F2: "up to date apart from one waiting update" states an exception, not zero. */
+const EXCEPTION_AFTER = /^.{0,12}?\b(?:apart from|except(?: for)?|other than|but for|besides|save for|aside from)\b/;
+/** T-064 F3: other ways to say "nothing pending". */
+const ZERO_PENDING =
+  /\bfully patched\b|\ball patched\b|\b(?:all )?caught up\b|\bnothing (?:is |else )?(?:waiting|pending|left|queued)(?: to be (?:installed|updated|upgraded))?\b|\bnothing (?:to|needs to be) (?:update|upgrade|install|patch)d?\b|\b(?:packages?|software|everything|it|they)(?: \w+){0,3} (?:are|is) (?:all )?(?:current|on the latest versions?)\b|\bon the latest versions?\b|\b(?:is|are) (?:all )?current\b(?!\s+(?:state|status|check|time|load|version|data))|\bclean on updates\b|\bupdates?\s*:\s*(?:none|0|zero)\b|\b(?:don't|do not|doesn't|does not) need (?:to )?(?:be )?(?:update|updating|upgrade|upgrading)\b/;
+/** T-064 F2: held-back packages are not pending updates. */
+const HELD_COUNT = new RegExp(
+  `\\b${Q}\\s+(?:\\w+\\s+){0,2}?(?:packages?|updates?|upgrades?)\\s+(?:(?:is|are|was|were|being|still)\\s+){0,2}(?:held|kept)\\s*back\\b`,
+  "g",
+);
+const HELD_COUNT_AFTER = /\b(?:held|kept)[- ]back(?:\s+(?:packages?|updates?))?\s*[:=]\s*(\d+)/g;
+/** T-064 F3: other ways to call a server healthy. Checked like "healthy". */
+const HEALTHY_LIKE =
+  /\b(?:is|are|looks?|seems?|all|running)\s+(?:fine|good|ok|okay|great|normal|normally|smoothly)\b|\bhas no (?:problems|issues)\b|\bnothing (?:is )?wrong\b|\ball good\b/g;
+/** "two of them", "most of the servers": a count of servers, not a claim about each. */
+const QUANTIFIED =
+  /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|some|several|most|few|many|half)\s+of\s+(?:them|these|those|(?:the|your|my)\s+(?:\w+\s+)?(?:servers|machines|hosts))\b/;
+/** "Sentani has six", "Timika and Merauke have none": the noun is the previous claim's. */
+const ELLIPSIS = /(?:\bha(?:s|ve)|:)\s+(\d+|no|zero|none|one|two|three|four|five|six|seven|eight|nine|ten)\s*$/;
+/** "none pending", "one waiting": a pending count without the noun. */
+const PENDING_ADJ = new RegExp(`\\b${Q}\\s+(?:pending|waiting|outstanding)\\b`, "g");
+/** "is up", "up and running": the latest check reached the server. */
+const IS_UP = /\b(?:is|are) up\b(?!\s+(?:to|for|by))|\bup and running\b/g;
+/** List numbering at the start of a line is not a claim. */
+const LIST_MARKER = /^\s*\d{1,2}[.)]\s+/gm;
 
 const FAILED_COUNT = new RegExp(
   `\\b${Q}\\s+(?:failed|failing|crashed|broken)\\s+(?:systemd\\s+)?(?:services?|units?)\\b`,
@@ -130,11 +157,10 @@ const SERVER_NOUN = /^\s*(?:of\s+(?:(?:your|the|my)\s+)?(?:\d+\s+)?)?(?:servers?
 const FLEET_WORD =
   /\b(?:all|every|each|both|none|neither|any)\s+(?:of\s+)?(?:your\s+|the\s+|my\s+|these\s+)?(?:\w+\s+)?(?:servers?|machines?|hosts?|boxes)\b|\b(?:your|the|whole)\s+fleet\b|\ball of them\b|\bacross the board\b/;
 /** Fleet-wide only before any server is named; after that they mean the named server. */
-const LOOSE_FLEET_WORD = /\beverything\b|\beverywhere\b|\ball good\b/;
+const LOOSE_FLEET_WORD = /\beverything\b|\beverywhere\b|\ball good\b|\bon each\b|\bfor each\b|\beach of them\b|\ball (?:\d+|two|three|four|five|six|seven|eight|nine|ten)\b/;
 const OTHER_WORD = /\b(?:the\s+)?(?:other|remaining|rest of the)\s+(?:\w+\s+)?(?:servers?|machines?|hosts?|ones?)\b/;
 const ALL_NAMED_WORD = /\b(?:both|all|each|neither|none|either)\b/;
 
-const CLAUSE_SPLIT = /[!?;\n]+|\.(?=\s|$)|,|\s[–—-]\s|\b(?:and|but|while|whereas|although|though|however)\b/;
 
 // ---------------------------------------------------------------------------
 // Facts
@@ -189,6 +215,7 @@ function numericFacts(input: AiServerInput): Set<number> {
     add(m.memoryUsedPercent);
     add(m.uptimeDays);
     add(m.pendingUpdates);
+    add(m.heldBack);
     // T-062: "3 from Docker's repository", "0 from Ubuntu".
     if (m.pendingOutsideUbuntu !== null) {
       add(m.pendingOutsideUbuntu.count);
@@ -279,15 +306,36 @@ interface Clause {
   readonly explicit: boolean;
 }
 
+/** State carried from clause to clause while checking one reply. */
+interface Memo {
+  /** The kind of the last counted claim, for "Sentani has six". */
+  lastKind: "pending" | "held" | "failed" | null;
+}
+
+const SENTENCE_SPLIT = /[!?;\n]+|\.(?=\s|$)/;
+// Joining words split clauses only as whole words: never inside "instructions-and-reply.service".
+const WITHIN_SENTENCE = /,|\s[–—-]\s|(?<![\w-])(?:and(?! running\b)|but|while|whereas|although|though|however)(?![\w-])/;
+
 function clauses(reply: string, servers: readonly ServerFacts[]): Clause[] {
-  const raw = reply.toLowerCase().split(CLAUSE_SPLIT).map((c) => c ?? "").filter((c) => c.trim().length > 0);
+  // T-064 F2: a bare list of names ("Nabire and Merauke are quiet") never carries into the next sentence.
+  const raw: Array<{ text: string; sentenceStart: boolean; sentenceNames: readonly ServerFacts[] }> = [];
+  for (const sentence of reply.toLowerCase().split(SENTENCE_SPLIT)) {
+    let first = true;
+    const sentenceNames = [...new Set(nameHits(sentence, servers).map((h) => h.server))];
+    for (const part of sentence.split(WITHIN_SENTENCE)) {
+      if (part === undefined || part.trim().length === 0) continue;
+      raw.push({ text: part, sentenceStart: first, sentenceNames });
+      first = false;
+    }
+  }
   const out: Clause[] = [];
   let subject: readonly ServerFacts[] = servers;
   let explicit = servers.length === 1;
   const named = new Set<ServerFacts>();
   let pendingList: ServerFacts[] | null = null;
 
-  for (const text of raw) {
+  for (const { text, sentenceStart, sentenceNames } of raw) {
+    if (sentenceStart) pendingList = null;
     const hits = nameHits(text, servers);
     const hasClaims = claimLike(text);
     if (OTHER_WORD.test(text) && hits.length === 0) {
@@ -332,6 +380,12 @@ function clauses(reply: string, servers: readonly ServerFacts[]): Clause[] {
       continue;
     }
     pendingList = null;
+    // T-064 F2: "Its last attempt ... so treat Sentani as unchecked": a nameless clause is about the
+    // server its own sentence names, unless the carried subject is already one of them.
+    if (sentenceNames.length > 0 && !subject.every((s) => sentenceNames.includes(s))) {
+      subject = sentenceNames;
+      explicit = true;
+    }
     const current = subject;
     out.push({ text, subjectAt: () => current, explicit });
   }
@@ -345,10 +399,18 @@ function claimLike(text: string): boolean {
   );
 }
 
-function checkClause(clause: Clause, given: string, all: readonly ServerFacts[]): FactMismatch | null {
+function checkClause(clause: Clause, given: string, all: readonly ServerFacts[], memo: Memo): FactMismatch | null {
   let rest = clause.text;
   const every = (index: number, test: (input: AiServerInput) => boolean) =>
     clause.subjectAt(index).every((s) => test(s.input));
+
+  // T-064 F2: "two of them have pending updates" is a count of servers, not a claim about each.
+  const quantified = QUANTIFIED.exec(rest);
+  if (quantified !== null) {
+    const n = quantity(quantified[1] ?? "");
+    if (!Number.isNaN(n) && n !== AT_LEAST_ONE && !plausibleServerCounts(all).has(n)) return "server_count";
+    return null;
+  }
 
   // Names and paths first, so their digits are not read as claims.
   for (const s of all) rest = blank(rest, new RegExp(`(?<![a-z0-9])${escapeRegExp(s.name.toLowerCase())}(?![a-z0-9])`, "g"));
@@ -358,8 +420,10 @@ function checkClause(clause: Clause, given: string, all: readonly ServerFacts[])
     const unit = m[0];
     const failedHere = FAIL_WORD.test(clause.text) && !NEGATION.test(clause.text);
     const ok = every(m.index ?? 0, (i) => {
-      const failed = i.metrics?.failedUnits?.names ?? [];
-      return failedHere ? failed.includes(unit) : failed.includes(unit) || i.server.importantServices.includes(unit);
+      // The clause is lower-cased; unit names are compared the same way.
+      const failed = (i.metrics?.failedUnits?.names ?? []).map((n) => n.toLowerCase());
+      const important = i.server.importantServices.map((n) => n.toLowerCase());
+      return failedHere ? failed.includes(unit) : failed.includes(unit) || important.includes(unit);
     });
     if (!ok) return "failed_services";
   }
@@ -373,14 +437,30 @@ function checkClause(clause: Clause, given: string, all: readonly ServerFacts[])
 
   for (const re of EXEMPT) rest = blank(rest, re);
 
-  // Versions: only ones that were in the data ("24.04").
+  // Decimals and versions. T-064 F3: checked per server: a load must be that server's load, a
+  // version must be in that server's OS name.
   for (const m of rest.matchAll(VERSION)) {
-    if (!given.includes(m[0])) return "unattributed_number";
+    const tok = m[0];
+    const ok = every(m.index ?? 0, (i) => numericFacts(i).has(Number(tok)) || (i.metrics?.os ?? "").toLowerCase().includes(tok));
+    if (!ok && !(clause.subjectAt(m.index ?? 0).length === all.length && given.includes(tok) && !/^\d+\.\d+$/.test(tok))) {
+      return "unattributed_number";
+    }
   }
   rest = blank(rest, VERSION);
 
+  // T-064 F2: held-back packages first, so "one package is held back" is not read as pending.
+  for (const re of [HELD_COUNT, HELD_COUNT_AFTER]) {
+    for (const m of rest.matchAll(re)) {
+      const n = quantity(m[1] ?? "");
+      if (!every(m.index ?? 0, (i) => countMatches(n, i.metrics?.heldBack ?? null))) return "held_back";
+      memo.lastKind = "held";
+    }
+    rest = blank(rest, re);
+  }
+
   // Pending updates.
   for (const m of rest.matchAll(PENDING_COUNT)) {
+    memo.lastKind = "pending";
     const n = quantity(m[1] ?? "");
     if (!every(m.index ?? 0, (i) => countMatches(n, i.metrics?.pendingUpdates ?? null))) return "pending_updates";
   }
@@ -390,6 +470,12 @@ function checkClause(clause: Clause, given: string, all: readonly ServerFacts[])
     if (!every(m.index ?? 0, (i) => countMatches(n, i.metrics?.pendingUpdates ?? null))) return "pending_updates";
   }
   rest = blank(rest, PENDING_COUNT_AFTER);
+  for (const m of rest.matchAll(PENDING_ADJ)) {
+    memo.lastKind = "pending";
+    const n = quantity(m[1] ?? "");
+    if (!every(m.index ?? 0, (i) => countMatches(n, i.metrics?.pendingUpdates ?? null))) return "pending_updates";
+  }
+  rest = blank(rest, PENDING_ADJ);
   const noneIdx = rest.search(PENDING_NONE);
   if (noneIdx >= 0 && !every(noneIdx, (i) => i.metrics?.pendingUpdates === 0)) return "pending_updates";
   const someIdx = rest.search(PENDING_SOME);
@@ -403,13 +489,21 @@ function checkClause(clause: Clause, given: string, all: readonly ServerFacts[])
     if (!ok) return "pending_updates";
   }
   const utdIdx = rest.search(UP_TO_DATE);
-  if (utdIdx >= 0 && !NEGATION.test(rest.slice(0, utdIdx))) {
+  const utdException = utdIdx >= 0 && EXCEPTION_AFTER.test(rest.slice(utdIdx + 10));
+  if (utdIdx >= 0 && !utdException && !NEGATION.test(rest.slice(0, utdIdx))) {
     if (!every(utdIdx, (i) => i.metrics?.pendingUpdates === 0)) return "status_word";
+  }
+  // T-064 F3: "fully patched", "nothing to update", "on the latest versions" claim zero pending.
+  const zero = ZERO_PENDING.exec(rest);
+  if (zero !== null && !/(?:\bnot|n't)\s+(?:\w+\s+)?$/.test(rest.slice(0, zero.index))) {
+    if (!every(zero.index, (i) => i.metrics?.pendingUpdates === 0)) return "pending_updates";
+    memo.lastKind = "pending";
   }
 
   // Failed services.
   for (const re of [FAILED_COUNT, FAILED_COUNT_VERB]) {
     for (const m of rest.matchAll(re)) {
+      memo.lastKind = "failed";
       const n = quantity(m[1] ?? "");
       if (!every(m.index ?? 0, (i) => countMatches(n, failedCount(i)))) return "failed_services";
     }
@@ -453,11 +547,45 @@ function checkClause(clause: Clause, given: string, all: readonly ServerFacts[])
   }
   rest = blank(rest, PERCENT);
 
-  // Status words (positive statements only; "not fresh" is not checked).
+  // Status words. T-064 F3: a negated one is checked too ("Timika is not healthy" must be true).
   for (const m of rest.matchAll(STATUS_WORD)) {
     const at = m.index ?? 0;
-    if (STATUS_NEGATION.test(rest.slice(0, at))) continue;
-    if (!every(at, (i) => statusWordHolds(m[1] ?? "", i))) return "status_word";
+    const before = rest.slice(0, at);
+    // "is not healthy" is a claim that must be true; other negation nearby ("doesn't match the
+    // unreachable status") makes the claim unclear, so it is not checked either way.
+    const copularNegation = /(?:\b(?:is|are|was|were)\s+(?:not|no longer|never)|\b(?:isn't|aren't|wasn't|weren't))(?:\s+\w+)?\s*$/.test(before);
+    if (!copularNegation && STATUS_NEGATION.test(before)) continue;
+    if (!every(at, (i) => statusWordHolds(m[1] ?? "", i) !== copularNegation)) return "status_word";
+  }
+  // T-064 F3: "is up", "up and running": the latest check must have reached it.
+  for (const m of rest.matchAll(IS_UP)) {
+    if (/(?:\bnot|n't)\s*$/.test(rest.slice(0, m.index ?? 0))) continue;
+    if (!every(m.index ?? 0, (i) => i.latestAttempt?.succeeded === true)) return "status_word";
+  }
+  rest = blank(rest, IS_UP);
+  // T-064 F3: "is fine", "looks good" are health claims.
+  for (const m of rest.matchAll(HEALTHY_LIKE)) {
+    const at = m.index ?? 0;
+    if (/(?:\bnot|n't|\bnever)\s*(?:\w+\s+)?$/.test(rest.slice(0, at)) || /\bnot\b/.test(m[0])) continue;
+    // "Load and memory are fine" is about those metrics, not a claim that the whole server is healthy.
+    if (/\b(?:load|memory|ram|cpu|disk|space|uptime|swap|network|inodes?|services?|checks?|else)\b/.test(rest.slice(0, at))) continue;
+    if (!every(at, (i) => statusWordHolds("healthy", i))) return "status_word";
+  }
+  rest = blank(rest, HEALTHY_LIKE);
+
+  // T-064 F3: "Sentani has six", "Timika and Merauke have none": the previous claim's noun.
+  const ellipsis = ELLIPSIS.exec(rest);
+  // No earlier noun: "Nabire has none." cannot be checked, so it is not shown.
+  if (ellipsis !== null && memo.lastKind === null && /^(?:none|no|zero)$/.test(ellipsis[1] ?? "")) return "unattributed_number";
+  if (ellipsis !== null && memo.lastKind !== null) {
+    const n = quantity(ellipsis[1] ?? "");
+    const at = ellipsis.index;
+    const metric = (i: AiServerInput) =>
+      memo.lastKind === "pending" ? i.metrics?.pendingUpdates ?? null : memo.lastKind === "held" ? i.metrics?.heldBack ?? null : failedCount(i);
+    if (!every(at, (i) => countMatches(n, metric(i)))) {
+      return memo.lastKind === "pending" ? "pending_updates" : memo.lastKind === "held" ? "held_back" : "failed_services";
+    }
+    rest = rest.slice(0, at);
   }
 
   // Every other number.
@@ -465,7 +593,8 @@ function checkClause(clause: Clause, given: string, all: readonly ServerFacts[])
     const n = Number(m[0]);
     const at = m.index ?? 0;
     const after = rest.slice(at + m[0].length);
-    if (SERVER_NOUN.test(after)) {
+    const allN = /\ball\s+$/.test(rest.slice(0, at)) && /^\s*(?:(?:were|are|have|of them)\b|$)/.test(after);
+    if (SERVER_NOUN.test(after) || allN) {
       if (!plausibleServerCounts(all).has(n)) return "server_count";
       continue;
     }
@@ -479,12 +608,68 @@ function checkClause(clause: Clause, given: string, all: readonly ServerFacts[])
  * Compare the claims in `reply` with the facts in `inputs`.
  * @param given the exact prompt the model received (versions must appear in it)
  */
+/**
+ * T-064 F3: a claim about a server whose facts were not given ("Timika has no
+ * failed services" when only Nabire is in scope). A capitalised name, not one
+ * of the servers given and not an ordinary word, as the subject of a factual
+ * verb, in a sentence that makes a claim.
+ */
+const NOT_A_SERVER = new Set(
+  ("It Its This That These Those There They Their Everything Nothing Something All Both Each Every Neither None Either No " +
+    "Your You The A An And But So Also Yes Note Overall Today Right Now Load Disk Memory Uptime Inodes Updates Update Packages " +
+    "Package Checks Check Reboot Ubuntu Docker Debian ServrSit Coverage Status Services Service Kernel Pending Held " +
+    "Inode Cpu Swap Root Usage Use Space Storage Filesystem Network System Server Servers Machine Host Fleet Plan Approval").split(" ").map((w) => w.toLowerCase()),
+);
+const SUBJECT_VERB = /\b([A-Z][a-z]{2,})(?:'s)?\s+(?:has|have|is|are|was|were|needs?|shows?|reports?|runs?|uses?)\b/g;
+
+function outOfScope(reply: string, servers: readonly ServerFacts[]): boolean {
+  const known = new Set(servers.map((s) => s.name.toLowerCase()));
+  for (const sentence of reply.split(SENTENCE_SPLIT)) {
+    const lower = sentence.toLowerCase();
+    if (!claimLike(lower)) continue;
+    const namesKnown = nameHits(lower, servers).length > 0;
+    for (const m of sentence.matchAll(SUBJECT_VERB)) {
+      const word = (m[1] ?? "").toLowerCase();
+      const stem = word.endsWith("s") ? word.slice(0, -1) : word;
+      if (NOT_A_SERVER.has(word) || NOT_A_SERVER.has(stem) || known.has(word)) continue;
+      // A capital at the start of a sentence is ordinary English unless the sentence names no server.
+      const sentenceInitial = sentence.slice(0, m.index ?? 0).trim().length === 0;
+      if (!sentenceInitial || !namesKnown) return true;
+    }
+  }
+  return false;
+}
+
 export function checkFacts(reply: string, inputs: readonly AiServerInput[], given: string): FactCheck {
   const servers: ServerFacts[] = inputs.map((input) => ({ name: input.server.name, input }));
-  if (servers.length === 0) return /\d/.test(reply) ? { ok: false, mismatch: "unattributed_number" } : { ok: true };
-  for (const clause of clauses(reply, servers)) {
-    const mismatch = checkClause(clause, given.toLowerCase(), servers);
+  // T-064 F2: "1. ..." / "2) ..." list numbering is not a claim.
+  const text = reply.replace(LIST_MARKER, "");
+  if (servers.length > 0 && outOfScope(text, servers)) return { ok: false, mismatch: "out_of_scope" };
+  if (servers.length === 0) return /\d/.test(text) ? { ok: false, mismatch: "unattributed_number" } : { ok: true };
+  const memo: Memo = { lastKind: null };
+  for (const clause of clauses(text, servers)) {
+    const mismatch = checkClause(clause, given.toLowerCase(), servers, memo);
     if (mismatch !== null) return { ok: false, mismatch };
   }
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Tone (T-064 F4, ADR-015 revised)
+// ---------------------------------------------------------------------------
+
+/** Words that make a reply bad news: failures, outages, data loss, security, a full disk. */
+const BAD_NEWS =
+  /\b(?:fail(?:ed|ing|ure|ures)?|down|unreachable|outage|offline|critical|crash(?:ed|ing)?|broken|breach(?:ed)?|compromised|attack(?:ed)?|intrusion|data loss|lost data|corrupt(?:ed|ion)?|full|errors?)\b|\b(?:can't|cannot|could not|couldn't) (?:reach|connect)\b|\b(?:9\d|100)\s?%/i;
+/** Jokes and comic markers. Cheeky lines belong only in routine good news. */
+const JOKE =
+  /\b(?:yikes|oops(?:ie|y)?|whoops(?:ie)?|uh[- ]?oh|oh no|oof|napping|snoozing|taking a nap|nap time|lol|lmao|rofl|haha+|hehe+|no biggie|welp|derp)\b|[\u{1F605}\u{1F648}\u{1F62C}\u{1F926}\u{1F602}\u{1F923}\u{1F643}\u{1F937}]/iu;
+
+/**
+ * True when a reply jokes while giving bad news. ADR-015: never cheeky about
+ * failures, outages, data loss, security or Timika client impact. A reply
+ * that contains any bad news is not a routine good-news moment.
+ */
+export function jokesAboutBadNews(reply: string): boolean {
+  return BAD_NEWS.test(reply) && JOKE.test(reply);
 }

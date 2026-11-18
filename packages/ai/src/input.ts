@@ -115,6 +115,8 @@ export const AiServerInputSchema = z
         /** Inode use per filesystem (T-051: so inode claims can be checked). */
         inodes: z.array(z.object({ mount: text(64), usedPercent: z.number().int().min(0).max(100) })).max(8).nullable(),
         pendingUpdates: z.number().int().nonnegative().nullable(),
+        /** T-064 F2: packages APT holds back (not part of pendingUpdates). */
+        heldBack: z.number().int().nonnegative().nullable(),
         /**
          * T-062: the part of pendingUpdates that comes from outside Ubuntu's archive (for example Docker's
          * repository). Update plans leave these out. Null when unavailable.
@@ -206,6 +208,7 @@ function metricsFrom(
           }))
         : null,
     pendingUpdates: o.packages.pendingCount.status === "ok" ? o.packages.pendingCount.value : null,
+    heldBack: o.packages.heldBackCount.status === "ok" ? o.packages.heldBackCount.value : null,
     pendingOutsideUbuntu:
       o.packages.pendingOutsideUbuntu.status === "ok"
         ? {

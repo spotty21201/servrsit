@@ -1160,3 +1160,75 @@ Tester gate, their files unchanged (temporary copy, removed): zt01-real-hosts 12
 1. **Merge order:** `feat/coder/package-origins` contains T-061 and T-062 and does not depend on T-053, so it can merge before it. Both it and `feat/coder/owner-auth` append to this handoff file, so merging the second one has a trivial conflict at the end of the file: keep both sections.
 2. **Sentani's clock is 7 h slow.** Fixing it is a change on the server (time sync), which only the founder may authorize. ServrSit now corrects package ages for it and shows a warning.
 3. **Next in my queue:** T-054 through T-059 (not started). ZT-01 and the route inventory remain the standing gate.
+
+## T-063: ServrSit checks its own clock (commit `9af148d`, branch `feat/coder/controller-clock`, from `integration/live-v1` at `8b29555`)
+
+**Correction to T-061.** The wrong clock is **Merauke's** (the controller), not the targets'. My T-061 handoff and finding text blamed Sentani. Sentani, Nabire and Timika are right.
+
+**How it works:**
+
+- **Evidence** (`apps/api/src/clock/controller-clock.ts`), on the health schedule, read-only:
+  - `timedatectl show --property=NTPSynchronized --value` (one fixed `execFile`, no shell, no sudo);
+  - HTTPS `HEAD` requests to google.com and cloudflare.com, comparing the `Date` header with the local clock;
+  - a static test checks that the code contains no clock-setting call.
+  - **ServrSit never changes the system clock.**
+- **Untrusted when:** NTP is not synchronised, the clock is more than 2 min off after uncertainty, the sources disagree, or nothing could verify it. Until the first check finishes, the clock is untrusted.
+- **Attribution:** if no HTTPS source gives an offset, but most targets agree with each other on one skew, that skew is put on the controller (`basis: "target-agreement"`).
+  - Target `time.skew.v1` now subtracts the controller's offset, so correct servers get no finding.
+  - A server that is really off is described against real time.
+  - With no verified controller clock, the finding says either clock could be wrong.
+- **`GET /api/fleet`** gains `controlPlane: {clock, findings}`. `control.clock.v1` is **critical**: "…Times, ages and expiries ServrSit shows may be wrong, and plan approval is blocked until the clock is fixed. ServrSit does not change the system clock." Designer needs to render it.
+- **Approval:** plans get the blocker `CONTROLLER_CLOCK_UNTRUSTED`, and the approval route re-checks the clock at approval time and returns 409 `PLAN_BLOCKED`.
+- **Assistant:** while untrusted, the observations carry `timesUncertain`, and the deterministic text starts with "ServrSit's own clock is about 7 h fast, so every time and age here may be wrong." (once per answer). It no longer says the host's clock is off.
+- **Tests and fixture mode:** with `startChecks: false` or in fixture mode, the clock is `not-checked` and does not block. This is why the Tester's I/O-guarded ZT-01 still spawns and fetches nothing.
+
+**Live evidence (one read-only run on Merauke, local clock 2026-11-18T03:50Z):** `ntpSynchronized false`; google.com offset +25201 s and cloudflare.com +25201 s; `status untrusted`, `offsetSeconds 25201 ± 2`, basis `https-date`.
+
+**Checks run (real output):**
+
+```
+pnpm -r test at 9af148d -> exit 0: 9, 17 (domain), 50, 48 (web), 11, 145 (ai), 18, 147 (api); fail 0
+typecheck: all 10 packages exit 0; key scan clean
+Gate (a) T-063 alone, Tester files as of 957b295: zt01 12/12, care-loop 35/6/1 (= baseline)
+Gate (b) throwaway merge of T-053 + T-063, Tester's current files (945f1ad, with my reviewed patch):
+  zt01 12/12, care-loop 36/5/1, routes-401 7/7, static-config 3/3, api suite 165/165
+```
+
+**Merge note for the Orchestrator:** merging `feat/coder/owner-auth` with this branch conflicts in two code files.
+
+- `apps/api/src/server.ts`: keep both option blocks (`controllerClock` and `auth`).
+- `apps/api/src/routes/care.test.ts`: keep `const sink = setupTokenSink();` and the `FleetService` with the `controllerClock` option, and drop `CsrfGuard`.
+- `handoff-coder-live.md`: keep both sections.
+
+I resolved exactly this way in the throwaway check above.
+
+**Limits:**
+
+- **Time sources:** the two HTTPS sources are fixed in code.
+- **Not covered yet:** the per-server explainer does not carry the `timesUncertain` note. T-064 O1 touches that path.
+- **Fixing Merauke's clock** is the founder's action (time sync failing to `123.235.232.172`). It needs sudo, which I do not use.
+
+## T-064: Tester's AI findings (branch `feat/coder/ai-hardening`, stacked on T-063)
+
+| Finding | Commit | What changed |
+|---|---|---|
+| **F1 (High)** secret detector blind spots | `b99d3e4` | Catches env-style names (`DB_PASSWORD=`, `GITHUB_TOKEN=`, `OPENAI_API_KEY=`; `_` defeated `\b`), "the sudo password for Sentani is …", and Tailscale, Stripe (`sk_live_`), Google `AIza`, npm, GitLab and Hugging Face keys. The owner-context file is stricter: a secret word followed by any value (`x: …`, `x = …`, `x is …`) rejects the whole file. The old "password is X" rule is narrowed to `=` and `:`, so "the password is required" is no longer refused. |
+| **F5** cut-off replies | `d472387` | `finish_reason: "length"` becomes reason `truncated_output`, with the notice "The AI's reply was cut off before it finished, so here are the checks directly." |
+| **F2** correct answers discarded | `a8d2eda` | Fixes: a name-only clause no longer carries into the next sentence; list numbering is ignored; "N of them" and "all N" are read as server counts; "on each" means every server; "up to date apart from one …" is an exception, not a zero; held-back packages are checked as held back (new `heldBack` in the model input); unit names that contain "-and-" stay whole; a nameless clause takes the server its own sentence names. |
+| **F3** missed phrasings | `a8d2eda` | New checks: "fully patched", "current", "nothing to update", "Updates: none", "none pending", "fine / looks good / up and running" (as health claims; "load and memory are fine" is not one), copular negation ("is not healthy" must be true), decimals per server, "has none" with no earlier noun (refused), and a named server outside the data (`out_of_scope`). |
+| **F4** tone | `a8d2eda` | A reply that contains bad news (failed, down, unreachable, outage, full, breach, ≥90 %, …) **and** a joke marker (yikes, oops, whoops, napping, lol, …) is withheld as `unsuitable_tone`: "The AI's reply joked about a problem, so here are the checks directly." A cheeky good-news line still passes. |
+| **O1** explainer | `a8d2eda` | `GuardedExplainer` runs the same fact and tone checks. It has no API route yet. |
+
+**The Tester's suites against this branch** (temporary copy; nothing of theirs committed). I added `host.clock`, `packages.metadataClock` and `packages.pendingOutsideUbuntu` to **the copy** of their `support/synthetic.mts`, because T-061/T-062 made those fields required. **They need the same fix,** or 8 `pipeline` tests fail with a TypeError.
+
+```
+owner-context 21/21 (was 20/21)   pipeline 11/11 (was 10/11)   fact-check 58/58 (was 47/58)
+coverage-probe 6/6 (was 0/6)      real-replay 10/10 (was 7/10: RC3, RC6 and RE2 are now accepted)
+```
+
+**Full run at `a8d2eda`:** `pnpm -r test` exit 0; ai 156, api 147, all others pass; typecheck exit 0; key scan clean.
+
+**Limits:**
+
+- **The checker is still lexical.** The out-of-scope check relies on capitalised names and a stop list. A sentence-initial capital is flagged only when its sentence names no known server.
+- **F6 is not addressed.** "Next check is due in 10 min" (minutes are exempt) is not checked.

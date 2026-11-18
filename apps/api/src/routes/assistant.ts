@@ -67,6 +67,8 @@ const UNAVAILABLE_NOTICES: Readonly<Partial<Record<AiUnavailableReason, string>>
   unsafe_output: "The AI's reply was withheld because it looked like a command, so this is a summary of the latest checks instead.",
   unverified_time: "The AI's reply was withheld because it stated a time that was not in the data, so this is a summary of the latest checks instead.",
   fact_mismatch: FACT_MISMATCH_NOTICE,
+  truncated_output: "The AI's reply was cut off before it finished, so here are the checks directly.",
+  unsuitable_tone: "The AI's reply joked about a problem, so here are the checks directly.",
 };
 const DEFAULT_UNAVAILABLE_NOTICE = "The AI is unavailable right now, so this is a summary of the latest checks instead.";
 

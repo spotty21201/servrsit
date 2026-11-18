@@ -303,3 +303,33 @@ test("the API key appears only in the Authorization header: not in the body, the
   assert.equal(JSON.stringify(r).includes(FAKE_API_KEY), false);
   await mock.close();
 });
+
+// ---- T-064 F5: a reply cut off at the token limit ------------------------------------
+
+test("T-064 F5: finish_reason 'length' is a truncated reply: never shown, deterministic fallback with its own reason", async () => {
+  const cut = "Nabire looks fine, though the reported figure is 11%,";
+  const { mock, explainer } = await setup((_req, res) =>
+    json(res, 200, { model: "m", choices: [{ message: { role: "assistant", content: cut }, finish_reason: "length" }] }),
+  );
+  try {
+    const r = await explainer.explain("s1", server());
+    assert.equal(r.source, "deterministic");
+    assert.equal(r.reason, "truncated_output");
+    assert.equal(r.text.includes(cut), false);
+  } finally {
+    await mock.close();
+  }
+});
+
+test("T-064 F5: finish_reason 'stop' (or absent) is a complete reply", async () => {
+  for (const finish of ["stop", undefined]) {
+    const { mock, explainer } = await setup((_req, res) =>
+      json(res, 200, { model: "m", choices: [{ message: { role: "assistant", content: "Nabire looks fine for the checks that ran." }, ...(finish === undefined ? {} : { finish_reason: finish }) }] }),
+    );
+    try {
+      assert.equal((await explainer.explain(`s-${String(finish)}`, server())).source, "openai_compatible", String(finish));
+    } finally {
+      await mock.close();
+    }
+  }
+});

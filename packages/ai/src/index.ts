@@ -62,5 +62,5 @@ export { TIME_AND_PACKAGE_RULES } from "./prompt.js";
 export { buildAssistantSystem, keyedByName, looksLikeSecret, OWNER_CONTEXT_RULES } from "./assistant.js";
 export { OWNER_CONTEXT_MAX_BYTES, PLACEHOLDER_MARK, prepareOwnerContext } from "./owner-context.js";
 export type { OwnerContextResult } from "./owner-context.js";
-export { checkFacts, FACT_MISMATCHES } from "./fact-check.js";
+export { checkFacts, FACT_MISMATCHES, jokesAboutBadNews } from "./fact-check.js";
 export type { FactCheck, FactMismatch } from "./fact-check.js";

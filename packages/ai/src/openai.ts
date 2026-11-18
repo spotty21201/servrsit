@@ -33,7 +33,15 @@ const CompletionSchema = z
   .object({
     model: z.string().optional(),
     choices: z
-      .array(z.object({ message: z.object({ content: z.string().nullable().optional() }).passthrough() }).passthrough())
+      .array(
+        z
+          .object({
+            message: z.object({ content: z.string().nullable().optional() }).passthrough(),
+            /** T-064 F5: "length" means the reply was cut off at the token limit. */
+            finish_reason: z.string().nullable().optional(),
+          })
+          .passthrough(),
+      )
       .min(1),
   })
   .passthrough();
@@ -141,6 +149,8 @@ export function createOpenAiProvider(config: OpenAiConfig, deps: OpenAiProviderD
         if (!parsed.success) return fail("malformed_response", status);
 
         const first = parsed.data.choices[0];
+        // T-064 F5: a reply cut off at the token limit is never shown as if complete.
+        if (first?.finish_reason === "length") return fail("truncated_output", status);
         // Only the text is read. tool_calls / function_call, if present, are ignored.
         const text = first?.message.content ?? "";
         const reported = parsed.data.model;
