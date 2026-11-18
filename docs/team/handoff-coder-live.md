@@ -1540,3 +1540,49 @@ Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21,
 - **Your current branch.** On `feat/tester/server-registration` (`75c2c61`), `care-loop` is 6/41 and `auth` is 36/37 (AU-04b). The result is identical on `integration/next` without T-076. Those files predate the T-057 acknowledgement mapping and the T-066 per-source lock. Your `1c9d5a7` versions pass.
 
 Next: T-077.
+
+## T-077: activity history and export (branch `feat/coder/activity`, from `integration/next`)
+
+**Contract** (`packages/contracts/src/activity.ts`):
+
+- `GET /api/activity?type=&server=&result=&from=&to=&q=&limit=` lists the history.
+- `POST /api/exports` creates an export.
+- `GET /api/exports` lists exports that have not expired.
+- `GET /api/exports/:id/download` returns the file as an attachment, or 410 once it has expired.
+
+**Records** (`apps/api/src/activity/history.ts`):
+
+- **Operations** come from the care store (new `CareStore.listOperations`). Each has a fixed title and outcome text per state. Failed, cancelled and unknown outcomes are included. `simulated: true` marks operations on a simulated target.
+- **Findings** give one record when opened and one when resolved. The resolved record says which check resolved it.
+- **Health checks**: one record per finished attempt, kept in the new `SqliteActivityStore`. Each holds the result, how many checks ran, or a fixed failure text. Nothing from server output is kept: a test plants a raw stderr string, and it does not appear.
+
+**Exports:**
+
+- Built on the server from the same records, with times in the requested IANA time zone.
+- Scrubbed for known secret values with the same scrubber used for logs and responses. A test plants a secret in a finding summary; the export does not contain it.
+- Stored until expiry and never edited.
+
+**Retention** (FR-21 proposal):
+
+- Health-check records: 30 days, then pruned.
+- Operations and findings: 90 days shown in the list. They are never deleted.
+- Exports: 7 days.
+
+**New file:** `.data/activity.db` (gitignored). Health checks are recorded after every fleet pass, and also before each read of the activity list.
+
+**Web:** `apps/web/src/api/activity.ts` keeps the stub's `list`, `createExport` and `listExports`. Two things differ because the server now builds the file:
+
+- An export result has `downloadUrl` in place of `content`, and the new `download()` fetches the file.
+- The stub's second argument to `createExport` (the records) is still accepted, but only their ids are sent.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 226, ai 156, web 93, ssh 51, store 26, domain 22, worker 19, infra 9; typecheck all 9 exit 0
+Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a, known),
+  zt01 13/13 with the reviewed list (T-069 x9, T-076 x4, plus POST /api/exports)
+```
+
+**For the Tester:** add `POST /api/exports` to ZT-01's list. It reads only ServrSit's own records and never contacts a server.
+
+Next: T-078.

@@ -29,6 +29,8 @@ export { SqliteFindingStore } from "./findings.js";
 export type { FindingEvent, FindingWriteResult, ObservedFinding, StoredFinding } from "./findings.js";
 export { SqliteSettingsStore } from "./settings.js";
 export type { SettingChange } from "./settings.js";
+export { SqliteActivityStore } from "./activity.js";
+export type { StoredExport, StoredInspection } from "./activity.js";
 export { FileIntentStore, IntentConflictError, MemoryIntentStore } from "./intent.js";
 export { SqliteAuthStore } from "./auth.js";
 export type { EnrolmentRecord, OwnerRecord, SessionRecord, SqliteAuthStoreOptions, TicketRecord } from "./auth.js";

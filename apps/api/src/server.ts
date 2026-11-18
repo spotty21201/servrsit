@@ -30,11 +30,13 @@ import { DEFAULT_ALLOWED_ORIGINS } from "./csrf.js";
 import serverRoutes from "./routes/servers.js";
 import findingRoutes, { PAUSE_KEY, type PausedSetting } from "./routes/findings.js";
 import { FindingTracker } from "./findings/tracker.js";
+import activityRoutes from "./routes/activity.js";
+import { ActivityService, InspectionRecorder } from "./activity/history.js";
 import { AddressPolicy, type Resolver } from "./servers/address.js";
 import { ServerRegistry, type FirstCheckCollector } from "./servers/registry.js";
 import { createHostKeyScanner, createKeyVault, probeTcp, type HostKeyScanner, type KeyVault } from "./servers/ssh-tools.js";
 import { DEFAULT_OWNER_CONTEXT_PATH, OwnerContextFile } from "./owner-context-file.js";
-import { SqliteAuthStore, SqliteCareStore, SqliteServerStore, SqliteFindingStore, SqliteSettingsStore, type CareStore, type NewServer, type StoredServer } from "@servrsit/store";
+import { SqliteAuthStore, SqliteCareStore, SqliteServerStore, SqliteFindingStore, SqliteSettingsStore, SqliteActivityStore, type CareStore, type NewServer, type StoredServer } from "@servrsit/store";
 import { SshWriteTarget, type WriteTarget } from "@servrsit/worker";
 import { buildFixtureFleet } from "./fleet/fixture.js";
 import { ControllerClockMonitor, NOT_CHECKED_CLOCK } from "./clock/controller-clock.js";
@@ -84,6 +86,8 @@ export interface BuildServerOptions {
 
 export interface FindingsWiring {
   readonly store?: SqliteFindingStore | undefined;
+  /** T-077: inspection history and exports. */
+  readonly activity?: SqliteActivityStore | undefined;
   readonly settings?: SqliteSettingsStore | undefined;
   readonly now?: (() => Date) | undefined;
 }
@@ -389,7 +393,34 @@ export async function buildServer(options: BuildServerOptions = {}) {
   const findingStore = mode === "fixture" ? new SqliteFindingStore({ path: ":memory:" }) : (options.findings?.store ?? new SqliteFindingStore({ path: ":memory:" }));
   const fleetSnapshot = () => (mode === "fixture" ? buildFixtureFleet(config, new Date()) : service.snapshot());
   const tracker = new FindingTracker({ store: findingStore, fleet: fleetSnapshot, now: options.findings?.now });
-  onPass = () => tracker.sync();
+  const activityStore = mode === "fixture" ? new SqliteActivityStore({ path: ":memory:" }) : (options.findings?.activity ?? new SqliteActivityStore({ path: ":memory:" }));
+  const inspections = new InspectionRecorder(activityStore, options.findings?.now);
+  onPass = () => {
+    const snapshot = fleetSnapshot();
+    tracker.sync(snapshot);
+    inspections.sync(snapshot);
+  };
+  const scrub = createScrubber(secrets);
+  await fastify.register(activityRoutes, {
+    service: new ActivityService({
+      activity: activityStore,
+      care: careStore,
+      findings: findingStore,
+      serverInfo: (id) => {
+        const known0 = care.servers().find((x) => x.id === id);
+        if (known0 !== undefined) return { name: known0.name, production: known0.production };
+        const known = registryStore.get(id);
+        return known === null ? null : { name: known.name, production: known.production };
+      },
+      scrub: (text) => String(scrub(text)),
+      refresh: () => onPass(),
+      now: options.findings?.now,
+    }),
+    owner: (request) => {
+      if (request.authSession === null) throw new Error("activity route reached without a session");
+      return request.authSession.info.username;
+    },
+  });
   await fastify.register(findingRoutes, {
     mode,
     tracker,

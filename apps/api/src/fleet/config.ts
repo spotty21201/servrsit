@@ -111,6 +111,8 @@ export const DEFAULT_KNOWN_HOSTS_PATH = new URL("../../.data/known_hosts", impor
 export const DEFAULT_REGISTRY_PATH = new URL("../../.data/servers.db", import.meta.url);
 /** T-076: finding records (gitignored). */
 export const DEFAULT_FINDINGS_PATH = new URL("../../.data/findings.db", import.meta.url);
+/** T-077: inspection history and exports (gitignored). */
+export const DEFAULT_ACTIVITY_PATH = new URL("../../.data/activity.db", import.meta.url);
 /** T-076/T-079: installation settings, such as the scheduler pause (gitignored). */
 export const DEFAULT_SETTINGS_PATH = new URL("../../.data/settings.db", import.meta.url);
 /** T-069: one 0700 directory per registered server, holding its key pair and pinned known_hosts (gitignored). */
