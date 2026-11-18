@@ -9,9 +9,11 @@
  * Honesty rules:
  *   - No progress percentages. Steps and recorded times only.
  *   - Only the state `succeeded` reads as completed and verified.
- *   - "Stop after this safe step" is a request, not an undo. The API has no
- *     stop endpoint yet, so the control is shown disabled with that reason
- *     (and shows "requested" when the record says a stop was requested).
+ *   - "Stop after this safe step" is a request, not an undo (POST
+ *     /api/operations/:id/stop-request). A queued operation can be cancelled
+ *     before it starts. The answer says what happened: requested, cancelled
+ *     or already final. "Recheck outcome" asks the API to read the target's
+ *     ledger again (reconcile); it never starts, retries or stops anything.
  *   - Unresolved operations are polled every 3 s; the live region only
  *     announces state changes, not each poll or log line.
  *
@@ -20,7 +22,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchFleet } from "../api/fleet";
 import { useClock } from "../clock/ClockContext";
-import { createCareClient, type CareClient, type OperationView, type PlanView } from "../api/stubs/care";
+import { createCareClient, type CareClient, type OperationView, type PlanView } from "../api/care";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
 import { planPath } from "../lib/router";
 import { usePageTitle } from "../lib/pageTitle";
@@ -125,6 +127,8 @@ export function OperationScreen({ operationId, client: injected }: { operationId
   const [refreshError, setRefreshError] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const planTried = useRef<string | null>(null);
+  const [acting, setActing] = useState<"stop" | "recheck" | null>(null);
+  const [actionNote, setActionNote] = useState<string | null>(null);
   const stopHelpId = useId();
   const clockView = useClock().view;
 
@@ -172,6 +176,37 @@ export function OperationScreen({ operationId, client: injected }: { operationId
     void client.getPlan(planId).then((r) => { if (r.ok) setPlan(r.data); });
   }, [client, planId]);
 
+  async function stop(): Promise<void> {
+    if (acting || view?.operation.stopRequested) return;
+    setActing("stop"); setActionNote(null);
+    const r = await client.requestStop(operationId);
+    setActing(null);
+    if (r.ok) {
+      setView({ operation: r.data.operation, events: r.data.events });
+      setNow(new Date());
+      setActionNote(r.data.stop === "cancelled" ? "Cancelled before it started. Nothing was sent to the server."
+        : r.data.stop === "requested" ? "Stop requested. ServrSit will stop after the current safe step. It has not stopped yet."
+        : "It had already finished, so there was nothing to stop.");
+    } else {
+      setActionNote("ServrSit did not get a clear answer, so the stop may or may not have been requested. Reload this page to see the record.");
+      void load();
+    }
+  }
+
+  async function recheck(): Promise<void> {
+    if (acting) return;
+    setActing("recheck"); setActionNote(null);
+    const r = await client.reconcile(operationId);
+    setActing(null);
+    if (r.ok) {
+      setView(r.data);
+      setNow(new Date());
+      setActionNote(r.data.operation.state === "outcome_unknown" ? "Checked again. The outcome is still not confirmed." : "Checked again. The record was updated from what the server holds.");
+    } else {
+      setActionNote(r.code === "RECONCILE_UNAVAILABLE" ? "ServrSit could not read the server's record right now. The outcome is still not confirmed." : "ServrSit could not check the outcome just now. It is still not confirmed. Try again in a moment.");
+    }
+  }
+
   const vm = view ? toOperationVM(view, plan, now, tz, clockView?.agesUncertain ?? false) : null;
   usePageTitle(vm ? `${vm.title}: ${vm.stateLabel}` : error ? "Operation not available" : "Loading the operation", vm !== null || error !== null);
 
@@ -210,21 +245,19 @@ export function OperationScreen({ operationId, client: injected }: { operationId
 
             {vm.stop.visible && (
               <div className={styles.stack}>
-                <button type="button" className={styles.secondary} disabled aria-describedby={stopHelpId}>{vm.stop.label}</button>
+                <button type="button" className={styles.secondary} onClick={() => void stop()} aria-disabled={vm.stop.requested || acting !== null || undefined} aria-describedby={stopHelpId}>{acting === "stop" ? "Sending the request" : vm.stop.label}</button>
                 <p id={stopHelpId} className={styles.small}>
-                  {vm.stop.requested
-                    ? "Stop requested. ServrSit will stop after the current safe step. It has not stopped yet."
-                    : `${vm.stop.help} Stop requests are not connected to the API yet.`}
+                  {vm.stop.requested ? "Stop requested. ServrSit will stop after the current safe step. It has not stopped yet." : vm.stop.help}
                 </p>
               </div>
             )}
             {vm.recheck && (
               <div className={styles.stack}>
-                <button type="button" className={styles.secondary} onClick={() => void load()}>Recheck outcome</button>
-                <p className={styles.small}>This looks up the record again. It does not run anything on the server.</p>
+                <button type="button" className={styles.secondary} onClick={() => void recheck()} aria-disabled={acting !== null || undefined}>{acting === "recheck" ? "Checking" : "Recheck outcome"}</button>
+                <p className={styles.small}>This reads the server&rsquo;s own record of the operation again. It does not start, retry or stop anything.</p>
               </div>
             )}
-            {vm.state === "queued" && <p className={styles.small}>Cancelling before start is not connected to the API yet.</p>}
+            <div role="status" aria-live="polite" className={styles.small}>{actionNote}</div>
           </section>
 
           <div className={`${styles.layout} ${styles.layoutOp}`}>

@@ -5,9 +5,9 @@ Screenshots of every screen and key state at **1440×900** (desktop) and **390×
 ## Read this first
 
 - **Nothing here is a real server of yours.** The test API ran in fixture mode with a throw-away database. Its servers, findings, activity and the account, recovery codes and QR key in the sign-in images were created for the test and mean nothing. Screens carry the `[FIXTURE DATA]` banner or an invented "Fixture …" name.
-- **What changed since pack 001:** the sign-in flow is complete (images 01 to 09: first-run setup, sign out, wrong password, code step, wrong code, recovery code). Findings, Activity, Baselines, Settings and Connect now run on the real API clients. The "real screen" images show what the API actually answers in fixture mode, including refusals. Each real screen is paired with a fixture state where the real API cannot show it.
+- **What changed since pack 001:** the sign-in flow is complete (images 01 to 09: first-run setup, sign out, wrong password, code step, wrong code, recovery code). Findings, Activity, Baselines, Settings, Connect, Plan review and Operation now run on the real API clients. The "real screen" images show what the API actually answers in fixture mode, including refusals. Each real screen is paired with a fixture state where the real API cannot show it.
 - **Real screens in fixture mode** (marked "real screen" below): Findings (29), Activity (31), Baselines (33), Settings (36) and Connect (15). The API refuses some things in this mode and the screen shows the refusal: the address is outside every enrolled route (15), the server cannot be read (33), checks cannot be paused ("Fixture mode: no checks run"). The Baselines list (33) names Timika, Nabire, Sentani and Merauke because the fixture-mode API lists them; nothing was read from them.
-- **Plan review and Operation pages (20 to 28) still run on sample data.** They use a built-in sample client until the real care client (T-082) lands, so a plan created by the real API would not open there yet.
+- **Plan review and Operation pages (20 to 28, 38 to 41) now use the real care client for real ids.** The images show the `/plans/fixture-…` and `/operations/fixture-…` states, because a real server cannot produce them yet (changes are switched off on every real host). A plan or operation created by the real API opens on the same pages (checked in a browser for packages, restart, reboot and directory plans). The plan pages now cover four kinds of change, each its own approval: packages (20 to 22), directories (23, 24), a service restart (38) and a reboot (39). Production plans show the two confirmations with their exact fixed text.
 - The yellow "Clock not checked" banner appears on most images because fixture mode does not check ServrSit's own clock. Image 11 shows the warning version, when the clock is wrong.
 - At 1440 the Overview fits the window; its lists scroll inside labelled regions. Other long pages are shown whole. Pages taller than 3000 px are cut at 3000 px and the line says so.
 - Activity (31) has no mode of its own in the API, so its fixture label comes from `/api/fleet`. Its server filter shows "Removed server" for the fixture findings; that is the API's text and is reported to Coder.
@@ -51,6 +51,10 @@ Screenshots of every screen and key state at **1440×900** (desktop) and **390×
 - `35-baselines-fixture-setup-1440.png`: Baselines (fixture), step 4: the plan creates missing directories only; missing packages are listed as not included. Data: [FIXTURE].
 - `36-settings-real-1440.png`: Settings, real screen: schedule, AI (not configured, so it stays off), retention, server access. Data: real screen on the local test API in fixture mode: the [FIXTURE DATA] banner is the API's own answer.
 - `37-settings-fixture-blocked-1440.png`: Settings (fixture): Disconnect is blocked while an operation on the server is unfinished; only Close is offered. Data: [FIXTURE].
+- `38-plan-restart-1440.png`: Plan review for restarting one service: names the unit, says it is not a reboot, verified by a new start time. Data: [FIXTURE].
+- `39-plan-reboot-production-1440.png`: Plan review for rebooting a production server: its own approval, the two exact confirmations, the whole-machine impact. Data: [FIXTURE].
+- `40-operation-reboot-running-1440.png`: Operation: a reboot in progress. ServrSit waits for the server to answer again and does not call silence a failure. Data: [FIXTURE].
+- `41-operation-directories-partial-1440.png`: Operation: directory creation partly verified, each path listed with its owner and mode. Data: [FIXTURE].
 
 ## Images, phone (390)
 
@@ -91,13 +95,18 @@ Screenshots of every screen and key state at **1440×900** (desktop) and **390×
 - `35-baselines-fixture-setup-390.png`: Baselines (fixture), step 4: the plan creates missing directories only; missing packages are listed as not included. Data: [FIXTURE].
 - `36-settings-real-390.png`: Settings, real screen: schedule, AI (not configured, so it stays off), retention, server access (page is 3387px tall; the image shows the first 3000px). Data: real screen on the local test API in fixture mode: the [FIXTURE DATA] banner is the API's own answer.
 - `37-settings-fixture-blocked-390.png`: Settings (fixture): Disconnect is blocked while an operation on the server is unfinished; only Close is offered (page is 3913px tall; the image shows the first 3000px). Data: [FIXTURE].
+- `38-plan-restart-390.png`: Plan review for restarting one service: names the unit, says it is not a reboot, verified by a new start time. Data: [FIXTURE].
+- `39-plan-reboot-production-390.png`: Plan review for rebooting a production server: its own approval, the two exact confirmations, the whole-machine impact. Data: [FIXTURE].
+- `40-operation-reboot-running-390.png`: Operation: a reboot in progress. ServrSit waits for the server to answer again and does not call silence a failure. Data: [FIXTURE].
+- `41-operation-directories-partial-390.png`: Operation: directory creation partly verified, each path listed with its owner and mode. Data: [FIXTURE].
 
 ## Things to look at
 
 1. Sign-in (01 to 09): is each failure message clear without telling an attacker which part was wrong? Is the recovery-code route easy to find?
 2. Overview (10 to 13): does it tell you what needs attention without a headline? Does the compact list (13) hold up at 20 servers?
 3. Real versus fixture pairs (29/30, 31/32, 33 to 35, 36/37): do the refusals read as honest, and does the fixture banner make it obvious which is which?
-4. Plan review (20 to 24): can you tell the target, scope, risk and what approving permits? Is the blocked state for real hosts clear? Image 23 and 24 show a preparing plan that creates directories only.
-5. Mobile (390 images): anything clipped, too small to tap or too dense?
+4. Plan review (20 to 24, 38, 39): can you tell the target, scope, risk and what approving permits? Is the blocked state for real hosts clear? Images 23 and 24 show a plan that creates directories only and leaves existing paths alone. Images 38 and 39 are the restart and reboot plans: is it obvious that a reboot is the whole machine and a separate approval?
+5. Operations (25 to 28, 40, 41): is a reboot in progress (40) clear that silence from the server is not failure? Does the directories receipt (41) say which path did not match?
+6. Mobile (390 images): anything clipped, too small to tap or too dense?
 
 Not covered: live data, screen-reader behaviour, a real phone. Checks per task are in `docs/team/handoff-designer-*.md`.

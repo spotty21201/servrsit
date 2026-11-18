@@ -16,12 +16,12 @@
  * /api/fleet (ownerTimeZone); until that is known the default applies.
  *
  * Fixture ids (fixture-plan-…) use createFixtureClient and show the
- * [FIXTURE DATA] banner. Real ids use the stub client in api/stubs/care.ts.
+ * [FIXTURE DATA] banner. Real ids use the real care client (api/care.ts, T-082).
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { fetchFleet } from "../api/fleet";
 import { useClock } from "../clock/ClockContext";
-import { createCareClient, type CareClient, type PlanView } from "../api/stubs/care";
+import { createCareClient, type CareClient, type PlanView } from "../api/care";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
 import { operationPath } from "../lib/router";
 import { usePageTitle } from "../lib/pageTitle";
@@ -162,7 +162,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
             </div>
           )}
           {refreshed && diffIsEmpty(refreshed.diff) && (
-            <p className={styles.small} role="status">Plan refreshed to version {refreshed.toVersion}. The scope is unchanged. Acknowledgements start again.</p>
+            <p className={styles.small} role="status">Plan refreshed to version {refreshed.toVersion}. {vm.kind === "apply.packages.v1" ? "The package scope is unchanged." : "Read the scope again: only package changes are compared automatically."} Acknowledgements start again.</p>
           )}
 
           <div className={styles.layout}>
@@ -170,6 +170,12 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
               <section className={styles.panel} aria-labelledby={sectionId("scope")}>
                 <h2 id={sectionId("scope")} className={styles.h2}>Scope</h2>
                 <p className={styles.p}>{vm.scopeSummary}</p>
+                {vm.unit && (
+                  <>
+                    <p className={styles.rowLabel}>Service to restart</p>
+                    <ul className={styles.pkgGrid} aria-label="Service to restart"><li>{vm.unit}</li></ul>
+                  </>
+                )}
                 {vm.directories.length > 0 && (
                   <>
                     <p className={styles.rowLabel}>Directories to create</p>
@@ -178,19 +184,18 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
                     </ul>
                   </>
                 )}
-                {vm.packages.length > 0 && (
+                {vm.existing.length > 0 && (
                   <>
-                    {vm.directories.length > 0 && <p className={styles.rowLabel}>Packages to install</p>}
-                    <ul className={styles.pkgGrid} aria-label="Packages in this plan">
-                      {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}</li>)}
+                    <p className={styles.rowLabel}>Already exist, left as they are</p>
+                    <ul className={`${styles.list} ${styles.bullets}`} aria-label="Already exist">
+                      {vm.existing.map((x) => <li key={x}><span className={styles.mono}>{x}</span></li>)}
                     </ul>
                   </>
                 )}
-                {vm.leftAlone.length > 0 && (
+                {vm.packages.length > 0 && (
                   <>
-                    <p className={styles.rowLabel}>Left alone</p>
-                    <ul className={`${styles.list} ${styles.bullets}`} aria-label="Left alone">
-                      {vm.leftAlone.map((x) => <li key={x.label}><span className={styles.mono}>{x.label}</span>: {x.reason}</li>)}
+                    <ul className={styles.pkgGrid} aria-label="Packages in this plan">
+                      {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}</li>)}
                     </ul>
                   </>
                 )}
@@ -227,10 +232,12 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
                   <summary>Technical details</summary>
                   <ul className={styles.diffList} aria-label="Package versions">
                     {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}:{p.arch} {p.from} → {p.to}</li>)}
-                    {vm.directories.map((d) => <li key={`d-${d.path}`}>create {d.path} owner {d.owner} mode {d.mode}</li>)}
-                    {vm.packages.length === 0 && vm.directories.length === 0 && <li>No versions or directories: nothing was prepared.</li>}
+                    {vm.directories.map((d) => <li key={`d-${d.path}`}>create {d.path} owner {d.owner}:{d.group} mode {d.mode}</li>)}
+                    {vm.unit && <li>restart {vm.unit}</li>}
+                    {vm.kind === "reboot.host.v1" && <li>reboot the whole machine</li>}
+                    {vm.packages.length === 0 && vm.directories.length === 0 && !vm.unit && vm.kind !== "reboot.host.v1" && <li>Nothing was prepared.</li>}
                   </ul>
-                  <p className={styles.small}>Operation: apply.packages.v1 · Plan ID <span className={styles.mono}>{vm.id}</span> · Digest <span className={styles.mono}>{vm.digestShort}…</span></p>
+                  <p className={styles.small}>Operation: {vm.kind} · Plan ID <span className={styles.mono}>{vm.id}</span> · Digest <span className={styles.mono}>{vm.digestShort}…</span></p>
                 </details>
               </section>
             </div>
@@ -294,7 +301,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
                       {vm.approveLabel}
                     </button>
                     <p id={`${ids}-help`} className={styles.small}>
-                      {!allAcked && vm.acknowledgements.length > 0 ? "Tick both confirmations to enable approval." : "Approving starts the update on this server. The review above is the checkpoint."}
+                      {!allAcked && vm.acknowledgements.length > 0 ? "Tick both confirmations to enable approval." : vm.approveHelp}
                     </p>
                   </>
                 )}

@@ -12,7 +12,7 @@
  *
  * Pure orchestration: the client and the sleep function are injected.
  */
-import type { ApprovalBody, CareClient, CareResult, ApprovalAccepted } from "../api/stubs/care";
+import type { ApprovalBody, CareClient, CareResult, ApprovalAccepted } from "../api/care";
 import type { PlanNotice } from "./planViewModel";
 
 export type ApprovalPhase =

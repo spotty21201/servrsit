@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { PlanView } from "../api/stubs/care";
+import { ACK_INTERRUPTION_RISK, ACK_RECOVERY_ROUTE, PRODUCTION_ACKNOWLEDGEMENT_TEXT } from "@servrsit/contracts";
+import { toPlanView, type PlanView } from "../api/care";
 import { diffScope, toPlanVM, WRITES_OFF_TEXT } from "./planViewModel";
 
 const NOW = new Date("2026-11-17T03:00:00Z"); // 10:00 WIB
@@ -10,7 +11,7 @@ function plan(over: Partial<PlanView> = {}): PlanView {
   return {
     id: "p1", version: 1, operation: "apply.packages.v1", serverId: "s1", production: false,
     scope: { packages: [{ name: "curl", arch: "amd64", from: "8.5.0-1", to: "8.5.0-2" }, { name: "openssl", arch: "amd64", from: "3.0.1", to: "3.0.2" }], includesServiceRestart: false, includesReboot: false },
-    preconditions: { previewDigest: "sha256:x" }, verification: { expectInstalled: { "curl:amd64": "8.5.0-2" } },
+    detail: {}, preconditions: { previewDigest: "sha256:x" }, verification: { expectInstalled: { "curl:amd64": "8.5.0-2" } },
     requiredAcknowledgements: [], createdAt: "2026-11-17T02:57:00Z", expiresAt: "2026-11-17T03:12:00Z", blockers: [], digest: `sha256:${"b".repeat(64)}`,
     target: { serverId: "s1", name: "Nabire", kind: "simulated", simulated: true }, approvable: true, ...over,
   };
@@ -28,14 +29,20 @@ test("ready plan: specific label, action and target in the title, expiry in owne
   assert.equal(vm.scopeSummary, "2 package updates, plan version 1.");
 });
 
-test("production plan: two specific acknowledgements, both tokens plus the API's required one are sent", () => {
-  const vm = toPlanVM(plan({ production: true, requiredAcknowledgements: ["production-impact"] }), NOW, TZ);
+test("production plan: the contract's two confirmations with their exact text, and exactly the API's tokens are sent", () => {
+  const vm = toPlanVM(plan({ production: true, requiredAcknowledgements: [ACK_RECOVERY_ROUTE, ACK_INTERRUPTION_RISK] }), NOW, TZ);
   assert.equal(vm.isProduction, true);
   assert.equal(vm.acknowledgements.length, 2);
-  assert.match(vm.acknowledgements[0]?.label ?? "", /recover Nabire/);
-  assert.match(vm.acknowledgements[1]?.label ?? "", /interrupt services running on Nabire/);
-  assert.deepEqual(vm.acknowledgementTokens, ["production-impact", "recovery-route", "interruption-risk"]);
+  assert.equal(vm.acknowledgements[0]?.label, PRODUCTION_ACKNOWLEDGEMENT_TEXT[ACK_RECOVERY_ROUTE]);
+  assert.equal(vm.acknowledgements[1]?.label, PRODUCTION_ACKNOWLEDGEMENT_TEXT[ACK_INTERRUPTION_RISK]);
+  assert.deepEqual(vm.acknowledgementTokens, ["recovery-route-confirmed", "interruption-risk-understood"]);
   assert.ok(vm.preconditions.some((p) => p.state === "owner"));
+});
+
+test("a confirmation token this page cannot show blocks approval instead of being invented", () => {
+  const vm = toPlanVM(plan({ production: true, requiredAcknowledgements: [ACK_RECOVERY_ROUTE, "something-new"] }), NOW, TZ);
+  assert.equal(vm.disposition.canApprove, false);
+  assert.match(vm.disposition.reason, /does not know how to show/);
 });
 
 test("writes disabled: fixed sentence, cannot approve, API text not used", () => {
@@ -90,21 +97,65 @@ test("clock untrusted: approval is paused with the clock reason, expiry and ages
   assert.equal(toPlanVM(plan(), NOW, TZ, null, false).disposition.canApprove, true);
 });
 
-test("a setup plan reads as one: title, scope, exclusions, specific approve label, still blocked on real hosts", () => {
-  const prep = {
-    baselineName: "Web server baseline", baselineVersion: 1, referenceName: "Fixture Web-1",
-    directories: [{ path: "/srv/app", owner: "deploy:deploy", mode: "0755" }],
-    leftAlone: [{ label: "/opt/tools", reason: "It exists and is owned by another user, so it is not changed." }],
+const NO_PKGS = { packages: [], includesServiceRestart: false, includesReboot: false } as const;
+
+test("a directory plan: title, what is created, what already exists and stays, exact approve label", () => {
+  const dirs = [{ path: "/srv/app", owner: "deploy", group: "deploy", mode: "0755" }, { path: "/srv/backups/app", owner: "root", group: "root", mode: "0750" }];
+  const vm = toPlanVM(plan({ operation: "prepare.directories.v1", scope: NO_PKGS, detail: { requested: dirs, directories: dirs, existing: ["/srv/tools"] } }), NOW, TZ);
+  assert.equal(vm.kind, "prepare.directories.v1");
+  assert.equal(vm.title, "Create directories on Nabire");
+  assert.equal(vm.approveLabel, "Approve creating directories on Nabire");
+  assert.equal(vm.scopeSummary, "2 directories to create, 1 path already exists and stays as it is. Plan version 1.");
+  assert.deepEqual(vm.directories.map((d) => d.path), ["/srv/app", "/srv/backups/app"]);
+  assert.deepEqual(vm.existing, ["/srv/tools"]);
+  assert.match(vm.exclusions.join(" "), /nothing is overwritten, re-owned or changed recursively/);
+  assert.match(vm.verifyChecks.join(" "), /exactly the approved owner, group and mode/);
+  assert.equal(vm.packages.length, 0);
+  const none = toPlanVM(plan({ operation: "prepare.directories.v1", scope: NO_PKGS, detail: { requested: dirs, directories: [], existing: ["/srv/app"] }, approvable: false, blockers: [{ code: "NO_CHANGES", message: "x" }] }), NOW, TZ);
+  assert.equal(none.disposition.reason, "Every requested path already exists, so there is nothing to create.");
+});
+
+test("malformed directory entries from the API are dropped, not shown", () => {
+  const vm = toPlanVM(plan({ operation: "prepare.directories.v1", scope: NO_PKGS, detail: { directories: [{ path: "/srv/a", owner: "x", group: "x", mode: "0755" }, { path: 5 }, null, "x"], existing: ["/srv/b", 3] } }), NOW, TZ);
+  assert.deepEqual(vm.directories.map((d) => d.path), ["/srv/a"]);
+  assert.deepEqual(vm.existing, ["/srv/b"]);
+});
+
+test("a restart plan names the one service, never reads as a reboot or an update", () => {
+  const vm = toPlanVM(plan({ operation: "restart.service.v1", scope: { packages: [], includesServiceRestart: true, includesReboot: false }, detail: { unit: "nginx.service" } }), NOW, TZ);
+  assert.equal(vm.title, "Restart nginx.service on Nabire");
+  assert.equal(vm.approveLabel, "Approve restart of nginx.service");
+  assert.equal(vm.unit, "nginx.service");
+  assert.match(vm.exclusions.join(" "), /No reboot/);
+  assert.match(vm.verifyChecks.join(" "), /start time is new/);
+  assert.doesNotMatch(vm.title, /update/i);
+  // an odd unit name from the API is not shown as the service
+  assert.equal(toPlanVM(plan({ operation: "restart.service.v1", scope: NO_PKGS, detail: { unit: "x y; rm -rf /" } }), NOW, TZ).unit, null);
+});
+
+test("a reboot plan is the whole machine and its own approval", () => {
+  const vm = toPlanVM(plan({ operation: "reboot.host.v1", scope: { packages: [], includesServiceRestart: false, includesReboot: true }, detail: {} }), NOW, TZ);
+  assert.equal(vm.title, "Reboot Nabire");
+  assert.equal(vm.approveLabel, "Approve reboot of Nabire");
+  assert.match(vm.impact.join(" "), /Every service on Nabire stops/);
+  assert.match(vm.impact.join(" "), /its own approval/);
+  assert.match(vm.verifyChecks.join(" "), /boot id is new/);
+});
+
+test("the real API's plan shape passes the guard and renders; new blocker codes have fixed text", () => {
+  const real = {
+    id: "884e1a11-57db-463d-83ed-3a055ff6e650", version: 1, operation: "restart.service.v1", serverId: "22222222-2222-4222-a222-222222222222", production: true,
+    scope: { unit: "nginx.service", includesServiceRestart: true, includesReboot: false }, preconditions: { previewDigest: "none" }, verification: { unit: "nginx.service", previousActiveSince: null },
+    requiredAcknowledgements: [ACK_RECOVERY_ROUTE, ACK_INTERRUPTION_RISK], createdAt: "2026-11-17T02:58:00Z", expiresAt: "2026-11-17T03:13:00Z",
+    blockers: [{ code: "WRITES_DISABLED", message: "x" }, { code: "UNIT_NOT_SELECTED", message: "x" }, { code: "IDENTITY_UNVERIFIED", message: "x" }],
+    digest: `sha256:${"a".repeat(64)}`, target: { serverId: "22222222-2222-4222-a222-222222222222", name: "Nabire", kind: "ssh", simulated: false }, approvable: false,
   };
-  const vm = toPlanVM(plan({ prepare: prep }), NOW, TZ);
-  assert.equal(vm.title, "Prepare Nabire from Web server baseline");
-  assert.equal(vm.approveLabel, "Approve setup of Nabire");
-  assert.match(vm.scopeSummary, /^1 directory to create and 2 packages to install, from Web server baseline version 1 \(reference: Fixture Web-1\)/);
-  assert.match(vm.exclusions.join(" "), /credentials, SSH host keys, application data, databases, personal files and network settings/);
-  assert.match(vm.exclusions.join(" "), /nothing is changed recursively/);
-  assert.deepEqual(vm.leftAlone.map((x) => x.label), ["/opt/tools"]);
-  const blocked = toPlanVM(plan({ prepare: prep, approvable: false, blockers: [{ code: "WRITES_DISABLED", message: "x" }], scope: { packages: [], includesServiceRestart: false, includesReboot: false }, preconditions: { previewDigest: "none" } }), NOW, TZ);
-  assert.equal(blocked.disposition.kind, "writes-disabled");
-  assert.equal(blocked.disposition.canApprove, false);
-  assert.equal(toPlanVM(plan({ prepare: { ...prep, directories: [] }, scope: { packages: [], includesServiceRestart: false, includesReboot: false } }), NOW, TZ).scopeSummary, "Nothing to create or install: this server already matches the baseline.");
+  const p = toPlanView(real);
+  assert.ok(p);
+  const vm = toPlanVM(p, NOW, TZ);
+  assert.equal(vm.disposition.kind, "writes-disabled");
+  assert.equal(vm.unit, "nginx.service");
+  assert.match(vm.blockers.map((b) => b.message).join(" "), /not in your selected set/);
+  assert.match(vm.blockers.map((b) => b.message).join(" "), /identity has not been verified/);
+  assert.equal(toPlanView({ ...real, scope: null }), null);
 });

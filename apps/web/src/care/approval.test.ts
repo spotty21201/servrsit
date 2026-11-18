@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { ApprovalBody, CareClient, CareResult, ApprovalAccepted } from "../api/stubs/care";
+import type { ApprovalBody, CareClient, CareResult, ApprovalAccepted } from "../api/care";
 import { judge, newIdempotencyKey, submitApproval, type ApprovalPhase } from "./approval";
 
 const BODY: ApprovalBody = { planVersion: 1, planDigest: `sha256:${"a".repeat(64)}`, idempotencyKey: "appr_1234567890abcdef", acknowledgements: [] };
