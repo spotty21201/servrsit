@@ -362,3 +362,5 @@ export * from "./findings.js";
 export * from "./activity.js";
 
 export * from "./baselines.js";
+
+export * from "./settings.js";
