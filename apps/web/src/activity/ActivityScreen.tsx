@@ -1,8 +1,10 @@
 /**
  * ActivityScreen — UX-10 Activity and export at /activity (UX Spec §14).
  *
- * Runs on the [FIXTURE] activity client (api/stubs/activity.ts): the API has
- * no history listing yet, so the [FIXTURE DATA] banner is always shown.
+ * Runs on Coder's real activity client (api/activity.ts, T-077). The
+ * [FIXTURE DATA] banner is shown on /fixtures/activity, which uses the
+ * in-memory fixture client. On the real page, work the API marks as simulated
+ * carries a "Simulated" tag on its row.
  *
  * The default list shows operations and findings; routine checks are one
  * checkbox away. Filters: server, result, period, type. Search matches name,
@@ -11,13 +13,15 @@
  * survives navigation and reload in this session; it never relies on a toast.
  */
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { createFixtureActivityClient, type ActivityClient, type ActivityRecord, type ActivityResult, type ActivityType, type ExportFormat, type ExportResult } from "../api/stubs/activity";
+import type { ActivityResult, ActivityType, ExportFormat } from "@servrsit/contracts";
+import { createActivityClient, type ActivityClient, type ActivityClientError, type ActivityRecord, type ExportResult } from "../api/activity";
+import { createFixtureActivityClient } from "../fixtures/activityFixture";
 import { CareShell, LoadFailure, ProductionLabel } from "../care/CareShell";
 import { useClock } from "../clock/ClockContext";
 import { usePageTitle } from "../lib/pageTitle";
 import { DEFAULT_OWNER_TIME_ZONE, formatClockWithAge, parseIso } from "../lib/time";
 import {
-  countText, DEFAULT_FILTERS, filterRecords, formatBytes, groupByDay, isDefault, PERIOD_LABEL, planExport, RESULT_LABEL, toRow, TYPE_LABEL,
+  countText, DEFAULT_FILTERS, exportErrorText, filterRecords, formatBytes, groupByDay, isDefault, PERIOD_LABEL, planExport, RESULT_LABEL, toRow, TRUNCATED_TEXT, TYPE_LABEL,
   type Filters, type Period,
 } from "./activityViewModel";
 import c from "../care/care.module.css";
@@ -27,12 +31,23 @@ const TONE_CLASS = { passed: c.tagMet, attention: c.tagOwner, failed: c.tagBlock
 const TYPES: readonly ActivityType[] = ["operation", "finding", "inspection"];
 const RESULTS = Object.keys(RESULT_LABEL) as ActivityResult[];
 
-function downloadHref(e: ExportResult): string {
-  return URL.createObjectURL(new Blob([e.content], { type: e.mime }));
+/** Saves a downloaded file through a temporary link, then releases it. */
+function saveFile(file: { content: string; mime: string; filename: string }): void {
+  const url = URL.createObjectURL(new Blob([file.content], { type: file.mime }));
+  const a = document.createElement("a");
+  a.href = url; a.download = file.filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  globalThis.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-export function ActivityScreen({ client: injected }: { client?: ActivityClient }) {
-  const client = useMemo(() => injected ?? createFixtureActivityClient(), [injected]);
+function expiryText(e: ExportResult, now: Date, tz: string, uncertain: boolean): string {
+  const at = parseIso(e.expiresAt);
+  if (!at) return "Expiry unknown.";
+  return at.getTime() <= now.getTime() ? "Expired." : `Available until ${formatClockWithAge(at, now, tz, uncertain)}.`;
+}
+
+export function ActivityScreen({ client: injected, fixture = false }: { client?: ActivityClient; fixture?: boolean }) {
+  const client = useMemo(() => injected ?? (fixture ? createFixtureActivityClient() : createActivityClient()), [injected, fixture]);
   const ids = useId();
   const tz = DEFAULT_OWNER_TIME_ZONE;
   const uncertain = useClock().view?.agesUncertain ?? false;
@@ -41,7 +56,10 @@ export function ActivityScreen({ client: injected }: { client?: ActivityClient }
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [format, setFormat] = useState<ExportFormat>("report");
   const [exporting, setExporting] = useState(false);
-  const [exportFailed, setExportFailed] = useState(false);
+  const [exportFailed, setExportFailed] = useState<ReturnType<typeof exportErrorText> | null>(null);
+  const [downloadFailed, setDownloadFailed] = useState<(ReturnType<typeof exportErrorText> & { id: string }) | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [truncated, setTruncated] = useState(false);
   const [latest, setLatest] = useState<ExportResult | null>(null);
   const [recent, setRecent] = useState<readonly ExportResult[]>([]);
   const [now, setNow] = useState(() => new Date());
@@ -49,8 +67,8 @@ export function ActivityScreen({ client: injected }: { client?: ActivityClient }
   usePageTitle("Activity");
 
   const load = useCallback(async () => {
-    const [r, e] = await Promise.all([client.list(), client.listExports()]);
-    if (r.ok) { setRecords(r.data); setError(false); } else setError(true);
+    const [r, e] = await Promise.all([client.list({ limit: 1000 }), client.listExports()]);
+    if (r.ok) { setRecords(r.data.records); setTruncated(r.data.truncated); setError(false); } else setError(true);
     if (e.ok) setRecent(e.data);
     setNow(new Date());
   }, [client]);
@@ -70,17 +88,32 @@ export function ActivityScreen({ client: injected }: { client?: ActivityClient }
 
   async function doExport(): Promise<void> {
     if (exporting || shown.length === 0) return;
-    setExporting(true); setExportFailed(false);
+    setExporting(true); setExportFailed(null);
     const r = await client.createExport(plan.request, shown);
     setExporting(false);
-    if (!r.ok) { setExportFailed(true); return; }
+    if (!r.ok) {
+      setExportFailed(exportErrorText(r.error, "create"));
+      // A lost answer may still have created a file: show what the API lists.
+      const list = await client.listExports();
+      if (list.ok) setRecent(list.data);
+      return;
+    }
     setLatest(r.data);
     const list = await client.listExports();
     if (list.ok) setRecent(list.data);
   }
 
+  async function download(e: ExportResult): Promise<void> {
+    if (downloading) return;
+    setDownloading(e.id); setDownloadFailed(null);
+    const r = await client.download(e);
+    setDownloading(null);
+    if (!r.ok) { setDownloadFailed({ id: e.id, ...exportErrorText(r.error as ActivityClientError, "download") }); return; }
+    saveFile(r.data);
+  }
+
   return (
-    <CareShell fixture section="Activity">
+    <CareShell fixture={fixture} section="Activity">
       <header className={c.header}>
         <h1 className={c.title}>Activity</h1>
         <p className={c.small}>What ServrSit did and found, newest first. Times are in {tz}.</p>
@@ -128,6 +161,7 @@ export function ActivityScreen({ client: injected }: { client?: ActivityClient }
       {records && (
         <section className={c.panel} aria-labelledby={`${ids}-list`}>
           <h2 id={`${ids}-list`} className={c.h2}>Records</h2>
+          {truncated && <div className={`${c.notice} ${c.noticeAttention}`} role="status"><p>{TRUNCATED_TEXT}</p></div>}
           <p className={c.small} role="status">{countText(shown.length, records.length)}{!filters.types.includes("inspection") ? ". Routine checks are hidden." : ""}</p>
           {shown.length === 0 ? (
             <p className={c.p}>No records match these filters. {isDefault(filters) ? "" : "Reset the filters to see everything."}</p>
@@ -142,6 +176,7 @@ export function ActivityScreen({ client: injected }: { client?: ActivityClient }
                       <div className={s.rowHead}>
                         <span className={s.type}>{row.typeTag}</span>
                         <span className={`${c.stateTag} ${TONE_CLASS[row.tone]}`}>{row.resultLabel}</span>
+                        {row.simulated && <span className={s.type}>Simulated</span>}
                         <span className={s.when}>{row.when}</span>
                       </div>
                       <p className={s.title}>{row.href ? <a href={row.href}>{row.title}<span className="sr-only"> on {row.serverName}</span></a> : row.title}</p>
@@ -166,12 +201,13 @@ export function ActivityScreen({ client: injected }: { client?: ActivityClient }
         </fieldset>
         <button type="button" className={c.primary} onClick={() => void doExport()} aria-disabled={exporting || shown.length === 0 || undefined} aria-describedby={`${ids}-exp-r`}>{exporting ? "Creating the export" : "Create export"}</button>
         <p id={`${ids}-exp-r`} className={c.small}>{shown.length === 0 ? "There is nothing to export with these filters." : exporting ? "Building the file. It will stay on this page when it is ready." : "The file is built from the records listed above."}</p>
-        {exportFailed && <div className={`${c.notice} ${c.noticeFailed}`} role="alert"><p className={c.noticeTitle}>The export failed</p><p>No file was created. Try again.</p></div>}
+        {exportFailed && <div className={`${c.notice} ${c.noticeFailed}`} role="alert"><p className={c.noticeTitle}>{exportFailed.title}</p><p>{exportFailed.text}</p></div>}
         {latest && (
           <div className={`${c.notice} ${c.noticePassed}`} role="status">
             <p className={c.noticeTitle}>Export ready</p>
-            <p>{latest.filename}: {latest.recordCount} records, {formatBytes(latest.sizeBytes)}. {latest.redaction} [FIXTURE: built in this browser from sample data.]</p>
-            <a className={c.linkBtn} href={downloadHref(latest)} download={latest.filename}>Download {latest.filename}</a>
+            <p>{latest.filename}: {latest.recordCount} records, {formatBytes(latest.sizeBytes)}. {latest.redaction}{fixture ? " [FIXTURE DATA: built in this browser from sample data.]" : ""} {expiryText(latest, now, tz, uncertain)}</p>
+            <button type="button" className={c.linkBtn} onClick={() => void download(latest)} aria-disabled={downloading === latest.id || undefined}>{downloading === latest.id ? "Fetching the file" : `Download ${latest.filename}`}</button>
+            {downloadFailed?.id === latest.id && <p role="alert">{downloadFailed.title}. {downloadFailed.text}</p>}
           </div>
         )}
         {recent.length > 0 && (
@@ -182,8 +218,9 @@ export function ActivityScreen({ client: injected }: { client?: ActivityClient }
                 const at = parseIso(e.createdAt);
                 return (
                   <li key={e.id} className={s.row}>
-                    <p className={s.title}><a href={downloadHref(e)} download={e.filename}>{e.filename}</a></p>
-                    <p className={s.meta}><span>{at ? formatClockWithAge(at, now, tz, uncertain) : "unknown time"}</span><span>{e.recordCount} records</span><span>{formatBytes(e.sizeBytes)}</span></p>
+                    <p className={s.title}><button type="button" className={c.linkBtn} onClick={() => void download(e)} aria-disabled={downloading === e.id || undefined}>{e.filename}</button></p>
+                    <p className={s.meta}><span>{at ? formatClockWithAge(at, now, tz, uncertain) : "unknown time"}</span><span>{e.recordCount} records</span><span>{formatBytes(e.sizeBytes)}</span><span>{expiryText(e, now, tz, uncertain)}</span></p>
+                    {downloadFailed?.id === e.id && <p className={s.summary} role="alert">{downloadFailed.title}. {downloadFailed.text}</p>}
                   </li>
                 );
               })}

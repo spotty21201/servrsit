@@ -36,4 +36,6 @@ test("findings and activity routes", () => {
   assert.deepEqual(matchRoute("/settings"), { name: "settings" });
   assert.deepEqual(matchRoute("/findings"), { name: "findings" });
   assert.deepEqual(matchRoute("/activity/"), { name: "activity" });
+  assert.deepEqual(matchRoute("/fixtures/findings"), { name: "fixtureFindings" });
+  assert.deepEqual(matchRoute("/fixtures/activity"), { name: "fixtureActivity" });
 });

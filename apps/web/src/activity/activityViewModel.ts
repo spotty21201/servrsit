@@ -10,7 +10,8 @@
  *   - an operation in an unknown or partial state never reads as success;
  *   - export states its date range, time zone and what was redacted.
  */
-import type { ActivityRecord, ActivityResult, ActivityType, ExportRequest } from "../api/stubs/activity";
+import type { ActivityResult, ActivityType } from "@servrsit/contracts";
+import type { ActivityClientError, ActivityRecord, ExportRequest } from "../api/activity";
 import { formatClockWithAge, formatClock, parseIso, zoneLabel, resolveTimeZone } from "../lib/time";
 
 export type Period = "24h" | "7d" | "30d" | "all";
@@ -77,6 +78,7 @@ export interface RowVM {
   readonly tone: ResultTone;
   readonly summary: string;
   readonly when: string;
+  readonly simulated: boolean;
   readonly href: string | null;
 }
 
@@ -85,7 +87,7 @@ export function toRow(r: ActivityRecord, now: Date, tz: string, uncertain = fals
   return {
     id: r.id, typeTag: TYPE_TAG[r.type], title: r.title, serverName: r.serverName, production: r.production,
     resultLabel: resultLabel(r.type, r.result), tone: RESULT_TONE[r.result], summary: r.summary,
-    when: at ? formatClockWithAge(at, now, tz, uncertain) : "unknown time", href: r.href,
+    when: at ? formatClockWithAge(at, now, tz, uncertain) : "unknown time", simulated: r.simulated, href: r.href,
   };
 }
 
@@ -143,3 +145,22 @@ export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   return `${(n / 1024).toFixed(1)} KiB`;
 }
+
+// ── Errors ──────────────────────────────────────────────────────────────────
+
+/** Why an export or a download did not work, in plain words. */
+export function exportErrorText(code: ActivityClientError, step: "create" | "download"): { title: string; text: string } {
+  switch (code) {
+    case "EXPIRED": return { title: "That export has expired", text: "Exports are kept for 7 days. Create a new one from the records above." };
+    case "NOT_FOUND": return { title: "That export is gone", text: "ServrSit no longer has it. Create a new one from the records above." };
+    case "TOO_LARGE": return { title: "Too many records for one export", text: "Narrow the period or filters above, then try again. No file was created." };
+    case "INVALID_INPUT": return { title: "The export was not accepted", text: "ServrSit did not accept those filters. No file was created." };
+    case "UNAUTHENTICATED": return { title: "You are signed out", text: "Sign in again, then repeat that." };
+    default:
+      return step === "download"
+        ? { title: "The download did not finish", text: "The file was not received. Try again. It stays on this page until it expires." }
+        : { title: "The export may not have been created", text: "ServrSit did not get a clear answer. Check Recent exports below before trying again." };
+  }
+}
+
+export const TRUNCATED_TEXT = "More records matched than ServrSit sent, so older ones are not listed. Narrow the period to see them. An export covers only the records listed here.";

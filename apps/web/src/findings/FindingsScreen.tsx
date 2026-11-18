@@ -1,23 +1,26 @@
 /**
  * FindingsScreen — T-070 at /findings (PRD FR-20, UX Spec §13.1, §13.2).
  *
- * Runs on the [FIXTURE] findings client (api/stubs/findings.ts): no findings
- * state API exists yet, so the [FIXTURE DATA] banner is always shown. A
- * fixture-only control previews the scheduler states.
+ * Runs on Coder's real findings client (api/findings.ts, T-076). The
+ * [FIXTURE DATA] banner appears when the API says its records are fixtures
+ * (`mode: "fixture"`), and always on /fixtures/findings, which uses the
+ * in-memory fixture client and a control to preview the scheduler states.
  *
  * Each row: server (+ Production), severity, summary, state tag with text,
  * first/last observed with ages, and a sentence on what the state does and
- * does not mean. Acknowledge and Snooze are separate actions. Stage A keeps
- * findings in the app and says external alerts are unavailable.
+ * does not mean. Acknowledge and Snooze are separate actions. Pause and
+ * resume are on the scheduler line, and a paused scheduler is never an
+ * all-clear. External alerts say what the API says about them.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createFixtureFindingsClient, type FindingRecord, type FindingsClient, type FindingsSnapshot, type FixtureScheduler, type SnoozeFor } from "../api/stubs/findings";
+import { createFindingsClient, type FindingRecord, type FindingsClient, type FindingsClientError, type FindingsResponse, type SchedulerStatus, type SnoozeFor } from "../api/findings";
+import { createFixtureFindingsClient, type FixtureScheduler } from "../fixtures/findingsFixture";
 import { CareShell, LoadFailure, ProductionLabel } from "../care/CareShell";
 import { useClock } from "../clock/ClockContext";
-import { DEFAULT_OWNER_TIME_ZONE } from "../lib/time";
+import { DEFAULT_OWNER_TIME_ZONE, formatClock, formatClockWithAge, parseIso } from "../lib/time";
 import { usePageTitle } from "../lib/pageTitle";
 import { SchedulerNotice } from "./SchedulerNotice";
-import { schedulerNotice, sortFindings, summarise, toFindingVM, type FindingVM } from "./findingsViewModel";
+import { actionErrorText, schedulerNotice, sortFindings, summarise, toFindingVM, type FindingVM } from "./findingsViewModel";
 import c from "../care/care.module.css";
 import s from "./findings.module.css";
 
@@ -28,6 +31,21 @@ const SNOOZES: ReadonlyArray<{ id: SnoozeFor; label: string }> = [
 ];
 
 const TAG_CLASS: Record<FindingVM["stateTag"], string | undefined> = { failed: c.tagBlocked, attention: c.tagOwner, unknown: c.tagUnknown, passed: c.tagMet, progress: c.tagProgress };
+
+function SchedulerLine({ status, busy, now, onPause, onResume }: { status: SchedulerStatus; busy: boolean; now: Date; onPause: () => void; onResume: () => void }) {
+  const next = status.status === "running" ? parseIso(status.nextRunAt) : null;
+  return (
+    <div className={s.schedule}>
+      {status.status === "running" && (
+        <>
+          <p className={c.small}>Checks are running{next ? `. Next check ${formatClock(next, now, DEFAULT_OWNER_TIME_ZONE)}` : ""}. While paused, nothing is checked, and a quiet list is not an all-clear.</p>
+          <button type="button" className={c.secondary} disabled={busy} onClick={onPause}>Pause checks</button>
+        </>
+      )}
+      {status.status === "paused" && <button type="button" className={c.primary} disabled={busy} onClick={onResume}>Resume checks</button>}
+    </div>
+  );
+}
 
 function Row({ f, busy, onAck, onSnooze }: { f: FindingVM; busy: boolean; onAck: () => void; onSnooze: (d: SnoozeFor) => void }) {
   return (
@@ -56,9 +74,9 @@ function Row({ f, busy, onAck, onSnooze }: { f: FindingVM; busy: boolean; onAck:
   );
 }
 
-export function FindingsScreen({ client: injected }: { client?: FindingsClient }) {
+export function FindingsScreen({ client: injected, fixture = false }: { client?: FindingsClient; fixture?: boolean }) {
   const [scenario, setScenario] = useState<FixtureScheduler>("running");
-  const [snap, setSnap] = useState<FindingsSnapshot | null>(null);
+  const [snap, setSnap] = useState<FindingsResponse | null>(null);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -67,7 +85,10 @@ export function FindingsScreen({ client: injected }: { client?: FindingsClient }
   const clockView = useClock().view;
   const holder = useMemo(() => ({ scenario: "running" as FixtureScheduler }), []);
   holder.scenario = scenario;
-  const client = useMemo(() => injected ?? createFixtureFindingsClient(() => new Date(), () => holder.scenario), [injected, holder]);
+  const client = useMemo(
+    () => injected ?? (fixture ? createFixtureFindingsClient(() => new Date(), () => holder.scenario, setScenario) : createFindingsClient()),
+    [injected, fixture, holder],
+  );
 
   const load = useCallback(async () => {
     const r = await client.list();
@@ -75,10 +96,10 @@ export function FindingsScreen({ client: injected }: { client?: FindingsClient }
   }, [client]);
   useEffect(() => { void load(); }, [load, scenario]);
 
-  async function act(p: Promise<{ ok: boolean }>): Promise<void> {
+  async function act(p: Promise<{ ok: true } | { ok: false; error: FindingsClientError }>): Promise<void> {
     setBusy(true); setProblem(null);
     const r = await p;
-    if (!r.ok) setProblem("That didn't go through. Nothing was changed.");
+    if (!r.ok) setProblem(actionErrorText(r.error));
     await load();
     setBusy(false);
   }
@@ -91,13 +112,15 @@ export function FindingsScreen({ client: injected }: { client?: FindingsClient }
   const earlier = list.filter((f) => !f.active);
 
   return (
-    <CareShell fixture section="Findings">
+    <CareShell fixture={fixture || snap?.mode === "fixture"} section="Findings">
       <header className={c.header}>
         <h1 className={c.title}>Findings</h1>
-        <p className={c.small}>Issues ServrSit found on your servers. Stage A keeps them here in the app. External alerts such as email are not available yet.</p>
+        <p className={c.small}>Issues ServrSit found on your servers. Stage A keeps them here in the app. {snap && !snap.externalAlerts.available ? snap.externalAlerts.reason : "External alerts such as email are not available yet."}</p>
       </header>
 
       {notice && <SchedulerNotice notice={notice} />}
+      {snap && <SchedulerLine status={snap.scheduler} busy={busy} now={now} onPause={() => void act(client.pause())} onResume={() => void act(client.resume())} />}
+      {error && snap && <div className={`${c.notice} ${c.noticeAttention}`} role="status"><p>ServrSit could not refresh this list. It shows what was loaded {formatClockWithAge(now, new Date(), DEFAULT_OWNER_TIME_ZONE, uncertain)}, which may be out of date.</p><button type="button" className={c.secondary} onClick={() => void load()}>Try again</button></div>}
       {error && !snap && <LoadFailure title="Couldn't load findings" text="Nothing is shown until real data arrives. This does not mean there are no findings." onRetry={() => void load()} heading={false} />}
       {!snap && !error && <p className={c.p} role="status">Loading findings…</p>}
       {problem && <div className={`${c.notice} ${c.noticeFailed}`} role="alert"><p>{problem}</p></div>}
@@ -120,7 +143,7 @@ export function FindingsScreen({ client: injected }: { client?: FindingsClient }
         </>
       )}
 
-      <fieldset className={s.preview}>
+      {fixture && <fieldset className={s.preview}>
         <legend>Fixture preview: scheduler state</legend>
         <p className={c.small}>[FIXTURE DATA] This control exists only to review the states below. It does not change any real scheduler.</p>
         <div className={s.choices}>
@@ -128,7 +151,7 @@ export function FindingsScreen({ client: injected }: { client?: FindingsClient }
             <label key={v} className={s.choice}><input type="radio" name="sched" checked={scenario === v} onChange={() => setScenario(v)} /><span>{v === "running" ? "Running normally" : v === "paused" ? "Checks paused" : v === "delayed" ? "Check delayed" : "Scheduler unavailable"}</span></label>
           ))}
         </div>
-      </fieldset>
+      </fieldset>}
     </CareShell>
   );
 }

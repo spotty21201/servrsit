@@ -13,8 +13,11 @@
  *   - Plain wording, no cheek: these are issues.
  */
 import type { FleetResponse } from "@servrsit/contracts";
-import type { FindingRecord, FindingSeverity, FindingState, SchedulerStatus } from "../api/stubs/findings";
+import type { FindingRecord, FindingsClientError, SchedulerStatus } from "../api/findings";
 import { formatClock, formatClockWithAge, parseIso } from "../lib/time";
+
+type FindingSeverity = FindingRecord["severity"];
+type FindingState = FindingRecord["state"];
 
 export type TagKey = "failed" | "attention" | "unknown" | "passed" | "progress";
 
@@ -153,3 +156,23 @@ export function schedulerFromFleet(fleet: Pick<FleetResponse, "nextCheckAt"> | n
 }
 
 
+
+// ── Action errors ───────────────────────────────────────────────────────────
+
+/**
+ * What to tell the owner when Acknowledge, Snooze, Pause or Resume fails. A
+ * lost or unreadable answer (NETWORK, TIMEOUT, INVALID_RESPONSE) never claims
+ * "nothing was changed": the request may have arrived. The list is reloaded
+ * after every action, so the screen shows what the API now says.
+ */
+export function actionErrorText(code: FindingsClientError): string {
+  switch (code) {
+    case "NOT_ALLOWED": return "That finding can no longer be changed. A resolved or not-rechecked finding cannot be acknowledged or snoozed.";
+    case "NOT_FOUND": return "That finding is no longer on the list. The list has been reloaded.";
+    case "INVALID_INPUT": return "ServrSit did not accept that request. Nothing was changed.";
+    case "UNAUTHENTICATED": return "You are signed out. Sign in again, then repeat that.";
+    case "UNAVAILABLE": return "ServrSit could not do that right now. Nothing was changed. Try again in a moment.";
+    case "CSRF_INVALID": return "Your session needs a refresh. Reload the page, then repeat that. Nothing was changed.";
+    default: return "ServrSit did not get a clear answer, so the change may or may not have been made. The list below has been reloaded and shows what is recorded.";
+  }
+}

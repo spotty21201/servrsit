@@ -56,6 +56,8 @@ function Routes() {
   if (route.name === "settings") return <SettingsScreen />;
   if (route.name === "baselines") return <BaselineScreen />;
   if (route.name === "activity") return <ActivityScreen />;
+  if (route.name === "fixtureActivity") return <ActivityScreen fixture />;
+  if (route.name === "fixtureFindings") return <FindingsScreen fixture />;
   if (route.name === "findings") return <FindingsScreen />;
   if (route.name === "connect") return <ConnectScreen />;
   if (route.name === "server") return <ServerDetailScreen serverId={route.id} section={route.section} />;

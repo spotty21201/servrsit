@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createFixtureFindingsClient, SNOOZE_MS } from "../api/stubs/findings";
-import { schedulerFromFleet, schedulerNotice, sortFindings, summarise, toFindingVM } from "./findingsViewModel";
+import { SNOOZE_MS } from "@servrsit/contracts";
+import { createFixtureFindingsClient } from "../fixtures/findingsFixture";
+import { actionErrorText, schedulerFromFleet, schedulerNotice, sortFindings, summarise, toFindingVM } from "./findingsViewModel";
 
 const NOW = new Date("2026-11-17T03:00:00Z"); // 10:00 WIB
 const TZ = "Asia/Jakarta";
@@ -98,4 +99,24 @@ test("a real overdue next check from /api/fleet reads 'Check delayed'; on time o
 test("ServrSit's own clock untrusted: ages carry ≈", async () => {
   const { snap } = await vms();
   assert.match(toFindingVM(snap.findings[0]!, NOW, TZ, true).lastObserved, /≈ 4 min ago/);
+});
+
+test("a lost answer never says nothing was changed", () => {
+  for (const code of ["NETWORK", "TIMEOUT", "INVALID_RESPONSE"] as const) {
+    assert.match(actionErrorText(code), /may or may not/);
+    assert.doesNotMatch(actionErrorText(code), /Nothing was changed/);
+  }
+  assert.match(actionErrorText("UNAVAILABLE"), /Nothing was changed/);
+  assert.match(actionErrorText("NOT_ALLOWED"), /resolved or not-rechecked/);
+});
+
+test("the fixture client reports fixture mode, no external alerts, and can pause and resume", async () => {
+  let state = "running" as "running" | "paused";
+  const c = createFixtureFindingsClient(fixed, () => state, (n) => { state = n as typeof state; });
+  const r = await c.list();
+  assert.ok(r.ok && r.data.mode === "fixture" && r.data.externalAlerts.available === false);
+  const p = await c.pause();
+  assert.ok(p.ok && p.data.status === "paused" && (state as string) === "paused");
+  const q = await c.resume();
+  assert.ok(q.ok && q.data.status === "running" && (state as string) === "running");
 });

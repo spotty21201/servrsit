@@ -105,3 +105,25 @@ Same fixes applied to the new screens (titles, reasons, 44 px targets, stretched
 | D-U14 `aria-label` on a span | Empty values: `aria-hidden` dash plus visually hidden "No value." | `D-U14` |
 | D-U15 "Server not found" without `<h1>` | Already closed by the T-075 fix (page-level failures render their title as `<h1>`); verified in Chromium: h1 "Server not found". Evidence only. | `D-U15` |
 Evidence: `docs/team/evidence/a11y-fixes/` (results and two screenshots). Not run: the Tester's own suite against this branch.
+
+## Addendum 5: T-080 part 2 (findings and activity on Coder's real clients)
+
+**Changed**
+- `FindingsScreen` uses `api/findings.ts` (T-076). `ActivityScreen` uses `api/activity.ts` (T-077). Neither Coder file was edited.
+- Stubs moved to `src/fixtures/findingsFixture.ts` and `activityFixture.ts`. They now implement the real client interfaces, including `pause`/`resume`/`scheduler` and `download`. Used only by the new routes `/fixtures/findings` and `/fixtures/activity`, which carry the `[FIXTURE DATA]` banner and the scheduler preview control.
+- Findings: the banner shows when the API says `mode: "fixture"`. The external-alerts line is the API's own `externalAlerts.reason`. New scheduler line with Pause checks (when running) and Resume checks (when paused). A failed refresh after an action keeps the old list under a "may be out of date" notice.
+- Activity: list loads with `limit: 1000`, shows a notice when `truncated`. Rows tagged "Simulated" when the API says so. Export download goes through `client.download` (a button, not a link), with EXPIRED / NOT_FOUND / TOO_LARGE wording and an "Available until" time on each export.
+- Error wording: a lost or unreadable answer (NETWORK, TIMEOUT, INVALID_RESPONSE) never says "Nothing was changed". After a lost export answer the Recent exports list is reloaded.
+- Baselines and settings stubs unchanged (T-078, T-079).
+
+**Checks**
+- `pnpm typecheck`, `pnpm test` (193 pass, 0 fail), `pnpm build`: clean.
+- Browser, my own API (:3005, fixture fleet mode) and preview (:5174): `/findings`, `/activity`, `/fixtures/findings`, `/fixtures/activity`: axe wcag2a/aa/21aa 0 violations, no horizontal scroll, no console errors. Fixture export created and downloaded (`servrsit-activity-202611180805.txt`). Evidence: `docs/team/evidence/t080/`.
+- After merging, `@servrsit/store` had to be rebuilt and the API needs `SERVRSIT_FINDINGS_DB`, `SERVRSIT_ACTIVITY_DB`, `SERVRSIT_SETTINGS_DB` paths to start in a sandbox.
+
+**Not verified / gaps for Coder or Orchestrator**
+1. In fixture fleet mode the real API reports the scheduler as `unavailable` ("Fixture mode: no checks run"), so Pause/Resume against the real API were not exercised. They are covered by the fixture client and tests only.
+2. `GET /api/activity` has no `mode` field. In fixture mode it returns finding records with `serverName: "Removed server"` and `simulated: false`, so the real Activity page shows no fixture label and three identical server names in the filter. Request: add `mode: "live" | "fixture"` to `ActivityResponse` (as `FindingsResponse` has), and resolve names for fixture servers. The UI will show the banner from it once it exists.
+3. Activity filters run in the browser over the loaded records (up to 1000). Server-side filters (`type`, `server`, `result`, `from`, `to`, `q`) are not used yet.
+
+Next: T-078 (baselines), T-079 (settings).

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildExportContent, createFixtureActivityClient, REDACTION_STATEMENT } from "../api/stubs/activity";
-import { countText, DEFAULT_FILTERS, dayLabel, filterRecords, groupByDay, isDefault, planExport, resultLabel, toRow } from "./activityViewModel";
+import { buildExportContent, createFixtureActivityClient, REDACTION_STATEMENT } from "../fixtures/activityFixture";
+import { exportErrorText, countText, DEFAULT_FILTERS, dayLabel, filterRecords, groupByDay, isDefault, planExport, resultLabel, toRow } from "./activityViewModel";
 
 const NOW = new Date("2026-11-17T03:00:00Z"); // 10:00 WIB
 const TZ = "Asia/Jakarta";
@@ -9,7 +9,7 @@ const TZ = "Asia/Jakarta";
 async function all() {
   const r = await createFixtureActivityClient(() => NOW).list();
   assert.ok(r.ok);
-  return r.data;
+  return r.data.records;
 }
 
 test("default list shows operations and findings; routine checks only when asked", async () => {
@@ -82,7 +82,7 @@ test("export states range, zone and redaction; the file holds whitelisted fields
   assert.equal(j.redaction, REDACTION_STATEMENT);
   assert.equal(j.timeZone, "Asia/Jakarta");
   assert.equal(j.records.length, 8);
-  assert.deepEqual(Object.keys(j.records[0]).sort(), ["at", "id", "production", "result", "server", "summary", "title", "type"]);
+  assert.deepEqual(Object.keys(j.records[0]).sort(), ["at", "id", "production", "result", "server", "simulated", "summary", "title", "type"]);
   const report = buildExportContent({ ...plan.request, format: "report" }, recs, NOW.toISOString());
   assert.match(report.content, /^ServrSit activity report \[FIXTURE DATA\]/);
   assert.match(report.content, /Secrets are redacted/);
@@ -101,4 +101,33 @@ test("the fixture client keeps exports as a persistent list, newest first", asyn
   assert.ok(list.ok);
   assert.deepEqual(list.data.map((x) => x.id), [b.data.id, a.data.id]);
   assert.ok(a.data.sizeBytes > 100);
+});
+
+test("the fixture download returns the stored file; an unknown export is NOT_FOUND", async () => {
+  const c = createFixtureActivityClient(() => NOW);
+  const recs = filterRecords(await all(), DEFAULT_FILTERS, NOW);
+  const made = await c.createExport(planExport("json", recs, DEFAULT_FILTERS, NOW, TZ).request, recs);
+  assert.ok(made.ok);
+  assert.match(made.data.downloadUrl, /^\/api\/exports\/[0-9a-f-]{36}\/download$/);
+  const d = await c.download(made.data);
+  assert.ok(d.ok && d.data.filename === made.data.filename && JSON.parse(d.data.content).records.length === 8);
+  const gone = await c.download({ ...made.data, id: "00000000-0000-4000-8000-000000000000" });
+  assert.deepEqual(gone, { ok: false, error: "NOT_FOUND" });
+});
+
+test("simulated work is flagged on the row", async () => {
+  const recs = await all();
+  const sim = recs.find((r) => r.simulated);
+  assert.ok(sim);
+  assert.equal(toRow(sim, NOW, TZ).simulated, true);
+  assert.equal(toRow(recs[0]!, NOW, TZ).simulated, false);
+});
+
+test("export errors: expired, too large, and a lost answer that may have created a file", () => {
+  assert.match(exportErrorText("EXPIRED", "download").title, /expired/);
+  assert.match(exportErrorText("TOO_LARGE", "create").text, /Narrow/);
+  const lost = exportErrorText("TIMEOUT", "create");
+  assert.match(lost.title, /may not have been created/);
+  assert.doesNotMatch(lost.text, /No file was created/);
+  assert.match(exportErrorText("NETWORK", "download").text, /not received/);
 });
