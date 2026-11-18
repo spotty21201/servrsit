@@ -14,10 +14,12 @@ import { useEffect, useState } from "react";
 import { useFleet } from "./api/useFleet";
 import { OverviewScreen } from "./components/overview/index.js";
 import { toOverviewVM } from "./components/overview/fleetViewModel.js";
+import { RouteAnnouncer } from "./lib/RouteAnnouncer";
 import { AuthGate } from "./auth/AuthGate";
 import { ClockProvider, useClock } from "./clock/ClockContext";
 import { FixtureClockPage } from "./clock/FixtureClockPage";
 import { matchRoute } from "./lib/router";
+import { ActivityScreen } from "./activity/ActivityScreen";
 import { FindingsScreen } from "./findings/FindingsScreen";
 import { ConnectScreen } from "./connect/ConnectScreen";
 import { ServerDetailScreen } from "./servers/ServerDetailScreen";
@@ -28,17 +30,21 @@ const CLOCK_TICK_MS = 30_000;
 
 export default function App() {
   return (
+    <>
+    <RouteAnnouncer />
     <AuthGate>
       <ClockProvider>
         <Routes />
       </ClockProvider>
     </AuthGate>
+    </>
   );
 }
 
 function Routes() {
   const route = matchRoute(globalThis.location.pathname);
   if (route.name === "fixtureClock") return <FixtureClockPage />;
+  if (route.name === "activity") return <ActivityScreen />;
   if (route.name === "findings") return <FindingsScreen />;
   if (route.name === "connect") return <ConnectScreen />;
   if (route.name === "server") return <ServerDetailScreen serverId={route.id} section={route.section} />;

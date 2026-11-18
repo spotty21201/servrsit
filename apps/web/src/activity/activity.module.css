@@ -1,0 +1,31 @@
+/** Activity page. Builds on care.module.css. No 100vw; every text child wraps. */
+.filters { gap: var(--space-1-half); }
+.field { display: flex; flex-direction: column; gap: var(--space-half); min-width: 0; }
+.field > label, .types legend { font-size: var(--text-compact-size); font-weight: var(--font-weight-semibold); }
+.field input[type="search"], .field select {
+  width: 100%; min-width: 0; min-height: var(--touch-target-min); padding: 0 var(--space-1-half);
+  border: 2px solid var(--color-control-boundary); border-radius: var(--radius-input); background: var(--color-surface); color: var(--color-ink);
+  font-family: var(--font-sans); font-size: 1rem;
+}
+.field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; border-color: var(--color-ink); }
+.selects { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-1-half); }
+@media (min-width: 700px) { .selects { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.types { border: 0; display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; min-width: 0; }
+.check { display: inline-flex; align-items: center; gap: var(--space-1); min-height: var(--touch-target-min); padding: 0 var(--space-1-half); border: 1px solid var(--color-control-boundary); border-radius: var(--radius-input); font-size: var(--text-compact-size); cursor: pointer; }
+.check input { width: 1.25rem; height: 1.25rem; accent-color: var(--color-ink); }
+.check:has(input:checked) { border-color: var(--color-ink); background: var(--color-canvas); }
+.day { display: flex; flex-direction: column; gap: var(--space-half); }
+.dayLabel { font-size: var(--text-compact-size); font-weight: var(--font-weight-semibold); color: var(--color-muted-ink); padding-top: var(--space-1); border-top: 1px solid var(--color-soft-line); }
+.list { list-style: none; display: flex; flex-direction: column; min-width: 0; }
+.row { position: relative; display: flex; flex-direction: column; gap: 2px; padding: var(--space-1) 0; border-bottom: 1px solid var(--color-soft-line); min-width: 0; }
+.row:last-child { border-bottom: 0; }
+.rowHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-half) var(--space-1); }
+.type { font-size: 0.75rem; font-weight: var(--font-weight-semibold); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-muted-ink); }
+.when { font-size: var(--text-compact-size); color: var(--color-muted-ink); }
+.title { font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
+/* The whole row is the hit area for its link (44 px+), not just the title text. */
+.title a::after { content: ""; position: absolute; inset: 0; }
+.title a:focus-visible::after { outline: 2px solid var(--color-focus); outline-offset: -2px; border-radius: var(--radius-small); }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-1-half); font-size: var(--text-compact-size); color: var(--color-muted-ink); }
+.id { font-family: var(--font-mono); font-size: 0.75rem; overflow-wrap: anywhere; }
+.summary { font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); overflow-wrap: anywhere; }
