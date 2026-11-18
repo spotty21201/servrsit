@@ -59,3 +59,11 @@ test("voice: light cheek only for a fresh server with nothing pending; plain eve
   assert.equal(vm.servers[2]?.primaryLine, "No pending updates");
   assert.doesNotMatch(vm.servers[2]?.primaryLine ?? "", /babysit/);
 });
+
+test("ServrSit's clock untrusted: relative ages carry ≈, clock times do not", () => {
+  const vm = toOverviewVM(ready(), NOW, true);
+  assert.equal(vm.servers[0]?.observedText, "Observed ≈ 10 min ago");
+  assert.equal(vm.receivedText, "15:09 WIB (≈ 1 min ago)");
+  assert.equal(vm.servers[0]?.freshUntilText, "fresh until 15:30 WIB");
+  assert.equal(toOverviewVM(ready(), NOW).servers[0]?.observedText, "Observed 10 min ago");
+});

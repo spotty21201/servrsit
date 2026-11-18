@@ -27,7 +27,7 @@
  *   ready, 0 servers empty state
  * The [FIXTURE DATA] banner shows only when at least one card is fixture.
  */
-import { FixtureBanner } from "../FixtureBanner/index.js";
+import { TopBanners } from "../../clock/TopBanners";
 import { ServerCard } from "../server-card/index.js";
 import { AttentionColumn } from "./AttentionColumn.js";
 import { RecentActivity } from "./RecentActivity.js";
@@ -47,7 +47,7 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
   const session = useSession();
   return (
     <div className={styles.appShell}>
-      {vm.anyFixture && <FixtureBanner />}
+      <TopBanners fixture={vm.anyFixture} />
 
       <nav className={styles.nav} aria-label="Main navigation">
         <div className={styles.wordmark}>

@@ -20,7 +20,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { ApprovalRequestSchema, PlanRequestSchema } from "@servrsit/contracts";
+import { ApprovalRequestSchema, PlanRequestSchema, type ControllerClock } from "@servrsit/contracts";
 import { buildPlan, type Plan } from "@servrsit/domain";
 import type { ApprovalRejection, CareStore, StoredOperation, TargetKind } from "@servrsit/store";
 import type { WriteTarget } from "@servrsit/worker";
@@ -42,6 +42,11 @@ export interface CareRouteOptions {
   readonly owner: (request: FastifyRequest) => string;
   readonly now?: (() => Date) | undefined;
   readonly newId?: (() => string) | undefined;
+  /**
+   * T-063: ServrSit's own clock. "untrusted" blocks planning and approval.
+   * "not-checked" (tests, fixture mode) does not block.
+   */
+  readonly controllerClock?: (() => ControllerClock) | undefined;
 }
 
 const STATUS: Readonly<Record<ApprovalRejection, number>> = {
@@ -78,6 +83,7 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
   const now = o.now ?? (() => new Date());
   const newId = o.newId ?? (() => randomUUID());
   const serverById = (id: string) => o.servers().find((s) => s.id === id);
+  const clockStatus = () => o.controllerClock?.().status ?? "not-checked";
 
   fastify.setErrorHandler((error, request, reply) => {
     const status = (error as { statusCode?: number }).statusCode ?? 500;
@@ -100,6 +106,7 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
       preview,
       unresolved: unresolved === null ? null : (unresolved.state as "queued" | "running" | "verifying" | "outcome_unknown"),
       now: now(),
+      controllerClockTrusted: clockStatus() !== "untrusted",
     });
     o.store.insertPlan(plan);
     return plan;
@@ -137,6 +144,11 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     const plan = o.store.getPlan(request.params.id);
     const server = plan === null ? undefined : serverById(plan.serverId);
     if (plan === null || server === undefined) return reply.code(404).send({ error: "PLAN_NOT_FOUND" });
+    // T-063: re-check at approval time; the clock may have become untrusted since the plan was made.
+    if (clockStatus() === "untrusted") {
+      request.log.info({ planId: plan.id, result: "rejected", code: "CONTROLLER_CLOCK_UNTRUSTED" }, "care: approval");
+      return reply.code(409).send({ error: "PLAN_BLOCKED", blockers: ["CONTROLLER_CLOCK_UNTRUSTED"] });
+    }
 
     const result = o.store.approve({
       planId: plan.id,

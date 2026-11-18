@@ -20,7 +20,9 @@
  * well-formedness check. Findings are built from our own templates.
  */
 
-import { clockSkewed, describeClockSkew, isSafeMountPath, isSafeUnitName, type InspectionObservation } from "@servrsit/ssh";
+import { CLOCK_SKEW_TOLERANCE_SECONDS, clockSkewed, isSafeMountPath, isSafeUnitName, type Clock, type InspectionObservation } from "@servrsit/ssh";
+import type { ControllerClock } from "@servrsit/contracts";
+import { describeSpan } from "../clock/controller-clock.js";
 import type { Finding } from "./schema.js";
 
 const WARNING = 85;
@@ -100,7 +102,34 @@ function outsideList(v: { count: number; packages: ReadonlyArray<{ name: string;
   return v.count > 5 ? `${text}; and ${v.count - 5} more` : text;
 }
 
+/**
+ * T-061 / T-063: a target's clock finding. The target's skew is measured
+ * against ServrSit's clock, so it is only blamed on the target when
+ * ServrSit's own offset is known (and subtracted) or ServrSit's clock is
+ * trusted. Otherwise the finding says it is unclear which clock is wrong.
+ */
+function clockFinding(c: Clock, controller: ControllerClock | null): Finding | null {
+  const converted = "Times the server writes itself, such as when it last refreshed package lists, are converted to ServrSit's clock.";
+  const finding = (summary: string): Finding => ({ id: "clock-skew", rule: "time.skew.v1", severity: "warning", summary });
+  if (controller !== null && controller.offsetSeconds !== null && controller.uncertaintySeconds !== null) {
+    // Target minus real time = (target minus ServrSit) + (ServrSit minus real time).
+    const real = c.skewSeconds + controller.offsetSeconds;
+    if (Math.abs(real) - (c.uncertaintySeconds + controller.uncertaintySeconds) <= CLOCK_SKEW_TOLERANCE_SECONDS) return null;
+    return finding(`This server's clock is about ${describeSpan(real)} ${real < 0 ? "behind" : "ahead of"} real time. ${converted} Check time synchronisation on the server.`);
+  }
+  if (!clockSkewed(c)) return null;
+  const span = describeSpan(c.skewSeconds);
+  if (controller !== null && controller.status === "trusted") {
+    return finding(`This server's clock is about ${span} ${c.skewSeconds < 0 ? "behind" : "ahead of"} ServrSit's clock, which is verified. ${converted} Check time synchronisation on the server.`);
+  }
+  return finding(
+    `This server's clock reads about ${span} ${c.skewSeconds < 0 ? "earlier" : "later"} than ServrSit's. ServrSit's own clock is not verified, so either clock could be the wrong one. ${converted}`,
+  );
+}
+
 export interface FindingsInput {
+  /** T-063: ServrSit's own clock. Absent means not checked. */
+  readonly controllerClock?: ControllerClock | null | undefined;
   readonly current: InspectionObservation | null;
   readonly previous: InspectionObservation | null;
   readonly consecutiveFailures: number;
@@ -130,11 +159,9 @@ export function evaluateFindings(input: FindingsInput): Finding[] {
   }
 
   if (current !== null) {
-    if (current.host.clock.status === "ok" && clockSkewed(current.host.clock.value)) {
-      findings.push({
-        id: "clock-skew", rule: "time.skew.v1", severity: "warning",
-        summary: `This server's clock is ${describeClockSkew(current.host.clock.value)}. Times the server writes itself, such as when it last refreshed package lists, are corrected for this. Check time synchronisation on the server.`,
-      });
+    if (current.host.clock.status === "ok") {
+      const f = clockFinding(current.host.clock.value, input.controllerClock ?? null);
+      if (f !== null) findings.push(f);
     }
     findings.push(...usageFindings("disk", filesystemUsage(current), filesystemUsage(previous)));
     findings.push(...usageFindings("inode", inodeUsage(current), inodeUsage(previous)));

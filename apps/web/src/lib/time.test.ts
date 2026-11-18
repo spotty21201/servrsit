@@ -64,3 +64,14 @@ test("seconds clock and time-until", () => {
   assert.equal(formatUntil(D("2026-11-17T03:00:30Z"), now), "in 30 s");
   assert.equal(formatUntil(D("2026-11-17T02:59:59Z"), now), "expired");
 });
+
+test("uncertain ages carry ≈; dated clock times and certain ages do not", () => {
+  const now = D("2026-11-17T03:00:00Z");
+  assert.equal(formatRelative(D("2026-11-17T02:56:00Z"), now, JKT, true), "≈ 4 min ago");
+  assert.equal(formatRelative(D("2026-11-17T02:59:50Z"), now, JKT, true), "≈ just now");
+  assert.equal(formatRelative(D("2026-11-15T03:00:00Z"), now, JKT, true), "15 Nov 10:00 WIB");
+  assert.equal(formatRelative(D("2026-11-17T02:56:00Z"), now, JKT), "4 min ago");
+  assert.equal(formatClockWithAge(D("2026-11-17T02:56:00Z"), now, JKT, true), "09:56 WIB (≈ 4 min ago)");
+  assert.equal(formatUntil(D("2026-11-17T03:12:00Z"), now, true), "≈ in 12 min");
+  assert.equal(formatUntil(D("2026-11-17T02:00:00Z"), now, true), "≈ expired");
+});

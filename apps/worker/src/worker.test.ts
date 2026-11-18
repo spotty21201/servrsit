@@ -45,7 +45,7 @@ async function harness(opts: { writesEnabled?: boolean; production?: boolean; ta
   const plan = buildPlan({
     id: randomUUID(), version: 1, operation: "apply.packages.v1",
     server: { id: SIM, production: opts.production ?? false, writesEnabled: true },
-    preview: await sim.previewPackages(), unresolved: null, now: clock.now(),
+    preview: await sim.previewPackages(), unresolved: null, now: clock.now(), controllerClockTrusted: true,
   });
   store.insertPlan(plan);
   const approved = store.approve({
@@ -117,7 +117,7 @@ test("invariant 8: if the ledger cannot be reached the outcome is unknown, confl
   await h.dispatcher.runOnce();
   assert.equal(h.state(), "outcome_unknown");
 
-  const second = buildPlan({ id: randomUUID(), version: 1, operation: "apply.packages.v1", server: { id: SIM, production: false, writesEnabled: true }, preview: await h.sim.previewPackages(), unresolved: "outcome_unknown", now: h.clock.now() });
+  const second = buildPlan({ id: randomUUID(), version: 1, operation: "apply.packages.v1", server: { id: SIM, production: false, writesEnabled: true }, preview: await h.sim.previewPackages(), unresolved: "outcome_unknown", now: h.clock.now(), controllerClockTrusted: true });
   assert.deepEqual(second.blockers.map((b) => b.code), ["OUTCOME_UNKNOWN", "PACKAGE_LOCKED"]);
   h.store.insertPlan(second);
   assert.deepEqual(

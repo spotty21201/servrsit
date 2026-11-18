@@ -133,7 +133,13 @@ export function approveLabelFor(serverName: string): string {
   return `Approve update on ${serverName}`;
 }
 
-export function toPlanVM(plan: PlanView, now: Date, tz: string, notice: PlanNotice | null = null): PlanVM {
+export const CLOCK_PAUSED_REASON = "ServrSit's own clock is wrong, so expiry times can't be trusted. Approvals are paused until it is fixed.";
+
+/**
+ * `clockPaused`: ServrSit's clock is untrusted. Approval is disabled here as
+ * well as in the API; relative ages and expiry are marked "≈".
+ */
+export function toPlanVM(plan: PlanView, now: Date, tz: string, notice: PlanNotice | null = null, clockPaused = false): PlanVM {
   const name = plan.target.name;
   const expires = parseIso(plan.expiresAt);
   const created = parseIso(plan.createdAt);
@@ -145,7 +151,7 @@ export function toPlanVM(plan: PlanView, now: Date, tz: string, notice: PlanNoti
 
   const preconditions: PreconditionRow[] = [
     created && hasPreview
-      ? { label: "Package state is recent", state: "met", detail: `Read ${formatClockWithAge(created, now, tz)}.` }
+      ? { label: "Package state is recent", state: "met", detail: `Read ${formatClockWithAge(created, now, tz, clockPaused)}.` }
       : { label: "Package state is recent", state: "unknown", detail: "No package preview was taken for this plan." },
     codes.has("WRITES_DISABLED")
       ? { label: "Changes switched on for this server", state: "blocked", detail: WRITES_OFF_TEXT }
@@ -177,6 +183,8 @@ export function toPlanVM(plan: PlanView, now: Date, tz: string, notice: PlanNoti
   } else if (plan.blockers.length > 0 || !plan.approvable) {
     const first = blockers[0]?.message ?? "This plan has a blocker.";
     disposition = { kind: "blocked", title: "This plan can't be approved", reason: first, canApprove: false, offerRefresh: true };
+  } else if (clockPaused) {
+    disposition = { kind: "blocked", title: "Approvals are paused", reason: CLOCK_PAUSED_REASON, canApprove: false, offerRefresh: false };
   } else if (expired) {
     const t = noticeText({ code: "PLAN_EXPIRED" }, name);
     disposition = { kind: "expired", ...t, canApprove: false, offerRefresh: true };
@@ -213,10 +221,10 @@ export function toPlanVM(plan: PlanView, now: Date, tz: string, notice: PlanNoti
     ],
     expiry: {
       absolute: expires ? formatClock(expires, now, tz) : "unknown",
-      relative: expires ? formatUntil(expires, now) : "unknown",
+      relative: expires ? formatUntil(expires, now, clockPaused) : "unknown",
       expired,
     },
-    createdText: created ? formatClockWithAge(created, now, tz) : "unknown",
+    createdText: created ? formatClockWithAge(created, now, tz, clockPaused) : "unknown",
     approveLabel: approveLabelFor(name),
     acknowledgements,
     acknowledgementTokens: production ? [...plan.requiredAcknowledgements, ACK_RECOVERY, ACK_INTERRUPTION] : [...plan.requiredAcknowledgements],

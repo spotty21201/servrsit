@@ -15,6 +15,8 @@ import { useFleet } from "./api/useFleet";
 import { OverviewScreen } from "./components/overview/index.js";
 import { toOverviewVM } from "./components/overview/fleetViewModel.js";
 import { AuthGate } from "./auth/AuthGate";
+import { ClockProvider, useClock } from "./clock/ClockContext";
+import { FixtureClockPage } from "./clock/FixtureClockPage";
 import { matchRoute } from "./lib/router";
 import { PlanScreen } from "./care/PlanScreen";
 import { OperationScreen } from "./care/OperationScreen";
@@ -24,13 +26,16 @@ const CLOCK_TICK_MS = 30_000;
 export default function App() {
   return (
     <AuthGate>
-      <Routes />
+      <ClockProvider>
+        <Routes />
+      </ClockProvider>
     </AuthGate>
   );
 }
 
 function Routes() {
   const route = matchRoute(globalThis.location.pathname);
+  if (route.name === "fixtureClock") return <FixtureClockPage />;
   if (route.name === "plan") return <PlanScreen planId={route.id} />;
   if (route.name === "operation") return <OperationScreen operationId={route.id} />;
   return <OverviewRoute />;
@@ -38,6 +43,7 @@ function Routes() {
 
 function OverviewRoute() {
   const fleet = useFleet();
+  const { view: clockView } = useClock();
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -50,5 +56,5 @@ function OverviewRoute() {
     setNow(new Date());
   }, [fleet.receivedAt, fleet.error]);
 
-  return <OverviewScreen vm={toOverviewVM(fleet, now)} onRetry={fleet.refresh} />;
+  return <OverviewScreen vm={toOverviewVM(fleet, now, clockView?.agesUncertain ?? false)} onRetry={fleet.refresh} />;
 }

@@ -6,7 +6,7 @@
  */
 
 import type { AiServerInput } from "./input.js";
-import { formatLocal, type TimeContext } from "./time.js";
+import { controllerClockWarning, formatLocal, type TimeContext } from "./time.js";
 
 /** Rules about time and package age, shared by every system prompt (DEF-L1, DEF-L2). */
 export const TIME_AND_PACKAGE_RULES =
@@ -19,8 +19,9 @@ export const SYSTEM_PROMPT =
   "\n- You cannot approve, authorize or schedule any change. If asked, say that approval happens only in the ServrSit approval screen.\n- Reply with the explanation text only.";
 
 /** Time context shown to the model next to the data. */
-export function timeContextFor(ctx: TimeContext): { timeZone: string; now: string } {
-  return { timeZone: ctx.timeZone, now: formatLocal(ctx.now, ctx.timeZone) };
+export function timeContextFor(ctx: TimeContext): { timeZone: string; now: string; timesUncertain?: string } {
+  const warning = controllerClockWarning(ctx);
+  return { timeZone: ctx.timeZone, now: formatLocal(ctx.now, ctx.timeZone), ...(warning === null ? {} : { timesUncertain: warning }) };
 }
 
 /** The user message. The data is fenced, and `<` is escaped so it cannot close the fence. */

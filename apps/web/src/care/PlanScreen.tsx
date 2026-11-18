@@ -20,6 +20,7 @@
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { fetchFleet } from "../api/fleet";
+import { useClock } from "../clock/ClockContext";
 import { createCareClient, type CareClient, type PlanView } from "../api/stubs/care";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
 import { operationPath } from "../lib/router";
@@ -49,6 +50,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
   const fixture = isFixtureId(planId);
   const client = useMemo(() => injected ?? (fixture ? createFixtureClient() : createCareClient()), [injected, fixture]);
   const tz = useOwnerZone(fixture);
+  const clockView = useClock().view;
 
   const [plan, setPlan] = useState<PlanView | null>(null);
   const [loadError, setLoadError] = useState<"missing" | "failed" | null>(null);
@@ -75,7 +77,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
     return () => globalThis.clearInterval(t);
   }, []);
 
-  const vm: PlanVM | null = plan ? toPlanVM(plan, now, tz, notice) : null;
+  const vm: PlanVM | null = plan ? toPlanVM(plan, now, tz, notice, clockView?.approvalsPaused ?? false) : null;
   const busy = phase.phase === "submitting" || phase.phase === "checking" || phase.phase === "accepted";
   const allAcked = vm ? vm.acknowledgements.every((_, i) => acks[i] === true) : false;
 
