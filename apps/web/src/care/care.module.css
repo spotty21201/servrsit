@@ -123,6 +123,7 @@
 }
 .notice p { color: var(--color-ink); }
 .noticeTitle { display: flex; align-items: center; gap: var(--space-1); font-weight: var(--font-weight-semibold); color: inherit !important; }
+h1.noticeTitle { font-size: var(--text-section-title-size); line-height: var(--text-section-title-line-height); }
 .noticeAttention { color: var(--color-state-attention-fg); background-color: var(--color-state-attention-bg); }
 .noticeFailed { color: var(--color-state-failed-fg); background-color: var(--color-state-failed-bg); }
 .noticeUnknown { color: var(--color-state-unknown-fg); background-color: var(--color-state-unknown-bg); }

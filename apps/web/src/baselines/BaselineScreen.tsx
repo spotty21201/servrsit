@@ -167,7 +167,7 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
         <p className={c.small}>Step {step + 1} of 4: {STEPS[step]}. Comparing copies and deletes nothing. A setup only ever happens through a plan you approve.</p>
       </header>
 
-      {load === "error" && <LoadFailure title="Couldn't load servers" text="Nothing is shown until real data arrives." onRetry={() => void loadServers()} />}
+      {load === "error" && <LoadFailure title="Couldn't load servers" text="Nothing is shown until real data arrives." onRetry={() => void loadServers()} heading={false} />}
       {load === "loading" && <p className={c.p} role="status">Loading servers…</p>}
 
       {load === "ready" && <ol className={s.stepper} aria-label="Progress">

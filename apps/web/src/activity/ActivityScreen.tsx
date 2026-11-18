@@ -122,7 +122,7 @@ export function ActivityScreen({ client: injected }: { client?: ActivityClient }
         {!isDefault(filters) && <button type="button" className={c.secondary} onClick={() => setFilters(DEFAULT_FILTERS)}>Reset filters</button>}
       </form>
 
-      {error && !records && <LoadFailure title="Couldn't load activity" text="Nothing is shown until real data arrives. This does not mean nothing happened." onRetry={() => void load()} />}
+      {error && !records && <LoadFailure title="Couldn't load activity" text="Nothing is shown until real data arrives. This does not mean nothing happened." onRetry={() => void load()} heading={false} />}
       {!records && !error && <p className={c.p} role="status">Loading activity…</p>}
 
       {records && (

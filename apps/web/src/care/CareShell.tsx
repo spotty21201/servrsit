@@ -54,10 +54,15 @@ export function LockGlyph() {
   );
 }
 
-export function LoadFailure({ title, text, onRetry }: { title: string; text: string; onRetry?: () => void }) {
+/**
+ * A page-level failure. By default its title is the page's <h1> (the screens that
+ * show it have nothing else to head the page); screens that already have their
+ * own <h1> pass `heading={false}`.
+ */
+export function LoadFailure({ title, text, onRetry, heading = true }: { title: string; text: string; onRetry?: () => void; heading?: boolean }) {
   return (
     <div className={`${styles.notice} ${styles.noticeFailed}`} role="alert">
-      <p className={styles.noticeTitle}>{title}</p>
+      {heading ? <h1 className={styles.noticeTitle}>{title}</h1> : <p className={styles.noticeTitle}>{title}</p>}
       <p>{text}</p>
       <div className={styles.row}>
         {onRetry && <button type="button" className={styles.secondary} onClick={onRetry}>Try again</button>}

@@ -98,7 +98,7 @@ export function FindingsScreen({ client: injected }: { client?: FindingsClient }
       </header>
 
       {notice && <SchedulerNotice notice={notice} />}
-      {error && !snap && <LoadFailure title="Couldn't load findings" text="Nothing is shown until real data arrives. This does not mean there are no findings." onRetry={() => void load()} />}
+      {error && !snap && <LoadFailure title="Couldn't load findings" text="Nothing is shown until real data arrives. This does not mean there are no findings." onRetry={() => void load()} heading={false} />}
       {!snap && !error && <p className={c.p} role="status">Loading findings…</p>}
       {problem && <div className={`${c.notice} ${c.noticeFailed}`} role="alert"><p>{problem}</p></div>}
 

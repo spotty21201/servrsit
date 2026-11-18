@@ -202,7 +202,7 @@ export function ServerDetailScreen({ serverId, section }: { serverId: string; se
 
   return (
     <CareShell fixture={server?.source === "fixture"} section="Server">
-      {fleet.phase === "loading" && <p className={c.p} role="status">Loading the server…</p>}
+      {fleet.phase === "loading" && <><h1 className={c.title}>Server</h1><p className={c.p} role="status">Loading the server…</p></>}
       {fleet.phase === "error" && <LoadFailure title="Couldn't load your servers" text={`${fleet.error?.message ?? "The ServrSit API did not answer."} Nothing is shown until real data arrives.`} onRetry={fleet.refresh} />}
       {fleet.phase === "ready" && !server && <LoadFailure title="Server not found" text="No server with this id is in your fleet. It may have been removed from the configuration." />}
 

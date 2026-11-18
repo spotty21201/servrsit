@@ -131,7 +131,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
     <CareShell fixture={fixture} section="Plan review">
       {loadError === "missing" && <LoadFailure title="Plan not found" text="There is no plan with this id. Nothing was started." />}
       {loadError === "failed" && <LoadFailure title="Couldn't load the plan" text="The ServrSit API did not return a usable plan. Nothing was started." onRetry={() => void load()} />}
-      {!plan && !loadError && <p className={styles.p} role="status">Loading the plan…</p>}
+      {!plan && !loadError && <><h1 className={styles.title}>Plan review</h1><p className={styles.p} role="status">Loading the plan…</p></>}
 
       {vm && plan && (
         <>

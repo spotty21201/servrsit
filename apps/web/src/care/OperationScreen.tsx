@@ -179,7 +179,7 @@ export function OperationScreen({ operationId, client: injected }: { operationId
     <CareShell fixture={fixture} section="Operation">
       {error === "missing" && <LoadFailure title="Operation not found" text="There is no operation with this id." />}
       {error === "failed" && !view && <LoadFailure title="Couldn't load the operation" text="The ServrSit API did not return a usable record. This does not tell you whether the operation ran." onRetry={() => void load()} />}
-      {!view && !error && <p className={styles.p} role="status">Loading the operation…</p>}
+      {!view && !error && <><h1 className={styles.title}>Operation</h1><p className={styles.p} role="status">Loading the operation…</p></>}
 
       {vm && (
         <>
