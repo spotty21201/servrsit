@@ -16,13 +16,15 @@
  * /api/fleet (ownerTimeZone); until that is known the default applies.
  *
  * Fixture ids (fixture-plan-…) use createFixtureClient and show the
- * [FIXTURE DATA] banner. Real ids use the stub client in api/stubs/care.ts.
+ * [FIXTURE DATA] banner. Real ids use the real care client (api/care.ts, T-082).
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { fetchFleet } from "../api/fleet";
-import { createCareClient, type CareClient, type PlanView } from "../api/stubs/care";
+import { useClock } from "../clock/ClockContext";
+import { createCareClient, type CareClient, type PlanView } from "../api/care";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
 import { operationPath } from "../lib/router";
+import { usePageTitle } from "../lib/pageTitle";
 import { StatusBadge } from "../components/StatusBadge/index.js";
 import { IDLE, newIdempotencyKey, PHASE_LABEL, submitApproval, type ApprovalPhase } from "./approval";
 import { CareShell, LoadFailure, LockGlyph, ProductionLabel, SimulatedLabel } from "./CareShell";
@@ -49,6 +51,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
   const fixture = isFixtureId(planId);
   const client = useMemo(() => injected ?? (fixture ? createFixtureClient() : createCareClient()), [injected, fixture]);
   const tz = useOwnerZone(fixture);
+  const clockView = useClock().view;
 
   const [plan, setPlan] = useState<PlanView | null>(null);
   const [loadError, setLoadError] = useState<"missing" | "failed" | null>(null);
@@ -75,7 +78,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
     return () => globalThis.clearInterval(t);
   }, []);
 
-  const vm: PlanVM | null = plan ? toPlanVM(plan, now, tz, notice) : null;
+  const vm: PlanVM | null = plan ? toPlanVM(plan, now, tz, notice, clockView?.approvalsPaused ?? false) : null;
   const busy = phase.phase === "submitting" || phase.phase === "checking" || phase.phase === "accepted";
   const allAcked = vm ? vm.acknowledgements.every((_, i) => acks[i] === true) : false;
 
@@ -121,13 +124,14 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
     if (end.phase === "rejected") { setNotice(end.notice); setPhase(IDLE); }
   }
 
+  usePageTitle(vm ? `Plan review: ${vm.title}${vm.disposition.canApprove ? "" : ` (${vm.disposition.title})`}` : loadError ? "Plan not available" : "Loading the plan", vm !== null || loadError !== null);
   const sectionId = (s: string): string => `${ids}-${s}`;
 
   return (
     <CareShell fixture={fixture} section="Plan review">
       {loadError === "missing" && <LoadFailure title="Plan not found" text="There is no plan with this id. Nothing was started." />}
       {loadError === "failed" && <LoadFailure title="Couldn't load the plan" text="The ServrSit API did not return a usable plan. Nothing was started." onRetry={() => void load()} />}
-      {!plan && !loadError && <p className={styles.p} role="status">Loading the plan…</p>}
+      {!plan && !loadError && <><h1 className={styles.title}>Plan review</h1><p className={styles.p} role="status">Loading the plan…</p></>}
 
       {vm && plan && (
         <>
@@ -158,7 +162,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
             </div>
           )}
           {refreshed && diffIsEmpty(refreshed.diff) && (
-            <p className={styles.small} role="status">Plan refreshed to version {refreshed.toVersion}. The scope is unchanged. Acknowledgements start again.</p>
+            <p className={styles.small} role="status">Plan refreshed to version {refreshed.toVersion}. {vm.kind === "apply.packages.v1" ? "The package scope is unchanged." : "Read the scope again: only package changes are compared automatically."} Acknowledgements start again.</p>
           )}
 
           <div className={styles.layout}>
@@ -166,10 +170,34 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
               <section className={styles.panel} aria-labelledby={sectionId("scope")}>
                 <h2 id={sectionId("scope")} className={styles.h2}>Scope</h2>
                 <p className={styles.p}>{vm.scopeSummary}</p>
+                {vm.unit && (
+                  <>
+                    <p className={styles.rowLabel}>Service to restart</p>
+                    <ul className={styles.pkgGrid} aria-label="Service to restart"><li>{vm.unit}</li></ul>
+                  </>
+                )}
+                {vm.directories.length > 0 && (
+                  <>
+                    <p className={styles.rowLabel}>Directories to create</p>
+                    <ul className={styles.pkgGrid} aria-label="Directories to create">
+                      {vm.directories.map((d) => <li key={d.path}>{d.path}</li>)}
+                    </ul>
+                  </>
+                )}
+                {vm.existing.length > 0 && (
+                  <>
+                    <p className={styles.rowLabel}>Already exist, left as they are</p>
+                    <ul className={`${styles.list} ${styles.bullets}`} aria-label="Already exist">
+                      {vm.existing.map((x) => <li key={x}><span className={styles.mono}>{x}</span></li>)}
+                    </ul>
+                  </>
+                )}
                 {vm.packages.length > 0 && (
-                  <ul className={styles.pkgGrid} aria-label="Packages in this plan">
-                    {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}</li>)}
-                  </ul>
+                  <>
+                    <ul className={styles.pkgGrid} aria-label="Packages in this plan">
+                      {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}</li>)}
+                    </ul>
+                  </>
                 )}
                 <ul className={`${styles.list} ${styles.bullets}`} aria-label="Not included">
                   {vm.exclusions.map((e) => <li key={e}>{e}</li>)}
@@ -204,9 +232,12 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
                   <summary>Technical details</summary>
                   <ul className={styles.diffList} aria-label="Package versions">
                     {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}:{p.arch} {p.from} → {p.to}</li>)}
-                    {vm.packages.length === 0 && <li>No package versions: nothing was prepared.</li>}
+                    {vm.directories.map((d) => <li key={`d-${d.path}`}>create {d.path} owner {d.owner}:{d.group} mode {d.mode}</li>)}
+                    {vm.unit && <li>restart {vm.unit}</li>}
+                    {vm.kind === "reboot.host.v1" && <li>reboot the whole machine</li>}
+                    {vm.packages.length === 0 && vm.directories.length === 0 && !vm.unit && vm.kind !== "reboot.host.v1" && <li>Nothing was prepared.</li>}
                   </ul>
-                  <p className={styles.small}>Operation: apply.packages.v1 · Plan ID <span className={styles.mono}>{vm.id}</span> · Digest <span className={styles.mono}>{vm.digestShort}…</span></p>
+                  <p className={styles.small}>Operation: {vm.kind} · Plan ID <span className={styles.mono}>{vm.id}</span> · Digest <span className={styles.mono}>{vm.digestShort}…</span></p>
                 </details>
               </section>
             </div>
@@ -263,13 +294,14 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
                       type="button"
                       className={styles.primary}
                       onClick={() => void approve()}
-                      disabled={busy || phase.phase === "unconfirmed" || !allAcked}
+                      disabled={busy}
+                      aria-disabled={phase.phase === "unconfirmed" || !allAcked ? true : undefined}
                       aria-describedby={`${ids}-help`}
                     >
                       {vm.approveLabel}
                     </button>
                     <p id={`${ids}-help`} className={styles.small}>
-                      {!allAcked && vm.acknowledgements.length > 0 ? "Tick both confirmations to enable approval." : "Approving starts the update on this server. The review above is the checkpoint."}
+                      {!allAcked && vm.acknowledgements.length > 0 ? "Tick both confirmations to enable approval." : vm.approveHelp}
                     </p>
                   </>
                 )}

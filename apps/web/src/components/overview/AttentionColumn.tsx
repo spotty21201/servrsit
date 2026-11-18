@@ -7,13 +7,17 @@
  * "Avoid filling every available gap. With no findings, it becomes a small quiet
  * note and the roster can expand."
  */
+import { useState } from "react";
 import type { AttentionItemVM } from "./fleetViewModel.js";
+import { ScrollRegion } from "./ScrollRegion.js";
 import styles from "./AttentionColumn.module.css";
 
 interface AttentionColumnProps {
   findings: AttentionItemVM[];
   /** True while there is no fleet data (loading or API down): don't claim "nothing needs attention". */
   unavailable?: boolean;
+  /** No server is connected yet: say nothing was checked, not that nothing needs attention. */
+  noServers?: boolean;
 }
 
 function FindingIcon({ severity }: { severity: "attention" | "failed" }) {
@@ -34,7 +38,16 @@ function FindingIcon({ severity }: { severity: "attention" | "failed" }) {
   );
 }
 
-export function AttentionColumn({ findings, unavailable = false }: AttentionColumnProps) {
+export function AttentionColumn({ findings, unavailable = false, noServers = false }: AttentionColumnProps) {
+  const [hidden, setHidden] = useState(0);
+  if (noServers) {
+    return (
+      <section className={styles.column} aria-labelledby="attention-heading">
+        <h2 id="attention-heading" className={styles.heading}>Needs attention</h2>
+        <p className={styles.empty}>No server is connected, so nothing has been checked yet.</p>
+      </section>
+    );
+  }
   if (unavailable) {
     return (
       <section className={styles.column} aria-labelledby="attention-heading">
@@ -62,6 +75,7 @@ export function AttentionColumn({ findings, unavailable = false }: AttentionColu
           <span className="sr-only"> items</span>
         </span>
       </h2>
+      <ScrollRegion label="Needs attention, list of findings" className={styles.scroll} onHidden={setHidden}>
       <ul className={styles.list} role="list">
         {findings.map((finding) => (
           <li key={finding.id} className={`${styles.finding} ${styles[finding.severity]}`}>
@@ -83,6 +97,11 @@ export function AttentionColumn({ findings, unavailable = false }: AttentionColu
           </li>
         ))}
       </ul>
+      </ScrollRegion>
+      <p className={styles.footer}>
+        {hidden > 0 && <span role="status">+{hidden} more, scroll the list. </span>}
+        <a href="/findings">View all findings</a>
+      </p>
     </section>
   );
 }

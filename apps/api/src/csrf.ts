@@ -1,20 +1,18 @@
 /**
- * CSRF protection for state-changing care requests (Technical Spec §5, §9.2).
+ * Cross-site request protection (Technical Spec §5, §9.2; T-053).
  *
- * "CSRF-ready" for the auth stub: a per-process random token, fetched by the
- * same-origin UI from GET /api/csrf and sent back in the X-CSRF-Token header,
- * compared in constant time. Requests carrying an Origin header must come
- * from an allowed origin, and a browser-reported cross-site request is
- * refused. When real sessions arrive (Cognito, T-023), the token binds to the
- * session instead of the process.
- *
- * This blocks cross-site browser requests. It does not authenticate a direct
- * client: that is the job of the missing login (D3).
+ * Two checks, both on every state-changing /api request:
+ *  - Origin: a browser-reported cross-site request is refused, and a request
+ *    that carries an Origin header must come from an allowed origin.
+ *  - CSRF token: the X-CSRF-Token header must equal the token bound to the
+ *    caller's session (see auth/owner-auth.ts). Requests that create a
+ *    session (setup, login, TOTP) have no session yet, so they get the
+ *    Origin check only; SameSite=Strict cookies cover the rest.
  */
 
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { AUTH_CSRF_HEADER } from "@servrsit/contracts";
 
-export const CSRF_HEADER = "x-csrf-token";
+export const CSRF_HEADER = AUTH_CSRF_HEADER;
 
 export const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
   "http://localhost:5173",
@@ -22,20 +20,14 @@ export const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
   "http://100.104.220.8:5173",
 ];
 
-export class CsrfGuard {
-  readonly token: string;
+export const STATE_CHANGING_METHODS: ReadonlySet<string> = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
-  constructor(private readonly allowedOrigins: readonly string[] = DEFAULT_ALLOWED_ORIGINS) {
-    this.token = randomBytes(32).toString("hex");
-  }
-
-  check(headers: Readonly<Record<string, string | string[] | undefined>>): boolean {
-    const site = headers["sec-fetch-site"];
-    if (site === "cross-site") return false;
-    const origin = headers["origin"];
-    if (typeof origin === "string" && !this.allowedOrigins.includes(origin)) return false;
-    const given = headers[CSRF_HEADER];
-    if (typeof given !== "string" || given.length !== this.token.length) return false;
-    return timingSafeEqual(Buffer.from(given), Buffer.from(this.token));
-  }
+export function originAllowed(
+  headers: Readonly<Record<string, string | string[] | undefined>>,
+  allowedOrigins: readonly string[] = DEFAULT_ALLOWED_ORIGINS,
+): boolean {
+  if (headers["sec-fetch-site"] === "cross-site") return false;
+  const origin = headers["origin"];
+  if (origin === undefined) return true;
+  return typeof origin === "string" && allowedOrigins.includes(origin);
 }

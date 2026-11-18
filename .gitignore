@@ -41,3 +41,6 @@ cdk.out/
 .worktrees/
 apps/web/public/review-001/
 apps/web/public/review-002/
+
+# Python
+__pycache__/

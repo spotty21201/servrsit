@@ -7,11 +7,15 @@
  * its output (D4).
  */
 
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { createAssistant } from "@servrsit/ai";
+import { SqliteActivityStore, SqliteAuthStore, SqliteBaselineStore, SqliteFindingStore, SqliteServerStore, SqliteSettingsStore } from "@servrsit/store";
 import { loadAiRuntime } from "./ai-runtime.js";
 import { createAsyncLogStream } from "./log-stream.js";
 import { resolvePort } from "./port.js";
-import { buildServer } from "./server.js";
+import { buildServer, DEFAULT_AUTH_DB_PATH, describeAi } from "./server.js";
+import { DEFAULT_ACTIVITY_PATH, DEFAULT_BASELINES_PATH, DEFAULT_FINDINGS_PATH, DEFAULT_REGISTRY_PATH, DEFAULT_SETTINGS_PATH } from "./fleet/config.js";
 import { createShutdownHandler } from "./shutdown.js";
 
 const PORT = resolvePort();
@@ -19,10 +23,24 @@ const HOST = "127.0.0.1";
 
 async function start(): Promise<void> {
   const ai = loadAiRuntime();
+  // T-069: the server registry persists across restarts (gitignored .data/).
+  const registryPath = process.env["SERVRSIT_REGISTRY_DB"] ?? DEFAULT_REGISTRY_PATH.pathname;
+  mkdirSync(dirname(registryPath), { recursive: true, mode: 0o700 });
   const fastify = await buildServer({
+    servers: { store: new SqliteServerStore({ path: registryPath }) },
+    // T-076: finding records and installation settings (scheduler pause) persist too.
+    findings: {
+      store: new SqliteFindingStore({ path: process.env["SERVRSIT_FINDINGS_DB"] ?? DEFAULT_FINDINGS_PATH.pathname }),
+      activity: new SqliteActivityStore({ path: process.env["SERVRSIT_ACTIVITY_DB"] ?? DEFAULT_ACTIVITY_PATH.pathname }),
+      baselines: new SqliteBaselineStore({ path: process.env["SERVRSIT_BASELINES_DB"] ?? DEFAULT_BASELINES_PATH.pathname }),
+      settings: new SqliteSettingsStore({ path: process.env["SERVRSIT_SETTINGS_DB"] ?? DEFAULT_SETTINGS_PATH.pathname }),
+    },
     redactSecrets: ai.redactSecrets,
+    aiDescription: describeAi(ai.config),
     assistant: createAssistant(ai.config),
     logStream: createAsyncLogStream({ fd: 1 }),
+    // T-053: owner auth records persist in apps/api/.data (gitignored, created 0600).
+    auth: { store: new SqliteAuthStore({ path: process.env["SERVRSIT_AUTH_DB"] ?? DEFAULT_AUTH_DB_PATH }) },
   });
   for (const note of ai.notes) fastify.log[note.level](note.message);
 

@@ -1,7 +1,6 @@
 /**
  * Care loop API (T-048, Technical Spec §9, §13). BUILD ONLY.
  *
- *   GET  /api/csrf                       token for the X-CSRF-Token header
  *   POST /api/plans                      {operation, serverId} -> immutable plan v1 (or typed blockers)
  *   POST /api/plans/:id/revisions        new version from current facts (material change)
  *   GET  /api/plans/:id                  latest version
@@ -14,7 +13,9 @@
  * never contacted to prepare a plan. Only simulated servers, injected in code,
  * can be approved and dispatched.
  *
- * Auth is the stub (D3). The owner is fixed until Cognito sessions (T-023).
+ * Auth (T-053): the global guard has already required a session for every
+ * route here, and an allowed Origin plus the session's CSRF token for every
+ * POST. The approving owner is taken from that session.
  */
 
 import { randomUUID } from "node:crypto";
@@ -32,7 +33,6 @@ import {
 } from "@servrsit/domain";
 import type { ApprovalRejection, CareStore, StoredOperation, TargetKind } from "@servrsit/store";
 import { Reconciler, TransportError, type WriteTarget } from "@servrsit/worker";
-import { CSRF_HEADER, type CsrfGuard } from "../csrf.js";
 
 export interface CareServer {
   readonly id: string;
@@ -51,8 +51,8 @@ export interface CareRouteOptions {
   readonly store: CareStore;
   readonly servers: () => readonly CareServer[];
   readonly targets: ReadonlyMap<string, WriteTarget>;
-  readonly csrf: CsrfGuard;
-  readonly owner: () => string;
+  /** The signed-in owner for this request (from the session the guard resolved). */
+  readonly owner: (request: FastifyRequest) => string;
   readonly now?: (() => Date) | undefined;
   readonly newId?: (() => string) | undefined;
   /**
@@ -60,6 +60,11 @@ export interface CareRouteOptions {
    * "not-checked" (tests, fixture mode) does not block.
    */
   readonly controllerClock?: (() => ControllerClock) | undefined;
+  /**
+   * T-078: receives the same plan builder the routes use, so other features
+   * (baseline setup) create canonical plans through one path.
+   */
+  readonly exposePlanner?: ((create: (request: PlanRequest) => Promise<{ plan: Plan; view: ReturnType<typeof planView> } | null>) => void) | undefined;
 }
 
 const STATUS: Readonly<Record<ApprovalRejection, number>> = {
@@ -194,9 +199,12 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     }
   }
 
-  fastify.get("/api/csrf", async (_request, reply) =>
-    reply.header("cache-control", "no-store").send({ token: o.csrf.token, header: CSRF_HEADER }),
-  );
+  o.exposePlanner?.(async (request) => {
+    const server = serverById(request.serverId);
+    if (server === undefined) return null;
+    const plan = await makePlan(newId(), 1, server, request);
+    return { plan, view: planView(plan, server) };
+  });
 
   fastify.post("/api/plans", { bodyLimit: 4096 }, async (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = PlanRequestSchema.safeParse(request.body);
@@ -237,7 +245,6 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
   });
 
   fastify.post("/api/plans/:id/approvals", { bodyLimit: 4096 }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
-    if (!o.csrf.check(request.headers)) return reply.code(403).send({ error: "CSRF_INVALID" });
     const parsed = ApprovalRequestSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply);
     const plan = o.store.getPlan(request.params.id);
@@ -281,7 +288,7 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
       planVersion: parsed.data.planVersion,
       planDigest: parsed.data.planDigest,
       idempotencyKey: parsed.data.idempotencyKey,
-      owner: o.owner(),
+      owner: o.owner(request),
       acknowledgements: parsed.data.acknowledgements,
       writesEnabled: server.writesEnabled,
       targetKind: server.kind,
@@ -303,7 +310,6 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
   // sent is cancelled before start; anything that may be on the target keeps going and the ledger
   // decides. Repeating it, or asking after the operation finished, is harmless.
   fastify.post("/api/operations/:id/stop-request", { bodyLimit: 1024 }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
-    if (!o.csrf.check(request.headers)) return reply.code(403).send({ error: "CSRF_INVALID" });
     const r = o.store.requestStop(request.params.id, "owner", now());
     request.log.info({ operationId: request.params.id, result: r.kind }, "care: stop request");
     if (r.kind === "not_found") return notFound(reply);
@@ -316,7 +322,6 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
   // toward the target: it can never start, retry or stop a mutation. A server whose writes are
   // disabled, or a real one, is never contacted.
   fastify.post("/api/operations/:id/reconcile", { bodyLimit: 1024 }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
-    if (!o.csrf.check(request.headers)) return reply.code(403).send({ error: "CSRF_INVALID" });
     const op = o.store.getOperation(request.params.id);
     if (op === null) return notFound(reply);
     const server = serverById(op.serverId);

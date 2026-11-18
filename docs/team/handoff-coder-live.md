@@ -1160,6 +1160,143 @@ Tester gate, their files unchanged (temporary copy, removed): zt01-real-hosts 12
 1. **Merge order:** `feat/coder/package-origins` contains T-061 and T-062 and does not depend on T-053, so it can merge before it. Both it and `feat/coder/owner-auth` append to this handoff file, so merging the second one has a trivial conflict at the end of the file: keep both sections.
 2. **Sentani's clock is 7 h slow.** Fixing it is a change on the server (time sync), which only the founder may authorize. ServrSit now corrects package ages for it and shows a warning.
 3. **Next in my queue:** T-054 through T-059 (not started). ZT-01 and the route inventory remain the standing gate.
+## T-053: local owner auth with mandatory TOTP (commit `2bfaa34`, branch `feat/coder/owner-auth`, rebased on `integration/live-v1` at `39ae4af`)
+
+Fixes Tester finding **F1**. Decision record: `docs/decisions/ADR-017-local-owner-auth.md`.
+
+**What it does:**
+
+- **One owner account.** The password is hashed with argon2id via `@node-rs/argon2` 2.2.2 (pinned, prebuilt, no install script): 19 MiB, 2 passes, 1 lane.
+- **TOTP is required before any session exists.** RFC 6238 via `otpauth` 9.6.0 (pinned), ±1 step. A time step is accepted once, and never one older than the last accepted step. The database enforces this with a conditional update.
+- **First run:** a one-time setup token is printed to the API's **stderr**, not the structured log, and stored as SHA-256. It works once, and a restart replaces it.
+  - `POST /api/auth/setup` returns the TOTP secret.
+  - `POST /api/auth/setup/confirm` with a valid code creates the owner, issues the session and returns 10 recovery codes (SHA-256 stored, shown once, each single use).
+- **Sessions** are opaque (32 random bytes, only SHA-256 stored). The cookie `servrsit_session` is HttpOnly, SameSite=Strict, Path=/, and Secure in production or over HTTPS. Limits: 60 minutes idle, 8 hours absolute.
+- **Global guard (`onRequest`):** every `/api` route, registered or not, returns 401 `{"error":"UNAUTHENTICATED"}` without a session. The 401 comes before CSRF, validation or 404.
+  - **Exceptions:** `/api/auth/{setup, setup/confirm, login, totp, session, logout}`, which check Origin themselves. `/health` stays open.
+  - **Every POST, PUT, PATCH or DELETE** also needs an allowed Origin and **this session's** `X-CSRF-Token`; otherwise 403 `CSRF_INVALID`.
+- **Brute force:** 10 auth requests per minute. From the 5th consecutive failure, sign-in locks for 30 s, doubling up to 15 min, and the right password is refused while locked. A sign-in ticket allows 5 code attempts.
+- **No disclosure:** an unknown user, a wrong password and "no account yet" all return the same 401 body, after the same argon2 cost.
+- **Storage:** `SqliteAuthStore` in `packages/store`, file `apps/api/.data/auth.db` (mode 0600, gitignored; `SERVRSIT_AUTH_DB` overrides the path). `buildServer()` without a store uses memory, so tests never touch `.data`, and auth is still enforced.
+- **Web data layer:** `apps/web/src/api/auth.ts` provides `getSession`, `startSetup`, `confirmSetup`, `login`, `verifySecondFactor`, `logout` and `csrfHeaders()`. The CSRF token is kept in memory only. `askAssistant` now sends the token.
+- **Removed:** the auth stub, `@fastify/session` and `SESSION_SECRET`, and the per-process `CsrfGuard`. `/api/csrf` now returns the caller's session token and requires a session.
+- **Not changed:** the dev server binding. `HOST` is still `127.0.0.1` in `src/index.ts`.
+
+**Tests:**
+
+- `apps/api/src/auth/auth.test.ts`, 18 tests:
+  - every route returns 401 (route-tree sweep); unauthenticated POST gets 401 before CSRF
+  - setup token single use; setup confirm; password alone gives no session
+  - wrong TOTP; replayed TOTP; older step refused
+  - no disclosure; lockout and doubling; second-factor lockout; rate limit; recovery codes
+  - cookie attributes, including Secure when configured
+  - idle and absolute expiry; logout needs CSRF; CSRF and Origin on two routes
+  - no secret in the log or the database file (also checks file mode 0600)
+- `apps/web/src/api/auth.test.ts`, 3 tests.
+- Existing API tests now sign in through the real flow (`src/auth/testing.ts`: `enrolOwner` and `signedInServer`; no bypass). `process.test.ts` now sends the auth database to a temp file. Before I fixed that, it had created a real `apps/api/.data/auth.db` in my worktree. The file held only a setup-token hash and no account, and I deleted it.
+
+**Mutation checks:** each change was made to the production file, the suite was run, and the file was restored and confirmed byte-identical with `cmp`.
+
+| Fault injected | Caught by |
+|---|---|
+| Replay allowed (store) | the replay test |
+| Guard skips `/api/plans` | the sweep and the unauthenticated-POST test |
+| No lockout | both lockout tests |
+| Idle limit ignored | the expiry test |
+
+In my first run, the three later mutations also showed a replay failure. The cause was my script: it did not rebuild the store's `dist` after restoring the first mutation. The final rebuild restored it, and 6 clean full runs passed 18 of 18.
+
+**Checks run (real output, after the rebase onto `39ae4af`):**
+
+```
+pnpm -r --workspace-concurrency=1 run test  -> exit 0
+  suites 9, 13, 40, 51 (web), 11, 140 (ai), 18, 148 (api); fail 0 everywhere
+typecheck: ai, contracts, domain, ssh, store, ui, api, web, worker, infra -> exit 0 each
+key scan of the staged diff -> clean; private-key headers 0; no .db or .data file staged
+apps/api/.data after the full run -> known_hosts only
+```
+
+**The Tester's standing gate, run against T-053** (their files copied in temporarily, run, then removed; nothing of theirs is committed):
+
+| Tester suite | Unchanged files | With `docs/team/t053-tester-gate.patch` |
+|---|---|---|
+| `auth/routes-401` (their F1 sweep) | **7/7 pass** | 7/7 |
+| `care-loop/zt01-real-hosts` (ZT-01 + route inventory) | fails at import (`CsrfGuard` removed) | **12/12 pass** |
+| `care-loop/care-loop` | fails at import | **36 pass, 5 fail, 1 not run**. Their baseline was 35/6/1. CL-02g (F1) now passes. The 5 failures are F2 (CL-04c), F3 (CL-07a–c) and F4 (CL-09a); CL-03e (F5) is still not run. These are T-054, T-055, T-059 and T-056. |
+| `care-loop/static-config`, `auth/totp`, both self-checks | pass | pass |
+
+**Why the gate cannot pass without a test change:**
+
+- **Requests without a session:** ZT-01 and the care-loop binding send plans and approvals with no session, which F1 forbids.
+- **New mutating routes:** the route inventory fails on purpose when a mutating route appears, and T-053 adds 5 auth POSTs (`login`, `logout`, `setup`, `setup/confirm`, `totp`). None of them touch a server or a care record.
+
+**The patch** (45 changed lines, `git apply --check` passes on `feat/tester/ai-auth`; checked, not applied):
+
+- signs the owner in through the real setup flow;
+- keeps one auth store across the binding's app rebuilds;
+- maps CL-02g's `session: "none"` to "no cookie";
+- adds the 5 auth routes to the reviewed inventory.
+
+The **Tester should review and apply it**, since those files are theirs.
+
+## Needs Orchestrator action (T-053)
+
+1. **Do not merge T-053 into the founder's running UI without a login screen.** After the merge, every `/api` call from the web UI returns 401 until Designer builds the setup and sign-in screens on `apps/web/src/api/auth.ts`. The founder's current instance (PID 458878, running from `/projects/servrsit`) is unaffected until it picks up this code.
+2. **First run on a real instance:** read the setup token from the API's stderr, which goes to `/tmp/api-dev.log` for the current watcher. Then `POST /api/auth/setup` and `/setup/confirm`. The recovery codes are shown once.
+3. **Tester:** review and apply `docs/team/t053-tester-gate.patch` so ZT-01 and the route inventory stay a standing gate.
+4. **ADR-017 limits:** TOTP secret stored in plain text in a 0600 file; no re-authentication flow; no reset except deleting `auth.db` on the host. Each must be resolved before hosted deployment or real writes.
+## T-061: target clock skew (commit `408f2e5`, branch `feat/coder/clock-skew`, from `integration/live-v1` at `39ae4af`)
+
+**How it works:**
+
+- **Measurement:** a new fixed collector section, `date +%s`, runs **first** in the read-only script and is on the reviewed allowlist in `script.test.ts`. It prints the time and cannot set it; setting needs `-s` or a date argument, plus root.
+  - Skew is the target epoch minus the midpoint of ServrSit's collection window.
+  - Uncertainty is half the window plus 1 s.
+  - The reading is stored as `host.clock`.
+- **Coverage:** `clock` is a counted check, so the total is now 16. An unreadable clock is "unavailable", never zero skew.
+- **Finding:** beyond 120 s after subtracting the uncertainty, `time.skew.v1` is a **warning** on the first observation: "This server's clock is about 7 h behind ServrSit's clock. Times the server writes itself, such as when it last refreshed package lists, are corrected for this. Check time synchronisation on the server."
+- **Ages from target timestamps:** the APT stamp is the only time the target writes. `packages.metadataClock` records how it was handled:
+  - `in-sync`: used as is;
+  - `corrected`: shifted by the measured skew;
+  - `unverified`: the clock could not be read, and the deterministic text says "this time may be wrong".
+  - The AI input carries `clock` and `packageListsClock`.
+- **Writes:** not wired to block anything yet. Real hosts are already `WRITES_DISABLED`, and simulated targets have no clock. The finding is the hook for Tech Spec §8.2's rule that skew blocks new changes, to be added with the planning precondition re-check (T-054).
+
+**Live evidence (one read-only collection, Sentani, 2026-11-17 22:08 UTC):** `skewSeconds -25202`, `uncertaintySeconds 4` (7 h 0 min 2 s slow), `metadataClock "corrected"`, coverage 16/16, `time.skew.v1` warning raised. This matches the Orchestrator's reading (14:27 against 21:27).
+
+## T-062: updates from outside Ubuntu's archive (commit `1405116`, branch `feat/coder/package-origins`, stacked on T-061)
+
+**How it works:**
+
+- **Classification:** each `Inst` line in the apt simulation is classified by origin.
+  - **Ubuntu's archive** is only `Ubuntu:NN.NN/<codename>`, `-updates` or `-security`.
+  - **Outside it:** backports, proposed, PPAs, ESM, mixed origins (for example `Ubuntu…, Docker CE:noble`) and lines that do not fully parse.
+- **Observation:** a new field `packages.pendingOutsideUbuntu` holds `{count, first 50 {name, origin}}`. Names and origins are validated, and a failure becomes `(unrecognised)`. `pendingCount` is unchanged (the total).
+- **Plans:** `scope.packages` holds only Ubuntu-archive changes, with no origin labels, so the manifest and verification are as before. `scope.excludedPackages` lists the rest with `reason: "outside-ubuntu-archive"`. If everything is excluded, the blocker is `ONLY_EXCLUDED_PACKAGES`. **A change with no origin is excluded.**
+  - The simulated target labels fixture upgrades without an origin as `Ubuntu:24.04/noble-updates` [SIMULATED], so existing simulated scenarios behave as before.
+- **"By default":** there is no way to include them yet. Adding one would need a reviewed plan option.
+- **Owner text:** the `packages.pending.v1` finding, the AI input (`pendingOutsideUbuntu`) and the deterministic text all name these updates. The fact check accepts "3 from Docker's repository, 0 from Ubuntu".
+
+**Live evidence (one read-only collection, Sentani):** `pendingCount 3`; `pendingOutsideUbuntu` count 3: `docker-ce-cli`, `docker-ce`, `docker-ce-rootless-extras`, all from `Docker CE:noble`. The finding text is as above. While writing the parser I also ran one in-memory probe that printed only Sentani's `Inst` lines, to learn the exact format. Nothing was saved.
+
+**Checks run (real output, at `1405116`):**
+
+```
+pnpm -r --workspace-concurrency=1 run test -> exit 0
+  suites 9, 16 (domain), 50 (ssh), 48 (web), 11 (store), 144 (ai), 18 (worker), 135 (api); fail 0 everywhere
+typecheck: ai, contracts, domain, ssh, store, ui, api, web, worker, infra -> exit 0 each
+key scan of staged diff -> clean (T-061 and T-062)
+Tester gate, their files unchanged (temporary copy, removed): zt01-real-hosts 12/12 (route inventory unchanged),
+  static-config 3/3, self-check 28/28, care-loop 35 pass / 6 fail / 1 not run = their baseline exactly
+```
+
+**Test fixtures changed** (needed by the contract change; all mine): the domain and store plan fixtures now carry an Ubuntu origin, and the API, AI and SSH observation fixtures carry `clock`, `metadataClock` and `pendingOutsideUbuntu`.
+
+**Needs Orchestrator action (T-061/T-062):**
+
+1. **Merge order:** `feat/coder/package-origins` contains T-061 and T-062 and does not depend on T-053, so it can merge before it. Both it and `feat/coder/owner-auth` append to this handoff file, so merging the second one has a trivial conflict at the end of the file: keep both sections.
+2. **Sentani's clock is 7 h slow.** Fixing it is a change on the server (time sync), which only the founder may authorize. ServrSit now corrects package ages for it and shows a warning.
+3. **Next in my queue:** T-054 through T-059 (not started). ZT-01 and the route inventory remain the standing gate.
 
 ## T-063: ServrSit checks its own clock (commit `9af148d`, branch `feat/coder/controller-clock`, from `integration/live-v1` at `8b29555`)
 
@@ -1183,6 +1320,18 @@ Tester gate, their files unchanged (temporary copy, removed): zt01-real-hosts 12
 - **Tests and fixture mode:** with `startChecks: false` or in fixture mode, the clock is `not-checked` and does not block. This is why the Tester's I/O-guarded ZT-01 still spawns and fetches nothing.
 
 **Live evidence (one read-only run on Merauke, local clock 2026-11-18T03:50Z):** `ntpSynchronized false`; google.com offset +25201 s and cloudflare.com +25201 s; `status untrusted`, `offsetSeconds 25201 ± 2`, basis `https-date`.
+## T-066: auth defects D-A1..D-A4 (commit `41676cc`, branch `feat/coder/owner-auth`)
+
+Details are in ADR-017, "Amended by T-066".
+
+- **D-A1 (rate limit):** counted only after the body is valid, per source. A source is the trusted-device cookie (`servrsit_device`, set after a full sign-in), or else the address.
+- **D-A2 (lockout):**
+  - per source: 30 s doubling to 15 min;
+  - account: locks only on 20 failures in 15 min, for 15 min, escalating to 4 h, reset by the owner's sign-in;
+  - **trusted devices are exempt from the account lock**;
+  - one failure at expiry no longer extends a lock.
+- **D-A3 / D-A3b (clock steps):** stored times implausibly in the future are stale, so locks are released, sessions end and tickets expire. A future TOTP step is clamped. **Enrolment is refused while ServrSit's own clock is untrusted** (`CLOCK_UNTRUSTED`, 409). With Merauke 7 h fast, setup now says so plainly instead of failing at the code step.
+- **D-A4 (setup token):** valid until enrolment is confirmed.
 
 **Checks run (real output):**
 
@@ -1282,3 +1431,463 @@ The new tests in `care.test.ts` use the pre-login harness (`CsrfGuard`, `care.cs
 - The real SSH write target still implements nothing; that is T-012 helper work.
 - Directory creation in the simulated target makes the leaf only and does not model parent creation or symlink checks. The real helper must use directory-fd operations (Tech Spec §8.3).
 - A stop request is recorded but not delivered to a running target, because `WriteTarget` has no stop channel.
+pnpm -r test -> exit 0 (api 176 incl. auth 18 + auth-t066 11, web 81, ai 145); typecheck all 10 exit 0; key scan clean
+Tester, current files (temporary copy, not committed):
+  auth-extra: the five todo tests X-05, X-14, X-17, X-18, X-19 now PASS
+  routes-401 7/7, zt01 12/12, static-config 3/3, care-loop 36/5/1 (unchanged; F2-F5)
+```
+
+**Tester tests that now conflict on purpose:** they recorded the old behaviour, or the opposite of the T-066 decision.
+
+| Test | Why it now fails | Suggested change |
+|---|---|---|
+| AU-04b "lock not bypassed by another address" | D-A2: locks are per source by decision. | Assert that the account lock holds after 20 failures across addresses, and that a trusted device is exempt. |
+| X-04 "anonymous caller can lock the owner out" | It recorded the defect, and the owner is no longer locked by 6 failures. | Invert it, or retire it. |
+| X-05b "garbage counts toward the limit" | D-A1: invalid bodies are not counted. | Use valid-shaped wrong logins from one address. |
+| X-17b "premise: stuck after the step back" | The step-back lock-out is fixed. | Retire it. |
+
+Please remove the `todo` markers on X-05, X-14, X-17, X-18 and X-19 so they guard the fixes (Tester-owned files).
+
+**Limits:**
+
+- The owner on a new, untrusted browser can still be held by an account lock driven from many addresses. Their trusted browsers are not affected.
+- Clamping treats a clock step back of more than 16 min as stale state. A smaller step back extends a lock by that small amount.
+- O-A3 (Secure cookies on plain-HTTP Tailscale in production mode) is not addressed. It needs a browser test.
+## T-069: server registration API (branch `feat/coder/server-registration`, from `integration/live-v1` at `9cfb554`)
+
+Commits: `37805b6` contract, `5610a48` implementation, `fa28545` CSRF interface for the owner-auth merge.
+
+**What it does.** The endpoints in `packages/contracts/src/servers.ts` now exist (`apps/api/src/routes/servers.ts`):
+
+1. **Draft.** The address is checked against Tech Spec §6.2 (`apps/api/src/servers/address.ts`). The draft holds no secret, records `duplicateOf` for an existing address and port, and probes TCP reachability.
+2. **Host key.** `ssh-keyscan` runs on the address that was just validated. It is read-only: a key exchange, no sign-in. The owner must type or compare the fingerprint, and it must match exactly. Only the confirmed key is written to that server's own `known_hosts`.
+3. **Access key.** `ssh-keygen` makes one ED25519 key per server in `apps/api/.data/server-keys/<id>/` (directory 0700, private file 0600). The code reads only `id_ed25519.pub`. The response holds `restrict,from="<controllerAddress>" ssh-ed25519 … servrsit-<name>` and never the private key or its path.
+4. **First check.** The fixed read-only collectors run with that key and that `known_hosts`. The result is reported as the contract's six steps, with ServrSit's own reason texts. A partial result can still be activated. A failure names the step that failed and marks the steps after it as not run.
+5. **Activate.** Refused while a server with the same address and port, or the same host key, is connected. Afterwards the fleet checks only the new server once, in live mode.
+6. **Rename/describe** (`PATCH`): name, role and production only. A `writesEnabled` field gets 400.
+7. **Disconnect.** Checks stop, and ServrSit's own key directory is deleted. The response always has `remoteKeyRemoved: false` and gives fixed steps for removing the line on the server. For an imported server, the owner's own key file is never touched (`controllerKeyDeleted: false`).
+
+**Registry.** `packages/store/src/servers.ts` (`SqliteServerStore`). The database itself enforces:
+
+- `writes_enabled` can only be 0;
+- server rows are never deleted;
+- a disconnected server cannot change;
+- names and address+port are unique among connected servers;
+- events are append-only.
+
+`hosts.json` is imported **once**, when the registry is empty. After that its host list is not read. The registry file is `apps/api/.data/servers.db` (or `SERVRSIT_REGISTRY_DB`). The fleet service, the care routes and the assistant now read servers from the registry on every pass.
+
+**Config.** `hosts.json` has a new optional `registration` block. I did not edit the real file. Defaults: port 22 only, public addresses allowed, no enrolled route, no controller address. **To register the founder's Tailscale servers, the founder must set** `registration.enrolledRoutes: ["100.64.0.0/10"]` and `registration.controllerAddress` (Merauke's Tailscale address). Without `controllerAddress` the access-key step returns 409.
+
+**Web client.** `apps/web/src/api/servers.ts` has the Designer stub's interface plus `updateServer` and `disconnect`. On owner-auth, pass `createServersClient({ csrf: { headers: async () => csrfHeaders() } })`, because the default reads `/api/csrf`. Extra error kinds: `TIMEOUT`, `CSRF_INVALID` (one retry with a fresh token), `UNAUTHENTICATED`.
+
+**Checks run:**
+
+```
+pnpm -r --workspace-concurrency=1 run test   exit 0: api 172, ai 156, web 83, ssh 50, store 19, worker 18, domain 17, infra 9
+typecheck: all 9 packages exit 0      key scan: clean      no private-key text in the diff
+```
+
+**Scratch merge with `feat/coder/owner-auth`** (throwaway worktree, removed):
+
+- API: 201/201.
+- Tester gates: `auth` 37/37, `auth-t066` 12/12, `auth-extra` 21/21, `routes-401` 7/7, `static-config` 3/3.
+- `zt01-real-hosts`: 12/13. **The route inventory test fails on purpose** because the eleven `/api/servers/...` routes are new. **The Tester must review and add them.** "Nothing started a process, opened a socket or resolved a name" still passes.
+- `care-loop`: 36/42. That is the same six failures (CL-03e, 04c, 07a–c, 09a) as `owner-auth` alone. They are fixed on `feat/coder/care-gaps`.
+
+**Merge notes (with owner-auth):**
+
+- `server.ts`: register `serverRoutes` with `csrf: null`, because the global guard checks session, CSRF and Origin. Use `owner: request.authSession.info.username`, as for care. Delete the `new CsrfGuard()` line.
+- `contracts/index.ts`: export both `auth.js` and `servers.js`.
+- `index.ts`: keep both stores.
+- `care.test.ts`: the writesEnabled test keeps the owner cookie on all four requests.
+- `servers.test.ts`: needs `setupTokenSink` + `enrolOwner`. The CSRF test then expects 401 without a session and 403 with a session but a bad token or Origin. I ran exactly this version.
+
+**Limits:**
+
+- **Keys are files on the controller,** not in Secrets Manager. AWS is not authorised. The key is not passphrase-protected, so the collector can run unattended. I did not add a core-dump limit for `ssh-keygen`.
+- **ssh resolves names itself after the policy check** (same limitation as before). The pinned key is the backstop.
+- **Identity is address+port and host key only.** Machine-id identity (T-056) is on `care-gaps`. Combine them when both merge.
+- **Not exercised against any real server.** Every scan, probe and collection in the tests is injected. Real `ssh-keygen` runs only in temporary directories.
+- **The first check's observation is not kept;** the fleet collects again right after activation.
+
+Next: T-076.
+
+## ADR-019: `integration/next` (= `integration/live-v1` at `7064f7e` + `feat/coder/owner-auth` + `feat/coder/server-registration`)
+
+Two merge commits. The conflicts were resolved like this:
+
+- **Auth guard on every route.** `apps/api/src/server.ts`: the T-053 guard (`installAuthGuard`) runs first and checks session, CSRF and Origin for every `/api` route. That includes care (`/api/plans`, `/api/operations/...`) and registration (`/api/servers/...`). `CsrfGuard` and `/api/csrf` are gone. Care and server routes take the owner from `request.authSession`. Server routes get `csrf: null` because the guard already checks.
+- **Clock.** The `ControllerClockMonitor` wiring (T-063) is kept. It feeds plans and approvals (`CONTROLLER_CLOCK_UNTRUSTED`) and the enrolment gate (`CLOCK_UNTRUSTED`, T-066).
+- **Fleet.** `FleetService` reads hosts from the registry. The T-056 machine-id comparison now runs over the registry's hosts.
+- **Care servers.** They come from the registry and keep `selectedServices` and `user` (T-059).
+- **Contracts index.** Exports both `auth.js` and `servers.js`.
+- **Entry point.** `index.ts` opens both stores: `auth.db` and `servers.db`.
+- **Tests.**
+  - The T-054..T-059 tests in `care.test.ts` and all of `servers.test.ts` now sign in with `setupTokenSink` + `enrolOwner`.
+  - The registration test now expects 401 without a session, and 403 with a session but a bad token or Origin.
+- **Web client.** `apps/web/src/api/servers.ts` now sends the session token from `./auth` (`csrfHeaders()`) by default. After a `CSRF_INVALID` it re-reads the session once.
+
+**Checks on `integration/next`:**
+
+```
+pnpm -r --workspace-concurrency=1 run test   exit 0
+  api 215, ai 156, web 87, ssh 51, domain 22, store 20, worker 19, infra 9
+typecheck: all 9 packages exit 0
+Tester suites (temporary copy of /projects/servrsit-tester @ 1c9d5a7, not committed):
+  auth 37/37, auth-t066 12/12, auth-extra 21/21, totp 5/5, auth self-check 29/29, routes-401 7/7
+  care-loop static-config 3/3, self-check 28/28, care-loop 41/42 (CL-09a: their binding lacks the T-059 kinds, known)
+  zt01-real-hosts 12/13 as committed. The route inventory fails on purpose: the 9 mutating /api/servers routes are new.
+```
+
+**The Tester must review and add these 9 routes to ZT-01's `expected` list:**
+
+- `DELETE /api/servers/drafts/:id`
+- `PATCH /api/servers/:id`
+- `POST /api/servers/:id/disconnect`
+- `POST /api/servers/drafts`
+- `POST /api/servers/drafts/:id/{host-key, host-key/confirm, access-key, first-check, activate}`
+
+Also compare the lists sorted on both sides (`[...expected].sort()`). With that change in my temporary copy, ZT-01 passes 13/13, including "nothing started a process, opened a socket or resolved a name". None of these routes can write to a server. They act on drafts, the registry and ServrSit's own key files. Their only server contact is the read-only key scan and first check.
+
+From here, T-076..T-079 are based on `integration/next`.
+
+## T-076: findings and scheduler API (branch `feat/coder/findings`, from `integration/next`)
+
+**Contract:** `packages/contracts/src/findings.ts`. The routes are `GET /api/findings`, `POST /api/findings/:id/acknowledge`, `POST /api/findings/:id/snooze {for: 1h|1d|1w}`, `GET /api/scheduler`, `POST /api/scheduler/pause {reason?}` and `POST /api/scheduler/resume`. The owner-auth guard covers all of them.
+
+**How findings behave** (`apps/api/src/findings/tracker.ts`, `packages/store/src/findings.ts`):
+
+- **One record per issue.** Each server and finding key (for example `disk:/srv`) has at most one open record. The database enforces this. A repeat detection updates the open record; a recurrence after resolution opens a new one.
+- **When a finding resolves.** A finding resolves only when a successful, fresh check covered it and no longer showed it. `RULE_EVIDENCE` maps each rule to the check it depends on. For example, `disk.usage.v1` needs `filesystems`, and `connection.unreachable.v1` needs a successful attempt. `resolvedBy` names the check with its time.
+- **Not-rechecked.** A finding becomes `not-rechecked`, never resolved, when the checks fail, the data is stale, the covering check was unavailable, or the rule is unknown.
+- **Acknowledge and snooze** never resolve. A resolved record refuses both with 409 `NOT_ALLOWED`. The Designer stub also refuses acknowledging a `not-rechecked` finding; the API allows it.
+- **Retention.** Resolved records stay in the list for 7 days. Records are never deleted, and their events are append-only.
+- **Recording.** Findings are recorded after every fleet pass (the new `onPassComplete` option) and on every `GET`.
+- **Fixture mode** keeps its `[FIXTURE DATA]` findings in memory only, and reports the scheduler as `unavailable`.
+- **No email alerts.** `externalAlerts.available` is always `false` in Stage A, as FR-20 requires.
+
+**Scheduler** (`FleetService.pause/resume/schedulerState`):
+
+- **Pause** stops new passes. A pass already running finishes. While paused, the single-server check after a server is added is skipped too.
+- **Resume** runs one current check, then returns to the normal interval. Missed runs are not replayed (FR-19).
+- **Persistence.** The pause is stored in the new `SqliteSettingsStore`, which has an append-only history, so it survives a restart.
+- **Delayed** means the next run is more than 60 s overdue, or a pass has run longer than one interval.
+
+**New files:** `.data/findings.db`, `.data/settings.db` (both gitignored).
+
+**Web:** `apps/web/src/api/findings.ts` keeps the stub's interface: `list`, `acknowledge` and `snooze`, with errors as plain codes. It adds `scheduler`, `pause` and `resume`. `apps/web/src/api/http.ts` is a shared transport used by T-076..T-079; it sends the session CSRF token and retries once after `CSRF_INVALID`.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 221, ai 156, web 90, ssh 51, store 24, domain 22, worker 19, infra 9; typecheck all 9 exit 0
+Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, static-config 3/3,
+  care-loop 41/42 (CL-09a, known), zt01 12/13 as committed; 13/13 with the reviewed list below
+```
+
+**For the Tester:**
+
+- **New mutating routes for ZT-01:** `POST /api/findings/:id/acknowledge`, `POST /api/findings/:id/snooze`, `POST /api/scheduler/pause`, `POST /api/scheduler/resume`. These come on top of the nine T-069 routes. None of them can reach a server.
+- **Your current branch.** On `feat/tester/server-registration` (`75c2c61`), `care-loop` is 6/41 and `auth` is 36/37 (AU-04b). The result is identical on `integration/next` without T-076. Those files predate the T-057 acknowledgement mapping and the T-066 per-source lock. Your `1c9d5a7` versions pass.
+
+Next: T-077.
+
+## T-077: activity history and export (branch `feat/coder/activity`, from `integration/next`)
+
+**Contract** (`packages/contracts/src/activity.ts`):
+
+- `GET /api/activity?type=&server=&result=&from=&to=&q=&limit=` lists the history.
+- `POST /api/exports` creates an export.
+- `GET /api/exports` lists exports that have not expired.
+- `GET /api/exports/:id/download` returns the file as an attachment, or 410 once it has expired.
+
+**Records** (`apps/api/src/activity/history.ts`):
+
+- **Operations** come from the care store (new `CareStore.listOperations`). Each has a fixed title and outcome text per state. Failed, cancelled and unknown outcomes are included. `simulated: true` marks operations on a simulated target.
+- **Findings** give one record when opened and one when resolved. The resolved record says which check resolved it.
+- **Health checks**: one record per finished attempt, kept in the new `SqliteActivityStore`. Each holds the result, how many checks ran, or a fixed failure text. Nothing from server output is kept: a test plants a raw stderr string, and it does not appear.
+
+**Exports:**
+
+- Built on the server from the same records, with times in the requested IANA time zone.
+- Scrubbed for known secret values with the same scrubber used for logs and responses. A test plants a secret in a finding summary; the export does not contain it.
+- Stored until expiry and never edited.
+
+**Retention** (FR-21 proposal):
+
+- Health-check records: 30 days, then pruned.
+- Operations and findings: 90 days shown in the list. They are never deleted.
+- Exports: 7 days.
+
+**New file:** `.data/activity.db` (gitignored). Health checks are recorded after every fleet pass, and also before each read of the activity list.
+
+**Web:** `apps/web/src/api/activity.ts` keeps the stub's `list`, `createExport` and `listExports`. Two things differ because the server now builds the file:
+
+- An export result has `downloadUrl` in place of `content`, and the new `download()` fetches the file.
+- The stub's second argument to `createExport` (the records) is still accepted, but only their ids are sent.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 226, ai 156, web 93, ssh 51, store 26, domain 22, worker 19, infra 9; typecheck all 9 exit 0
+Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a, known),
+  zt01 13/13 with the reviewed list (T-069 x9, T-076 x4, plus POST /api/exports)
+```
+
+**For the Tester:** add `POST /api/exports` to ZT-01's list. It reads only ServrSit's own records and never contacts a server.
+
+Next: T-078.
+
+## T-078: baselines, comparison and setup plans (branch `feat/coder/baselines`, from `integration/next`)
+
+**Contract** (`packages/contracts/src/baselines.ts`):
+
+- `GET /api/baselines/servers`
+- `GET /api/baselines`
+- `GET /api/baselines/candidates?reference=`
+- `POST /api/baselines` (new baseline, or the next version when `baselineId` is set)
+- `GET /api/baselines/:id`
+- `POST /api/baselines/:id/compare`
+- `PUT` and `DELETE /api/baselines/:id/exceptions...`
+- `GET /api/baselines/:id/history?target=`
+- `POST /api/baselines/:id/setup-plan`
+
+**New read-only inventory** (`packages/ssh/src/inventory.ts`). It runs only when the owner asks for candidates or a comparison, never on the schedule, and goes through the same check queue (`FleetService.exclusive`). It uses the same transport and pinning rules as the health check: an unpinned host is never contacted. The fixed script lists:
+
+- directories under `/srv` (two levels deep) and the login user's home (one level, not hidden), with owner, group and mode, using `find -printf`;
+- installed packages and versions, using `awk` on `/var/lib/dpkg/status`;
+- which installed versions appear in Ubuntu's own archive lists, using `awk` on `/var/lib/apt/lists/*ubuntu.com_ubuntu_dists_*_Packages`.
+
+The script uses no sudo, writes nothing, has no pipes and no `-exec`, and does no network access. A reviewed-allowlist test covers it, like the collector. On Merauke it read 705 installed packages, 703 of them confirmed from Ubuntu's archive, in about 1.7 s. That run was local and read-only. **I did not run it on any remote server.** On a server with a mirror outside `*.ubuntu.com`, no package can be confirmed, and the response says so.
+
+**Rules:**
+
+- **Candidates.** A directory is eligible only if `directoryAllowed` would accept creating it: under `/srv` or `/home/<user>`, plain path, no setuid/setgid/sticky bit, not world-writable. A package is eligible only if its installed version is in Ubuntu's archive. Every ineligible item carries a reason.
+- **Home conventions** are stored relative to the home, with the owner and group recorded as the login user. They are then compared against the target's own user and home.
+- **Comparison** reports `matches`, `missing`, `conflict`, `different-by-design` (marked intentional) or `not-checked` (part of the listing could not be read). It copies and deletes nothing.
+- **Exceptions** change only their own record. Every mark and removal goes into an append-only history.
+- **Setup plan.** It holds only the missing directories (at most 20, parents first) and is built by the same care planner (`exposePlanner`) as every other plan, as `prepare.directories.v1`. A server with writes disabled gets a plan blocked `WRITES_DISABLED`. The response lists everything else under `notIncluded`, with reasons.
+
+**Not done, Orchestrator decision needed:**
+
+- **Package installation from a baseline is not implemented.** There is no install operation (`install.packages.v1`) in the catalog, the worker or the simulated target. Missing packages are reported with "Installing packages is not a supported operation yet". Adding that operation is a new write capability and needs its own task and review.
+
+**New file:** `.data/baselines.db` (gitignored).
+
+**Web:** `apps/web/src/api/baselines.ts` keeps the stub's methods and return shapes. It adds `listBaselines`, `candidatesResponse` and `comparison`, which return the full responses with source, time and notes.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 232, ai 156, web 96, ssh 56, store 27, domain 22, worker 19, infra 9; typecheck all 9 exit 0
+Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a, known),
+  zt01 13/13 with the reviewed list (adds POST /api/baselines, /:id/compare, PUT and DELETE /:id/exceptions, /:id/setup-plan)
+```
+
+**For the Tester:**
+
+- **ZT-01 review.** Of the new routes, only `setup-plan` produces something that could later change a server, and it goes through the existing plan and approval path, so the hard gate still applies. Compare and candidates contact a server read-only.
+
+Next: T-079.
+
+## T-079: settings API (branch `feat/coder/settings`, from `integration/next`)
+
+**Contract** (`packages/contracts/src/settings.ts`):
+
+- `GET /api/settings`
+- `PUT /api/settings/schedule {intervalMinutes 5|15|30|60, dailyTime, timeZone}`
+- `POST /api/settings/schedule/pause {paused}`
+- `PUT /api/settings/ai {enabled}`
+- `GET /api/servers/:id/disconnect-preview`
+
+**Behaviour:**
+
+- **Schedule.** Saving takes effect at once: `FleetService.setIntervalMinutes` restarts the timer without an extra pass, and `setOwnerTimeZone` changes the zone used by the fleet and the assistant. The schedule is stored with history and survives a restart. A saved schedule takes priority over `hosts.json`.
+- **`dailyTime` is stored but not used yet** (`dailyTimeInEffect: false`). Every check runs at the interval, because there is no separate daily deep check.
+- **Pause** is the same persisted pause as `/api/scheduler/pause` and `/api/scheduler/resume`, through the shared `pauseScheduler` and `resumeScheduler` helpers.
+- **AI on/off.**
+  - Turning AI off switches the assistant to answers built only from the checks at the next message. A test confirms the model is called while AI is on and not called after it is turned off.
+  - AI cannot be turned on unless a provider is configured (409 `NOT_ALLOWED`).
+  - The response describes the provider, the host it reaches, and what is sent. It never includes the key: the entry point passes `describeAi(ai.config)`.
+- **Disconnect preview** lists queued or active work on the server. Disconnect itself is still refused while work is unresolved (T-069).
+- **Retention** (30, 90 and 7 days) is shown and cannot be edited.
+
+**Web:** `apps/web/src/api/settings.ts` has the stub's six methods. Errors are the contract's codes; the stub's `INVALID` is now `INVALID_INPUT`.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 238, ai 156, web 98, ssh 56, store 27, domain 22, worker 19, infra 9; typecheck all 9 exit 0
+Tester @1c9d5a7: auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a, known),
+  zt01 13/13 with the reviewed list (adds PUT /api/settings/schedule, POST /api/settings/schedule/pause, PUT /api/settings/ai)
+```
+
+Next: T-081.
+
+## T-081: registration defects (branch `feat/coder/registration-fixes`, from `integration/next`)
+
+These are the fixes for the Tester's report `test-report-registration-001` (on `feat/tester/server-registration`).
+
+- **R-1: production is now yes / no / not sure.** Requests keep `production` (true or false) and may add `productionStatus`. If both are sent they must agree; otherwise the request gets 400.
+  - "Not sure" is stored as `production = 1`, so the fleet, plans and approvals treat it as production everywhere. It needs the production acknowledgements, and a test checks this.
+  - Drafts and the PATCH response carry `productionStatus`. It is optional in the schema only so the Designer's existing fixtures still parse.
+  - The registry gets a `production_status` column through an in-place migration. Older rows derive the value from `production`.
+- **R-2: privilege check** (`packages/ssh/src/privilege.ts`).
+  - **What it runs:** exactly `sudo -n -l` as the login user. It lists the account's sudo rules, runs nothing as root, never prompts and never gives a password. There is no `sudo -n true` and no other sudo form; a script test checks the exact command.
+  - **When:** only in the first check of a new server, after a successful collection. It is never part of the 15-minute health check, whose no-sudo test is unchanged.
+  - **Disclosure:** `PRIVILEGE_CHECK.disclosure` in the contract. It mentions the auth-log entry and the possible email to the server's administrator. The check appears as the step "Checking sudo rules (sudo -n -l)" from the start of the check.
+  - **What is reported:** only a classification, never the output. `FirstCheck.privilege` is `{level: no-sudo-rules | passwordless-sudo | unknown, broad, summary}`. Passwordless sudo for every command (`(ALL) NOPASSWD: ALL` and similar) is `broad`, and the step's reason carries a warning. "A password is required" is `unknown`.
+  - **A failed check** marks the step unavailable and leaves `privilege` null. It never blocks the server.
+  - **Test fixtures** are recorded-style `sudo -n -l` outputs.
+- **D-R3: abandoned drafts.** Expired drafts and their private keys are now swept at start-up and every 15 minutes (`ServerRegistry.startSweeper`), and still on each new draft.
+- **D-R2: re-registering an existing server** under its own name now returns a draft whose `duplicateOf` names that server. It used to get a name error.
+- **D-R1: very long ids** (Fastify `maxParamLength: 2048`) now get the contract's 404 (`SERVER_NOT_FOUND` / `DRAFT_NOT_FOUND`). The path is no longer echoed.
+- **O-R1:** a rescan refused after confirmation now tells the owner to delete the draft and start again if the key changed.
+- **Not changed:** R-5 (disconnect reporting running work). Disconnect is still refused while any operation is unresolved, and `GET /api/servers/:id/disconnect-preview` (T-079) lists that work.
+
+**For the Tester:** the privilege check has a seam, `servers.privilegeProbe`, next to `servers.collector`. A binding must inject it. **Without it, the default runs real `/usr/bin/ssh`.**
+
+**For the Designer:**
+
+- To offer "Not sure", send `productionStatus: "not_sure"` with `production: true`.
+- Show `PRIVILEGE_CHECK.disclosure` before the first check starts, and show `FirstCheck.privilege.summary` after it, with the warning when `broad`.
+- `src/fixtures/serversFixture.ts` can add `productionStatus` and `privilege` when convenient. Both are optional in the schema.
+
+**Process note:** one local test run, before the probe seam existed, used the default privilege probe. That run spawned `/usr/bin/ssh` toward the synthetic test addresses `100.101.102.103` and `100.101.102.104` with freshly made keys that no server knows. No real server was registered or authorised for those keys. The addresses are fixtures in the Tailscale range. If a device holds one of them, it saw a failed public-key sign-in. Since the seam was added, every test injects the probe.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 242, ai 156, web 198, ssh 61, store 28, domain 22, worker 19, infra 9; typecheck all 9 exit 0; web build ok
+Tester @1c9d5a7: auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a, known), zt01 13/13 with the reviewed list
+```
+
+Next: T-082 (care client), then merge `feat/designer/t080` again.
+
+## T-082: real care client (branch `feat/coder/care-client`, from `integration/next`)
+
+**What:** `apps/web/src/api/care.ts` keeps the Designer stub's `CareClient` interface and result shape (`{ok:false, kind, status?, code?}`). It adds:
+
+- `createActionPlan`, for the restart, reboot and prepare-directories kinds;
+- `requestStop`, whose result says `stop: requested | cancelled | already-final`;
+- `reconcile`;
+- `newIdempotencyKey()`.
+
+**Rules it follows:**
+
+- **CSRF:** every POST carries the session's CSRF token from `./auth`. A `CSRF_INVALID` reply re-reads the session and retries once.
+- **Idempotency:** each approval carries an idempotency key. Keep the same key when retrying one decision, and the API returns the same operation (`replayed`).
+- **Error codes:** only known codes are passed on, and `PLAN_BLOCKED` comes with its blocker codes. Response bodies are never shown.
+- **Plan kinds:** only the four catalog kinds are accepted. Non-package plans get `scope.packages: []`, and their own scope is in `detail`.
+- **Simulated work:** `simulated` is required on every operation, so simulated work is always labelled.
+
+**Checks:**
+
+- **Client tests:** 5/5 web tests.
+- **Against the real API:** a throwaway script (not committed) ran the client's own parsers on real API responses for every kind on a `[SIMULATED]` server, plus a real-host package plan, approve, get operation and stop request. All of them parse.
+- **Fastify warning fixed:** `maxParamLength` (T-081) now goes through `routerOptions`, which removes the FSTDEP022 deprecation warning.
+
+**For the Designer:** move the Plan review and operation screens from `stubs/care.ts` to `../care` (same names). `PlanView.verification` is now a loose record (it still has `expectInstalled`), and the old `prepare` field is gone. For a setup plan, use `detail.directories`, `detail.existing` and `detail.requested`.
+
+## T-083: target helper, BUILD ONLY (branch `feat/coder/target-helper`, from `integration/next`)
+
+**Not installed anywhere.** Nothing was copied to, installed on or run on Sentani, Nabire, Timika or Merauke. No sudo was used. No container was used: none is available without sudo, so the tests run directly with `python3 -m unittest` against fake paths.
+
+**What it is** (`target-helper/`, Python 3.12, standard library plus Ubuntu's `python3-cryptography` and `python3-apt`; nothing from pip):
+
+| File | What |
+|---|---|
+| `servrsit_helper/canonical.py` | Canonical JSON, byte-identical to `canonicalJson()` / `digestOf()`. It refuses floats and non-ASCII keys rather than guessing. |
+| `signature.py` | Root-owned `trust.json` with public keys by key id. Verifies Ed25519 or RSA-PSS/SHA-256 (ADR-020). Refuses an unknown key id or algorithm, and a trust file that is a symlink, not owned by root, or writable by group or others. |
+| `schema.py` | Fixed request and manifest schemas: exact keys and types, bounded sizes, allowlisted operation ids. Units, packages, versions, accounts, modes and paths follow the same rules as `packages/domain/src/actions.ts`. |
+| `ledger.py` | One record per operation in a root-only directory. The claim is atomic (`O_CREAT\|O_EXCL` under `flock`). The same id with the same digest returns the existing record; another digest gets `DIGEST_MISMATCH`; a second unresolved mutation gets `TARGET_BUSY`. Finished records are final. Writes go to a temp file, fsync, then rename, then the directory is fsynced. `O_NOFOLLOW` throughout. |
+| `paths.py` | Directory creation walks each component by file descriptor (`O_NOFOLLOW\|O_DIRECTORY`), creates only the last component, and sets owner and mode with `fchown`/`fchmod`. An existing path is left as it is. |
+| `adapters.py` | One adapter per operation. Each verifies its result independently, so an exit code of 0 is never success on its own. Precondition digests use the same rules as the simulated target. `RealSystem` is the only code that touches the machine: fixed argument vectors, no shell, `python3-apt`, and `systemd-run --unit=servrsit-op-<id>` for the runner. |
+| `helper.py` | `submit` checks, in order: signature, schema, installation and host-key binding, allowed unit, ledger replay (before expiry, so a replay after expiry still returns the existing operation), clock skew and expiry, precondition, then claim and start of the runner. `query.operation.v1` reads the ledger, and settles a reboot once it sees a new boot id. |
+| `runner.py` | Started only through systemd-run, so it outlives the SSH session (invariant 6). It rechecks the precondition, never acts twice, and records the verified outcome. |
+| `gateway.py` | The forced SSH command. It ignores `SSH_ORIGINAL_COMMAND`, reads one bounded request, checks it, and calls exactly `/usr/bin/sudo -n -- /usr/lib/servrsit/bin/servrsit-helper` with the same bytes. It never shows the helper's own output on failure. |
+| `packaging/sudoers.in` | `<account> ALL=(root) NOPASSWD: /usr/lib/servrsit/bin/servrsit-helper ""` (no arguments), plus `env_reset, !setenv`. |
+| `packaging/bootstrap.sh` | Reviewable, run by the owner as root. In order: Ubuntu 24.04 and dependency check, SHA-256 check, files, account (only with `--create-account`), one forced-command key line, then sudoers via `visudo -c -f` before install and `visudo -c` after (the rule is removed again if that fails). `--dry-run` changes nothing. |
+| `packaging/uninstall.sh` | Removes the sudoers rule and ServrSit's one key line, and verifies both are gone. Removes `/usr/lib/servrsit` and `/etc/servrsit`. Keeps the ledger unless `--remove-ledger`. |
+| `packaging/build.sh` | Reproducible tarball plus `.sha256`. |
+| `README.md` | Disclosure for the owner and the Designer: files, owners, modes, dependencies and removal. |
+
+**Signing key:** ADR-020 in `docs/decisions/decision-log.md`. Local Ed25519 until KMS. The helper also accepts RSA-PSS/SHA-256, so moving to KMS is a trust-file change.
+
+**Checks (real output):**
+
+```
+$ cd target-helper/tests && PYTHONPATH=..:. python3 -m unittest
+Ran 51 tests in 1.075s
+OK
+
+$ PATH=<dir of logging stubs for sudo, systemctl, systemd-run, apt, apt-get, useradd, userdel, install, ssh, scp>:$PATH python3 -m unittest
+OK
+guarded calls: (none)
+
+$ pnpm -r --workspace-concurrency=1 run test     exit 0 (target-helper 51, api 242, web 209, ai 156, ssh 61, store 28, domain 22, worker 19, infra 9)
+typecheck: all 9 TS packages exit 0
+$ visudo -c -f <rendered sudoers.in>   parsed OK      (a broken copy: syntax error, rc=1)
+```
+
+**What the tests cover:**
+
+- **Cross-language vectors:** canonical text, digest, Ed25519 and RSA-PSS signatures made by Node, all checked in Python.
+- **Signatures:** invalid, tampered, under the wrong key id, unknown key, garbage base64.
+- **Replay** (including after expiry), digest mismatch, misbinding, expiry, clock skew, unsupported schema or operation, precondition change, busy target.
+- **Injection strings** in units, paths and packages, extra `command` fields, oversized and deeply nested requests, path traversal in the operation id.
+- **A trust file writable by others** is refused.
+- **Runner:** never acts twice; exit 0 alone is not success; the precondition is rechecked; reboot is settled by a new boot id; finished records are final.
+- **Symlinks:** at the parent, at the final path, and a parent swapped for a symlink mid-walk (simulated race). None of them is followed, and nothing is created outside the root.
+- **Ledger:** 12 racing processes for one id give exactly one acceptance; racing different digests give one acceptance and 5 mismatches; symlinked records and open directories are refused; a crash leftover does not block updates.
+- **Gateway:** ignores the SSH command; invalid requests never reach sudo.
+- **Sources:** no shell, `eval`, `exec`, `pickle` or dynamic import; only standard-library modules, `cryptography` and `apt` are imported.
+- **Scripts:** syntax, nothing fetched, reproducible build. Bootstrap's dry run puts the checksum check before any install and `visudo -c -f` before the sudoers install. A wrong checksum aborts before anything is installed; bad inputs and other Ubuntu releases are refused. Uninstall's dry run keeps the ledger and the account.
+
+**A defect the tests found and I fixed:** bootstrap checked each option with `grep -E`, which matches line by line. A value with a line break (for example a second key line) could pass. Every option value must now be a single line, and the same check is in uninstall.
+
+**Limits:**
+
+- **Not proven by these tests: APT, systemd and reboot behaviour.** No test runs `RealSystem`'s mutating methods, as root, or on Ubuntu with real packages. That needs the disposable-target gate (T-012).
+- **`plan.packages.v1` (the package preview) is not built.** The helper's package precondition digest is `digest_of({"installed": {name:arch: version}})`, and the controller's preview must use the same function when it lands.
+- **The controller side does not exist yet.** There is no persistent signing key and no SSH write target that speaks this protocol; `SshWriteTarget` still refuses every write.
+- **pytest is not installed on Merauke,** and pip from the internet is not allowed. The tests are unittest-based and pytest can collect them (`tests/conftest.py`).
+
+**For the Orchestrator:** review ADR-020 and D-HELPER-01. Bootstrap installs persistent files on managed servers, so it needs the founder's acceptance before T-012.
+
+## T-084: helper defects from test-report-helper-001 (branch `feat/coder/helper-fixes`, from `integration/next`), BUILD ONLY
+
+| ID | Fix |
+|---|---|
+| **D-H2** (Medium) | `ledger.claim()` now writes the first record by temp file + fsync + rename, under the lock, like every other write, so no reader can see half a record. `get()` reads under the lock. A record that cannot be parsed raises `UnreadableRecord`. `unresolved()` counts such a record as unresolved, so no new change is accepted while it exists (fail closed). `handle()` turns it into `HELPER_UNAVAILABLE` with a fixed reason. Nothing crashes. |
+| **D-H3** (Medium) | Root no longer writes inside the account's home. The key line is added by `account-add-key.sh` and removed by `account-remove-key.sh`, both run **as the account** (`runuser -u <account> -- /bin/sh -s`, with the script on stdin, so the account never reads root's temporary directory). Both scripts refuse a symlinked home, `.ssh` or `authorized_keys`, and anything the account does not own. Bootstrap also refuses a symlinked `.ssh` before starting. |
+| **D-H1** (Low) | A new `schema.parse_request()` is used by both the gateway and the helper. It catches every way `json.loads` can fail, including the `ValueError` Python raises for integers over 4300 digits, and also refuses NaN/Infinity. The reply is always `INVALID_REQUEST`, never a traceback. |
+| **D-H4** (Low) | `sudoers.in` and both account-side key scripts are now inside the checksum-verified package. Bootstrap reads them only from there and stops if one is missing. In a dry run it prints the rule taken from the package. |
+| **D-H7** (Low) | Before removing anything, uninstall lists ledger records that are not finished and any `servrsit-op-*` units. If there are any, it stops, unless `--force`; with `--force` it always keeps the ledger. |
+| D-H5 (Info) | Duplicate JSON keys are refused at every level. The Tester's strict-xfail H04b now passes, so that test should become a plain test. |
+| D-H6 (Info) | A new directory's emptiness is checked by listing it, not by link count (btrfs reports 1). |
+| O-1 | A manifest whose acceptance window is longer than 30 minutes gets `EXPIRED`, with a reason. |
+
+**Checks:**
+
+```
+$ cd target-helper/tests && PYTHONPATH=..:. python3 -m unittest
+Ran 66 tests in 1.673s
+OK                                    (51 before + 15 new in test_t084.py)
+  concurrency tests (16 threads x 10 rounds, process races) repeated 10 times: 10/10 OK
+  with logging stubs for sudo, runuser, systemctl, systemd-run, apt, apt-get, useradd, userdel, install, ssh first on PATH: 0 calls
+
+Tester's own suite (tests/helper @ feat/tester/next, read-only, nothing of theirs changed; SERVRSIT_HELPER_SRC = this tree):
+  123 passed, 3 failed
+  H18, H21 (all), H21b (both), H12 (threads; 5 more runs: 5/5), H45 and H46 now PASS
+  remaining failures are expected:
+    H00   pinned to 6c7df23 (re-pin to the new commit)
+    H04b  strict xfail now passes (duplicate keys refused, D-H5)
+    H44   static check looks for the removal check in uninstall.sh; it now lives in account-remove-key.sh (`grep -qF -- "$PREFIX" "$F"` after the move)
+
+pnpm -r --workspace-concurrency=1 run test   exit 0 (target-helper 66, api 242, web 215, ai 156, ssh 61, store 28, domain 22, worker 19, infra 9)
+typecheck: all 9 TS packages exit 0
+```
+
+**Still NOT PROVEN** (as in T-083): APT, systemd and `systemd-run`, restart, reboot, real root ownership, `sudo`, sshd's `restrict`, and running bootstrap or uninstall for real. That includes `runuser` itself and the planted-link case done as root. This all belongs to T-012 on a disposable VM.

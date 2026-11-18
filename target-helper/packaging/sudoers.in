@@ -1,0 +1,7 @@
+# ServrSit target helper (T-083). Installed as /etc/sudoers.d/servrsit, 0440 root:root.
+#
+# The ServrSit account may run exactly one program as root: the helper, with
+# no arguments ("" below), a reset environment, and no password. It may not
+# run a shell, python, systemctl, apt, systemd-run or anything else.
+Defaults:@ACCOUNT@ env_reset, !setenv, !requiretty
+@ACCOUNT@ ALL=(root) NOPASSWD: /usr/lib/servrsit/bin/servrsit-helper ""

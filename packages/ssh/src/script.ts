@@ -17,7 +17,7 @@
  * lock, so it cannot interfere with a concurrent package operation.
  */
 
-import { COLLECTOR_SECTIONS } from "./sections.js";
+import { COLLECTOR_SECTIONS, type CollectorSection } from "./sections.js";
 
 const NONCE_PATTERN = /^[0-9a-f]{32}$/;
 
@@ -28,7 +28,8 @@ export function isValidNonce(nonce: string): boolean {
 /** Remote command line. Fixed. `sh -s` reads the script from stdin. */
 export const REMOTE_COMMAND: readonly string[] = ["sh", "-s"];
 
-export function buildCollectorScript(nonce: string): string {
+/** The script for a fixed list of reviewed sections (default: the health collector). */
+export function buildCollectorScript(nonce: string, sections: readonly CollectorSection[] = COLLECTOR_SECTIONS): string {
   if (!isValidNonce(nonce)) {
     throw new Error("collector nonce must be 32 lowercase hex characters");
   }
@@ -45,7 +46,7 @@ export function buildCollectorScript(nonce: string): string {
     "  s_rc=$?",
     `  printf '\\n@@END ${nonce} %s %s@@\\n' "$s_name" "$s_rc"`,
     "}",
-    ...COLLECTOR_SECTIONS.map((s) => `section ${s.name} ${s.command}`),
+    ...sections.map((s) => `section ${s.name} ${s.command}`),
     "exit 0",
     "",
   ];

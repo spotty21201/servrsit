@@ -5,7 +5,8 @@
  * banner is rendered whenever the page is backed by fixtures.
  */
 import type { ReactNode } from "react";
-import { FixtureBanner } from "../components/FixtureBanner/index.js";
+import { TopBanners } from "../clock/TopBanners";
+import { SignOutButton } from "../auth/SignOutButton";
 import styles from "./care.module.css";
 
 interface CareShellProps {
@@ -18,7 +19,7 @@ interface CareShellProps {
 export function CareShell({ fixture, section, children }: CareShellProps) {
   return (
     <div className={styles.shell}>
-      {fixture && <FixtureBanner />}
+      <TopBanners fixture={fixture} />
       <header className={styles.topbar}>
         <a href="/" className={`${styles.brand} pixel-text`} aria-label="ServrSit, back to Overview">ServrSit</a>
         <nav aria-label="Breadcrumb" className={styles.crumbs}>
@@ -26,8 +27,9 @@ export function CareShell({ fixture, section, children }: CareShellProps) {
           <span aria-hidden="true">/</span>
           <span aria-current="page">{section}</span>
         </nav>
+        <SignOutButton variant="bar" />
       </header>
-      <main id="main-content" className={styles.main}>{children}</main>
+      <main id="main-content" className={styles.main} tabIndex={-1}>{children}</main>
     </div>
   );
 }
@@ -52,10 +54,15 @@ export function LockGlyph() {
   );
 }
 
-export function LoadFailure({ title, text, onRetry }: { title: string; text: string; onRetry?: () => void }) {
+/**
+ * A page-level failure. By default its title is the page's <h1> (the screens that
+ * show it have nothing else to head the page); screens that already have their
+ * own <h1> pass `heading={false}`.
+ */
+export function LoadFailure({ title, text, onRetry, heading = true }: { title: string; text: string; onRetry?: () => void; heading?: boolean }) {
   return (
     <div className={`${styles.notice} ${styles.noticeFailed}`} role="alert">
-      <p className={styles.noticeTitle}>{title}</p>
+      {heading ? <h1 className={styles.noticeTitle}>{title}</h1> : <p className={styles.noticeTitle}>{title}</p>}
       <p>{text}</p>
       <div className={styles.row}>
         {onRetry && <button type="button" className={styles.secondary} onClick={onRetry}>Try again</button>}

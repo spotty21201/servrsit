@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  height: var(--banner-h);
+  height: var(--fixture-banner-h, 2.25rem);
   width: 100%;
   min-width: 0;
   padding: 0 max(var(--space-2), env(safe-area-inset-right)) 0 max(var(--space-2), env(safe-area-inset-left));
@@ -20,9 +20,7 @@
   font-size: var(--text-compact-size);
   line-height: var(--text-compact-line-height);
   font-weight: var(--font-weight-medium);
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  /* sticks as part of TopBanners (clock/TopBanners.tsx), which publishes --banner-h */
   overflow: hidden;
 }
 

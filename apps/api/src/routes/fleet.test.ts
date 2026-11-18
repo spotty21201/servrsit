@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildServer } from "../server.js";
+import { signedInServer } from "../auth/testing.js";
 import { FleetConfigSchema } from "../fleet/config.js";
 import { FleetResponseSchema } from "../fleet/schema.js";
 import { FleetService } from "../fleet/service.js";
@@ -29,8 +29,8 @@ function service() {
 }
 
 test("GET /health returns 200 with status ok and a timestamp", async () => {
-  const app = await buildServer({ config, fleetService: service().s, startChecks: false, logger: false });
-  const res = await app.inject({ method: "GET", url: "/health" });
+  const { app, inject } = await signedInServer({ config, fleetService: service().s, startChecks: false, logger: false });
+  const res = await inject({ method: "GET", url: "/health" });
   assert.equal(res.statusCode, 200);
   const body = res.json() as { status: string; timestamp: string };
   assert.equal(body.status, "ok");
@@ -40,9 +40,9 @@ test("GET /health returns 200 with status ok and a timestamp", async () => {
 
 test("live mode: schema-valid, per-server source live, unverified host reported and never contacted", async () => {
   const { s, contacted } = service();
-  const app = await buildServer({ config, fleetService: s, mode: "live", startChecks: false, logger: false });
+  const { app, inject } = await signedInServer({ config, fleetService: s, mode: "live", startChecks: false, logger: false });
   await s.refreshAll();
-  const res = await app.inject({ method: "GET", url: "/api/fleet" });
+  const res = await inject({ method: "GET", url: "/api/fleet" });
   assert.equal(res.statusCode, 200);
   const body = FleetResponseSchema.parse(res.json());
   assert.equal(body.mode, "live");
@@ -61,18 +61,18 @@ test("live mode: schema-valid, per-server source live, unverified host reported 
 
 test("GET /api/fleet never triggers a collection", async () => {
   const { s, contacted } = service();
-  const app = await buildServer({ config, fleetService: s, startChecks: false, logger: false });
-  await app.inject({ method: "GET", url: "/api/fleet" });
-  await app.inject({ method: "GET", url: "/api/fleet" });
+  const { app, inject } = await signedInServer({ config, fleetService: s, startChecks: false, logger: false });
+  await inject({ method: "GET", url: "/api/fleet" });
+  await inject({ method: "GET", url: "/api/fleet" });
   assert.equal(contacted.length, 0);
   await app.close();
 });
 
 test("response never exposes key paths or other configuration secrets", async () => {
   const { s } = service();
-  const app = await buildServer({ config, fleetService: s, startChecks: false, logger: false });
+  const { app, inject } = await signedInServer({ config, fleetService: s, startChecks: false, logger: false });
   await s.refreshAll();
-  const text = (await app.inject({ method: "GET", url: "/api/fleet" })).body;
+  const text = (await inject({ method: "GET", url: "/api/fleet" })).body;
   for (const needle of ["id_ed25519", ".ssh", "identityFile", "known_hosts"]) {
     assert.equal(text.includes(needle), false, `response must not contain ${needle}`);
   }
@@ -81,8 +81,8 @@ test("response never exposes key paths or other configuration secrets", async ()
 
 test("fixture mode labels every server source 'fixture', tags reasons, and contacts nothing", async () => {
   const { s, contacted } = service();
-  const app = await buildServer({ config, fleetService: s, mode: "fixture", startChecks: true, logger: false });
-  const body = FleetResponseSchema.parse((await app.inject({ method: "GET", url: "/api/fleet" })).json());
+  const { app, inject } = await signedInServer({ config, fleetService: s, mode: "fixture", startChecks: true, logger: false });
+  const body = FleetResponseSchema.parse((await inject({ method: "GET", url: "/api/fleet" })).json());
   assert.equal(body.mode, "fixture");
   assert.ok(body.servers.every((x) => x.source === "fixture"));
   assert.ok(body.servers.every((x) => x.statusReason.startsWith("[FIXTURE DATA]")));
@@ -92,7 +92,7 @@ test("fixture mode labels every server source 'fixture', tags reasons, and conta
 
 test("stopping the server stops the refresh timer", async () => {
   const { s } = service();
-  const app = await buildServer({ config, fleetService: s, startChecks: true, logger: false });
+  const { app, inject } = await signedInServer({ config, fleetService: s, startChecks: true, logger: false });
   await app.close();
   assert.equal(s.snapshot().nextCheckAt, null);
 });

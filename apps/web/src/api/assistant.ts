@@ -23,6 +23,7 @@ import {
   AssistantResponseSchema,
   type AssistantResponse,
 } from "@servrsit/contracts";
+import { csrfHeaders } from "./auth.js";
 
 export const ASSISTANT_ENDPOINT = "/api/assistant/messages";
 /** Slightly above the server's AI timeout, so the server's deterministic fallback normally wins. */
@@ -139,7 +140,8 @@ export async function askAssistant(
   try {
     const response = await doFetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      // T-053: a POST needs the session's CSRF token.
+      headers: { "Content-Type": "application/json", Accept: "application/json", ...csrfHeaders() },
       body: JSON.stringify({ message, scope }),
       cache: "no-store",
       credentials: "same-origin",

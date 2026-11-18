@@ -261,6 +261,33 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 
 **Decision:** Coder creates `integration/next` = `integration/live-v1` + `feat/coder/owner-auth` + `feat/coder/server-registration`, resolving the repeated API conflicts once (auth guard, clock check, registration, care routes). From then on Coder, Designer and Tester base new work on `integration/next`. `integration/live-v1` stays the founder's running app until ADR-018's conditions are met (clock fixed); then `integration/next` is merged into it.
 
+## ADR-020 — Manifest signing key until AWS KMS: local Ed25519, verifier also accepts RSA-PSS/SHA-256
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-18 (controller clock) |
+| **Owner** | Coder |
+| **Status** | [AGENT DECISION] — for review by the Orchestrator |
+| **Requirements** | Technical Spec §8.2 (KMS asymmetric key, RSA-PSS/SHA-256 after a compatibility check; target holds only public keys; unknown key ids refused); T-083 |
+
+**Context.** Tech Spec §8.2 says manifests are signed by a scoped AWS KMS asymmetric key, RSA-PSS/SHA-256. AWS is not authorised yet (D-AWS-01). The controller already signs simulated manifests with Ed25519 (`packages/domain/src/signature.ts`), and the target helper (T-083) needs a verifier now.
+
+**Decision.**
+1. **Until KMS:** the controller signs with an **Ed25519** key it generates locally. Today `createSigner()` keeps the key in memory, which is enough for simulated targets only. A persistent key for real targets is not built yet. When it is, it lives only on the controller in a 0600 file under the gitignored `.data/` directory (the same handling as the per-server SSH keys, T-069), and is never logged, sent to a model or exported. The target's `trust.json` holds only the public key, under a key id.
+2. **The helper verifies both** `ed25519` and `rsa-pss-sha256` (MGF1-SHA256, salt length 32, RSA keys of at least 3072 bits), selected per key id in `trust.json`. Moving to KMS is then a trust-file change (add the KMS key id, later remove the Ed25519 one), not a helper release.
+3. **Signed bytes:** the UTF-8 canonical JSON of the manifest, as `canonicalJson()` produces it. The Python canonicalizer is tested byte for byte against vectors made by the controller's own code (`target-helper/tests/vectors.json`, `make_vectors.mts`). Those vectors include RSA-PSS signatures made by Node and verified in Python.
+4. **Unknown key id, unknown algorithm, invalid signature,** or a trust file that is not root-owned or is writable by anyone else: refused.
+
+**Alternatives.**
+- **RSA-PSS locally now:** matches the KMS target, but gives larger keys and signatures, and the controller has no RSA path today.
+- **HMAC:** a shared secret on every target. Rejected: a target must never hold signing material.
+- **The `openssl` command line on the target:** avoids `python3-cryptography`, but adds a subprocess and output parsing. Rejected in favour of an Ubuntu-packaged library.
+
+**Consequences.**
+- `python3-cryptography` (Ubuntu archive, `41.0.7` on 24.04) is a helper dependency next to `python3-apt`.
+- **Before KMS:** check whether KMS supports an Edwards-curve key in the chosen region. If it does, staying on Ed25519 is possible. If not, use RSA-PSS as the spec says.
+- **A compromised controller can still sign** (Tech Spec §8.2). Approval, operation limits and audit remain the other controls.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |

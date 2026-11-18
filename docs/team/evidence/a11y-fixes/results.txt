@@ -1,0 +1,16 @@
+Browser checks for test-report-ui-a11y-002 (own API :3005, preview :5174, real Chromium; all fixture data)
+
+D-U16 (focus obscured by sticky nav), Tab walk, 89 stops per page:
+  BEFORE  overview cards 1024x768: HIDDEN 7 (Fixture 11, Fixture 03, Fixture-production-..., Fixture 17 ...)
+  AFTER   768x1024, 1024x768, 390x844 on overview cards, overview list, activity, settings: none hidden
+
+D-U10 (link targets, all non-prose links on overview cards/list, activity, plan, connect, settings, findings,
+       server-not-found, at 1440 and 390): every link box >= 44 px high.
+  server-name link box 156x49 (two-line clamped name); a click on blank card space opens the server;
+  the action button still goes to its own target.
+  activity title links 44 px.
+
+D-U15 (Server not found has no h1): already closed by the T-075 audit fix (LoadFailure renders its title as h1).
+  /servers/<unknown id>: h1 = "Server not found", title "Server not found · ServrSit".
+
+D-U14: empty values now render aria-hidden dash + visually hidden "No value." (no aria-label on a span).

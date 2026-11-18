@@ -4,7 +4,9 @@
  * UX Spec §5.2: "Recent activity: a compact list below the roster,
  * not another wall of metrics."
  */
+import { useState } from "react";
 import type { RecentOperationFixture } from "../../fixtures/overview.js";
+import { ScrollRegion } from "./ScrollRegion.js";
 import styles from "./RecentActivity.module.css";
 
 interface RecentActivityProps {
@@ -56,12 +58,14 @@ function getStateClass(state: string): string {
 }
 
 export function RecentActivity({ operations }: RecentActivityProps) {
+  const [hidden, setHidden] = useState(0);
   return (
     <section className={styles.section} aria-labelledby="activity-heading">
       <h2 id="activity-heading" className={styles.heading}>Recent activity</h2>
       {operations.length === 0 ? (
         <p className={styles.empty}>No recent operations.</p>
       ) : (
+        <ScrollRegion label="Recent activity, list of operations" className={styles.scroll} onHidden={setHidden}>
         <ul className={styles.list} role="list">
           {operations.map((op) => {
             const stateClass = getStateClass(op.state);
@@ -83,8 +87,10 @@ export function RecentActivity({ operations }: RecentActivityProps) {
             );
           })}
         </ul>
+        </ScrollRegion>
       )}
 
+      {hidden > 0 && <p className={styles.moreNote} role="status">+{hidden} more, scroll the list.</p>}
       <a href="/activity" className={styles.viewAll}>
         View all activity
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" focusable="false">

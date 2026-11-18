@@ -1,0 +1,13 @@
+/** Baseline compare rows. Builds on care.module.css and servers.module.css. No 100vw; text wraps. */
+.rows { list-style: none; display: flex; flex-direction: column; min-width: 0; }
+.row { display: flex; flex-direction: column; gap: var(--space-half); padding: var(--space-1) 0; border-bottom: 1px solid var(--color-soft-line); min-width: 0; }
+.row:last-child { border-bottom: 0; }
+.rowHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-half) var(--space-1); }
+.kind { font-size: 0.75rem; font-weight: var(--font-weight-semibold); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-muted-ink); }
+.label { font-family: var(--font-mono); font-size: var(--text-technical-size); overflow-wrap: anywhere; }
+.line { font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); overflow-wrap: anywhere; }
+.k { color: var(--color-muted-ink); font-weight: var(--font-weight-medium); margin-right: var(--space-half); }
+.mark { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-1); border: 2px solid var(--color-ink); border-radius: var(--radius-panel); min-width: 0; }
+.mark input[type="text"] { width: 100%; min-width: 0; min-height: var(--touch-target-min); padding: 0 var(--space-1-half); border: 2px solid var(--color-control-boundary); border-radius: var(--radius-input); font-family: var(--font-sans); font-size: 1rem; background: var(--color-surface); color: var(--color-ink); }
+.mark input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; border-color: var(--color-ink); }
+.row button { width: auto; align-self: flex-start; }

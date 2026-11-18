@@ -71,21 +71,26 @@ export function formatClock(d: Date, now: Date, tz: string, withZone = true): st
   return withZone ? `${text} ${zoneLabel(zone, d)}` : text;
 }
 
-/** "just now", "4 min ago", "2 h ago", or a dated clock time for 24 h or more. */
-export function formatRelative(d: Date, now: Date, tz: string): string {
+/**
+ * "just now", "4 min ago", "2 h ago", or a dated clock time for 24 h or more.
+ * `uncertain` (ServrSit's own clock is not trusted) prefixes ages with "≈ ".
+ * Dated clock times are not ages and are left alone.
+ */
+export function formatRelative(d: Date, now: Date, tz: string, uncertain = false): string {
+  const mark = (t: string): string => (uncertain ? `≈ ${t}` : t);
   const sec = Math.round((now.getTime() - d.getTime()) / 1000);
   if (sec < 0) return formatClock(d, now, tz); // clock skew: don't claim the future
-  if (sec < 45) return "just now";
+  if (sec < 45) return mark("just now");
   const min = Math.round(sec / 60);
-  if (min < 60) return `${min} min ago`;
+  if (min < 60) return mark(`${min} min ago`);
   const h = Math.round(min / 60);
-  if (h < 24) return `${h} h ago`;
+  if (h < 24) return mark(`${h} h ago`);
   return formatClock(d, now, tz);
 }
 
 /** Standalone time plus age: "09:42 WIB (3 min ago)". Past-24h times already read as a date. */
-export function formatClockWithAge(d: Date, now: Date, tz: string): string {
-  const rel = formatRelative(d, now, tz);
+export function formatClockWithAge(d: Date, now: Date, tz: string, uncertain = false): string {
+  const rel = formatRelative(d, now, tz, uncertain);
   const clock = formatClock(d, now, tz);
   return rel === clock ? clock : `${clock} (${rel})`;
 }
@@ -105,11 +110,12 @@ export function formatTimeSeconds(d: Date, tz: string): string {
 }
 
 /** Time until `d`: "in 12 min", "in 45 s", or "expired". Not announced per second. */
-export function formatUntil(d: Date, now: Date): string {
+export function formatUntil(d: Date, now: Date, uncertain = false): string {
+  const mark = (t: string): string => (uncertain ? `≈ ${t}` : t);
   const sec = Math.round((d.getTime() - now.getTime()) / 1000);
-  if (sec <= 0) return "expired";
-  if (sec < 60) return `in ${sec} s`;
+  if (sec <= 0) return mark("expired");
+  if (sec < 60) return mark(`in ${sec} s`);
   const min = Math.round(sec / 60);
-  if (min < 60) return `in ${min} min`;
-  return `in ${Math.round(min / 60)} h`;
+  if (min < 60) return mark(`in ${min} min`);
+  return mark(`in ${Math.round(min / 60)} h`);
 }

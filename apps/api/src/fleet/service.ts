@@ -20,23 +20,31 @@ import {
   type InspectionObservation,
   type PinState,
 } from "@servrsit/ssh";
-import type { HostConfig, FleetConfig } from "./config.js";
+import type { FleetConfig, FleetHost } from "./config.js";
 import { evaluateFindings } from "./findings.js";
 import type { FleetResponse, FleetServer } from "./schema.js";
 import { coverageOf, deriveStatus, freshUntil, type Attempt } from "./status.js";
 
-export type Collector = (host: HostConfig) => Promise<CollectionResult>;
-export type PinChecker = (host: HostConfig) => Promise<PinState>;
+export type Collector = (host: FleetHost) => Promise<CollectionResult>;
+export type PinChecker = (host: FleetHost) => Promise<PinState>;
 
 export interface FleetServiceOptions {
   readonly config: FleetConfig;
   readonly knownHostsFile: string;
+  /**
+   * T-069: the servers to check, read on every pass and snapshot (the server
+   * registry). Default: config.hosts. A server that leaves this list is no
+   * longer checked.
+   */
+  readonly hosts?: (() => readonly FleetHost[]) | undefined;
   readonly collector?: Collector | undefined;
   readonly pinChecker?: PinChecker | undefined;
   readonly now?: (() => Date) | undefined;
   readonly log?: { info: (o: object, m: string) => void; warn: (o: object, m: string) => void } | undefined;
   /** T-063: ServrSit's own clock, as last checked. Absent means not checked (tests). */
   readonly controllerClock?: (() => ControllerClock) | undefined;
+  /** T-076: called after every pass and single-server check (findings tracking). */
+  readonly onPassComplete?: (() => void) | undefined;
 }
 
 interface ServerState {
@@ -58,6 +66,11 @@ export class FleetService {
   private timer: NodeJS.Timeout | null = null;
   private running: Promise<void> | null = null;
   private lastRunAt: Date | null = null;
+  /** start() was called: background checks belong to this process. */
+  private scheduled = false;
+  /** T-076: the owner paused background checks. */
+  private paused = false;
+  private passStartedAt: Date | null = null;
 
   constructor(private readonly options: FleetServiceOptions) {
     this.now = options.now ?? (() => new Date());
@@ -73,47 +86,145 @@ export class FleetService {
                 user: host.user,
                 ...(host.identityFile === undefined ? {} : { identityFile: host.identityFile }),
               },
-              { knownHostsFile: options.knownHostsFile },
+              { knownHostsFile: host.knownHostsFile ?? options.knownHostsFile },
             ));
     this.pinChecker =
       options.pinChecker ??
       (async (host) =>
-        host.access === "local" ? "pinned" : pinStateFor(options.knownHostsFile, host.address, host.port));
-    for (const host of options.config.hosts) {
-      this.states.set(host.id, {
+        host.access === "local"
+          ? "pinned"
+          : pinStateFor(host.knownHostsFile ?? options.knownHostsFile, host.address, host.port));
+    this.hosts = options.hosts ?? (() => options.config.hosts);
+  }
+
+  private readonly hosts: () => readonly FleetHost[];
+
+  private stateFor(host: FleetHost): ServerState {
+    let state = this.states.get(host.id);
+    if (state === undefined) {
+      state = {
         pin: host.access === "local" ? "pinned" : "unknown",
         latestAttempt: null,
         lastSuccess: null,
         previousSuccess: null,
         consecutiveFailures: 0,
         retryBlocked: false,
-      });
+      };
+      this.states.set(host.id, state);
     }
+    return state;
+  }
+
+  /** Forget servers that left the list (disconnected), so nothing about them lingers. */
+  private prune(hosts: readonly FleetHost[]): void {
+    const ids = new Set(hosts.map((h) => h.id));
+    for (const id of this.states.keys()) if (!ids.has(id)) this.states.delete(id);
+  }
+
+  /** T-079: the owner's interval, when set; otherwise the configured one. */
+  private intervalMinutes: number | null = null;
+  /** T-079: the owner's time zone, when set; otherwise the configured one. */
+  private timeZone: string | null = null;
+
+  setOwnerTimeZone(zone: string): void {
+    this.timeZone = zone;
+  }
+
+  ownerTimeZone(): string {
+    return this.timeZone ?? this.options.config.ownerTimeZone;
   }
 
   private get intervalMs(): number {
-    return this.options.config.healthIntervalMinutes * 60_000;
+    return (this.intervalMinutes ?? this.options.config.healthIntervalMinutes) * 60_000;
+  }
+
+  /**
+   * T-079: change the check interval. A running timer restarts on the new
+   * interval without an extra pass; nothing is replayed.
+   */
+  setIntervalMinutes(minutes: number): void {
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) throw new Error("interval must be 1..1440 minutes");
+    this.intervalMinutes = minutes;
+    if (this.timer !== null) {
+      clearInterval(this.timer);
+      this.timer = setInterval(() => void this.refreshAll(), this.intervalMs);
+      this.timer.unref();
+    }
+  }
+
+  /** Every check runs through this chain, so no two collections overlap. */
+  private chain: Promise<void> = Promise.resolve();
+
+  private serial(fn: () => Promise<void>): Promise<void> {
+    const next = this.chain.then(fn);
+    this.chain = next.catch(() => undefined);
+    return next;
+  }
+
+  /**
+   * T-078: run other read-only work on servers (the baseline inventory) in
+   * the same queue as checks, so no two connections overlap.
+   */
+  exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.chain.then(fn);
+    this.chain = next.then(() => undefined, () => undefined);
+    return next;
   }
 
   /** Run one pass over all hosts, serially. Concurrent calls share one run. */
   refreshAll(): Promise<void> {
     if (this.running !== null) return this.running;
-    this.running = this.runPass().finally(() => {
+    this.running = this.serial(() => this.runPass()).finally(() => {
       this.running = null;
     });
     return this.running;
   }
 
   private async runPass(): Promise<void> {
-    for (const host of this.options.config.hosts) {
+    this.passStartedAt = this.now();
+    try {
+      await this.checkAll();
+    } finally {
+      this.passStartedAt = null;
+    }
+    this.notifyPass();
+  }
+
+  /** T-076: tell listeners (the findings tracker) that new results exist. Their errors never stop checks. */
+  private notifyPass(): void {
+    try {
+      this.options.onPassComplete?.();
+    } catch (error) {
+      this.options.log?.warn({ err: error }, "pass listener failed");
+    }
+  }
+
+  private async checkAll(): Promise<void> {
+    const hosts = this.hosts();
+    this.prune(hosts);
+    for (const host of hosts) {
+      // A server disconnected during the pass is skipped.
+      if (!this.hosts().some((h) => h.id === host.id)) continue;
       await this.refreshOne(host);
     }
     this.lastRunAt = this.now();
   }
 
-  private async refreshOne(host: HostConfig): Promise<void> {
-    const state = this.states.get(host.id);
-    if (state === undefined) return;
+  /**
+   * T-069: check one server now (just after it was added), without touching
+   * any other server. It queues behind a running pass, so checks stay serial.
+   */
+  refreshHost(id: string): Promise<void> {
+    if (this.paused) return Promise.resolve();
+    return this.serial(async () => {
+      const host = this.hosts().find((h) => h.id === id);
+      if (host !== undefined) await this.refreshOne(host);
+      this.notifyPass();
+    });
+  }
+
+  private async refreshOne(host: FleetHost): Promise<void> {
+    const state = this.stateFor(host);
     state.pin = await this.pinChecker(host);
     if (state.pin !== "pinned" || !host.collect || state.retryBlocked) return;
 
@@ -138,16 +249,47 @@ export class FleetService {
 
   /** Start periodic refresh. The first pass runs immediately in the background. */
   start(): void {
-    if (this.timer !== null) return;
+    this.scheduled = true;
+    if (this.timer !== null || this.paused) return;
     void this.refreshAll();
     this.timer = setInterval(() => void this.refreshAll(), this.intervalMs);
     this.timer.unref();
   }
 
+  /**
+   * T-076 (FR-19): stop background checks until resume(). A pass already
+   * running finishes; nothing new starts.
+   */
+  pause(): void {
+    this.paused = true;
+    if (this.timer !== null) clearInterval(this.timer);
+    this.timer = null;
+  }
+
+  /** Resume: one current check now, then the normal interval. Missed runs are not replayed. */
+  resume(): void {
+    this.paused = false;
+    if (this.scheduled) this.start();
+  }
+
+  /** T-076: what the scheduler is doing, for GET /api/scheduler. */
+  schedulerState(): { scheduled: boolean; paused: boolean; passStartedAt: Date | null; nextRunAt: Date | null; intervalMs: number } {
+    const base = this.lastRunAt ?? this.passStartedAt;
+    return {
+      scheduled: this.scheduled,
+      paused: this.paused,
+      passStartedAt: this.passStartedAt,
+      nextRunAt: this.timer === null || base === null ? null : new Date(base.getTime() + this.intervalMs),
+      intervalMs: this.intervalMs,
+    };
+  }
+
   async stop(): Promise<void> {
+    this.scheduled = false;
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
     if (this.running !== null) await this.running;
+    await this.chain;
   }
 
   /** T-063: the controller clock, with skew attributed to it when most targets agree. */
@@ -164,17 +306,19 @@ export class FleetService {
   snapshot(): FleetResponse {
     const now = this.now();
     const controlPlane = this.controlPlane();
-    // T-056: which configured hosts report the same machine id (observed, read-only).
+    const hosts = this.hosts();
+    this.prune(hosts);
+    // T-056: which listed hosts report the same machine id (observed, read-only).
     const byMachine = new Map<string, string[]>();
-    for (const host of this.options.config.hosts) {
+    for (const host of hosts) {
       const mid = this.states.get(host.id)?.lastSuccess?.observation.host.machineId;
       if (mid?.status === "ok") byMachine.set(mid.value, [...(byMachine.get(mid.value) ?? []), host.name]);
     }
-    const sameAs = (host: HostConfig): string[] => {
+    const sameAs = (host: FleetHost): string[] => {
       const mid = this.states.get(host.id)?.lastSuccess?.observation.host.machineId;
       return mid?.status === "ok" ? (byMachine.get(mid.value) ?? []).filter((n) => n !== host.name) : [];
     };
-    const servers = this.options.config.hosts.map((host) => this.serverView(host, now, controlPlane.clock, sameAs(host)));
+    const servers = hosts.map((host) => this.serverView(host, now, controlPlane.clock, sameAs(host)));
     const next =
       this.timer === null
         ? null
@@ -182,17 +326,16 @@ export class FleetService {
     return {
       mode: "live",
       generatedAt: now.toISOString(),
-      healthIntervalMinutes: this.options.config.healthIntervalMinutes,
-      ownerTimeZone: this.options.config.ownerTimeZone,
+      healthIntervalMinutes: this.intervalMs / 60_000,
+      ownerTimeZone: this.ownerTimeZone(),
       nextCheckAt: next,
       controlPlane,
       servers,
     };
   }
 
-  private serverView(host: HostConfig, now: Date, controllerClock: ControllerClock, sameMachineIdAs: readonly string[]): FleetServer {
-    const state = this.states.get(host.id);
-    if (state === undefined) throw new Error(`no state for ${host.id}`);
+  private serverView(host: FleetHost, now: Date, controllerClock: ControllerClock, sameMachineIdAs: readonly string[]): FleetServer {
+    const state = this.stateFor(host);
     const success = state.lastSuccess;
     const coverage = success === null ? null : coverageOf(success.observation);
     const derived = deriveStatus({

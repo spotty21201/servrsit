@@ -14,14 +14,55 @@ import { useEffect, useState } from "react";
 import { useFleet } from "./api/useFleet";
 import { OverviewScreen } from "./components/overview/index.js";
 import { toOverviewVM } from "./components/overview/fleetViewModel.js";
+import { usePageTitle } from "./lib/pageTitle";
+import { RouteAnnouncer } from "./lib/RouteAnnouncer";
+import { SkipLink } from "./lib/SkipLink";
+import { AuthGate } from "./auth/AuthGate";
+import { ClockProvider, useClock } from "./clock/ClockContext";
+import { FixtureClockPage } from "./clock/FixtureClockPage";
 import { matchRoute } from "./lib/router";
+import { FixtureConnect } from "./fixtures/FixtureConnect";
+import { StressOverview } from "./fixtures/StressOverview";
+import { SettingsScreen } from "./settings/SettingsScreen";
+import { BaselineScreen } from "./baselines/BaselineScreen";
+import { ActivityScreen } from "./activity/ActivityScreen";
+import { FindingsScreen } from "./findings/FindingsScreen";
+import { ConnectScreen } from "./connect/ConnectScreen";
+import { ServerDetailScreen } from "./servers/ServerDetailScreen";
 import { PlanScreen } from "./care/PlanScreen";
 import { OperationScreen } from "./care/OperationScreen";
 
 const CLOCK_TICK_MS = 30_000;
 
 export default function App() {
+  return (
+    <>
+    <SkipLink />
+    <RouteAnnouncer />
+    <AuthGate>
+      <ClockProvider>
+        <Routes />
+      </ClockProvider>
+    </AuthGate>
+    </>
+  );
+}
+
+function Routes() {
   const route = matchRoute(globalThis.location.pathname);
+  if (route.name === "fixtureClock") return <FixtureClockPage />;
+  if (route.name === "fixtureConnect") return <FixtureConnect />;
+  if (route.name === "fixtureOverview") return <StressOverview />;
+  if (route.name === "settings") return <SettingsScreen />;
+  if (route.name === "baselines") return <BaselineScreen />;
+  if (route.name === "activity") return <ActivityScreen />;
+  if (route.name === "fixtureSettings") return <SettingsScreen fixture />;
+  if (route.name === "fixtureBaselines") return <BaselineScreen fixture />;
+  if (route.name === "fixtureActivity") return <ActivityScreen fixture />;
+  if (route.name === "fixtureFindings") return <FindingsScreen fixture />;
+  if (route.name === "findings") return <FindingsScreen />;
+  if (route.name === "connect") return <ConnectScreen />;
+  if (route.name === "server") return <ServerDetailScreen serverId={route.id} section={route.section} />;
   if (route.name === "plan") return <PlanScreen planId={route.id} />;
   if (route.name === "operation") return <OperationScreen operationId={route.id} />;
   return <OverviewRoute />;
@@ -29,6 +70,8 @@ export default function App() {
 
 function OverviewRoute() {
   const fleet = useFleet();
+  const { view: clockView } = useClock();
+  usePageTitle(fleet.phase === "loading" ? "Loading your servers" : "Overview", fleet.phase !== "loading");
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -41,5 +84,5 @@ function OverviewRoute() {
     setNow(new Date());
   }, [fleet.receivedAt, fleet.error]);
 
-  return <OverviewScreen vm={toOverviewVM(fleet, now)} onRetry={fleet.refresh} />;
+  return <OverviewScreen vm={toOverviewVM(fleet, now, clockView?.agesUncertain ?? false)} onRetry={fleet.refresh} />;
 }

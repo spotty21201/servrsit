@@ -1,0 +1,8 @@
+#!/usr/bin/python3 -I
+# ServrSit target helper (T-083): the runner entry point. Installed root-owned, 0755.
+import sys
+
+sys.path.insert(0, "/usr/lib/servrsit")
+from servrsit_helper.runner import main  # noqa: E402
+
+sys.exit(main())

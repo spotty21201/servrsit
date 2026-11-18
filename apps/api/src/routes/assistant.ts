@@ -32,12 +32,13 @@ export const ASSISTANT_RATE_WINDOW_MS = 60_000;
 export const ASSISTANT_BODY_LIMIT_BYTES = 16 * 1024;
 
 export interface AssistantRouteOptions {
-  readonly assistant: AssistantResponder;
+  /** T-079: a function, so turning AI off takes effect on the next message. */
+  readonly assistant: AssistantResponder | (() => AssistantResponder);
   /** Current fleet view. Never contacts a server. */
   readonly fleet: () => { readonly servers: readonly FleetServer[] };
   readonly limiter?: SlidingWindowLimiter | undefined;
   /** Owner's IANA time zone for every time in the answer (DEF-L1). */
-  readonly timeZone: string;
+  readonly timeZone: string | (() => string);
   /** For tests. */
   readonly now?: (() => Date) | undefined;
   /** The prepared owner-context layer (T-050), or null for none. Read per request. */
@@ -132,11 +133,12 @@ export async function assistantRoutes(fastify: FastifyInstance, options: Assista
         return reply.code(429).header("retry-after", String(retry)).send({ error: "RATE_LIMITED" });
       }
 
-      const result = await options.assistant.respond(
+      const assistant = typeof options.assistant === "function" ? options.assistant() : options.assistant;
+      const result = await assistant.respond(
         message,
         scoped,
         {
-          timeZone: options.timeZone,
+          timeZone: typeof options.timeZone === "function" ? options.timeZone() : options.timeZone,
           now: (options.now ?? (() => new Date()))(),
           ...(options.controllerClock === undefined ? {} : { controllerClock: clockForAi(options.controllerClock()) }),
         },

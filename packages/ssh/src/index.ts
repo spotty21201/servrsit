@@ -50,3 +50,13 @@ export {
 export type { FailureCode, PinState, SshOptions, SshTarget } from "./transport.js";
 export { spawnRunner } from "./runner.js";
 export type { CommandRunner, RunRequest, RunResult } from "./runner.js";
+export {
+  buildInventory,
+  collectInventoryLocal,
+  collectInventoryViaSsh,
+  INVENTORY_LIMITS,
+  INVENTORY_SECTIONS,
+} from "./inventory.js";
+export type { Inventory, InventoryDeps, InventoryDirectory, InventoryResult, Part } from "./inventory.js";
+export { buildPrivilegeScript, classifySudo, PRIVILEGE_SUMMARIES, probePrivilegeViaSsh } from "./privilege.js";
+export type { PrivilegeDeps, PrivilegeLevel, PrivilegeProbeResult, PrivilegeResult } from "./privilege.js";
