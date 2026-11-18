@@ -11,13 +11,17 @@
  *   4 Review plan         what a setup would do and never touch, then the
  *                         canonical Plan review (/plans/:id)
  *
- * Runs on the [FIXTURE] baselines client (api/stubs/baselines.ts), so the
- * [FIXTURE DATA] banner is always shown. Nothing here changes a server. A setup
- * plan for a real host opens blocked by writesEnabled=false on the same Plan
- * review screen used for updates.
+ * Runs on Coder's real baselines client (api/baselines.ts, T-078). The
+ * [FIXTURE DATA] banner shows on /fixtures/baselines and whenever the API
+ * lists a simulated server; simulated servers also carry a "Simulated" tag.
+ * Nothing here changes a server. A setup plan creates missing directories
+ * only; missing packages are listed as not included. A plan for a real host
+ * opens blocked by writesEnabled=false on the same Plan review screen used
+ * for updates.
  */
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { createFixtureBaselinesClient, type Baseline, type BaselineServer, type BaselinesClient, type Candidate, type ComparisonRow, type HistoryEvent } from "../api/stubs/baselines";
+import { createBaselinesClient, type Baseline, type BaselineServer, type BaselinesClient, type BaselinesClientError, type Candidate, type CandidatesResponse, type Comparison, type ComparisonRow, type HistoryEvent } from "../api/baselines";
+import { createFixtureBaselinesClient } from "../fixtures/baselinesFixture";
 import { CareShell, LoadFailure, ProductionLabel } from "../care/CareShell";
 import { ReasonButton } from "../auth/AuthFrame";
 import { useClock } from "../clock/ClockContext";
@@ -26,7 +30,7 @@ import { planPath } from "../lib/router";
 import { DEFAULT_OWNER_TIME_ZONE, formatClockWithAge, parseIso } from "../lib/time";
 import { WRITES_OFF_TEXT } from "../care/planViewModel";
 import {
-  canMarkIntentional, describeSetup, EXCLUSION_STATEMENT, groupRows, referenceAge, SAVE_NOTE, setupScope, splitCandidates, STATUS_LABEL, STATUS_TONE,
+  baselineErrorText, canMarkIntentional, describeSetup, EXCLUSION_STATEMENT, groupRows, NOT_INCLUDED_REASON, referenceAge, SAVE_NOTE, setupScope, SOURCE_LABEL, splitCandidates, STATUS_LABEL, STATUS_TONE,
   summaryText, validateBaselineName,
 } from "./baselineLogic";
 import c from "../care/care.module.css";
@@ -69,8 +73,8 @@ function Row({ r, busy, onMark, onUnmark }: { r: ComparisonRow; busy: boolean; o
   );
 }
 
-export function BaselineScreen({ client: injected }: { client?: BaselinesClient }) {
-  const client = useMemo(() => injected ?? createFixtureBaselinesClient(), [injected]);
+export function BaselineScreen({ client: injected, fixture = false }: { client?: BaselinesClient; fixture?: boolean }) {
+  const client = useMemo(() => injected ?? (fixture ? createFixtureBaselinesClient() : createBaselinesClient()), [injected, fixture]);
   const ids = useId();
   const tz = DEFAULT_OWNER_TIME_ZONE;
   const uncertain = useClock().view?.agesUncertain ?? false;
@@ -79,6 +83,8 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
   const [servers, setServers] = useState<readonly BaselineServer[]>([]);
   const [referenceId, setReferenceId] = useState("");
   const [candidates, setCandidates] = useState<readonly Candidate[]>([]);
+  const [inventory, setInventory] = useState<Pick<CandidatesResponse, "observedAt" | "source" | "notes"> | null>(null);
+  const [seen, setSeen] = useState<Pick<Comparison, "observedAt" | "source"> | null>(null);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
@@ -106,14 +112,15 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
   const { eligible, ineligible } = splitCandidates(candidates);
   const groups = rows ? groupRows(rows) : null;
   const scope = rows ? setupScope(rows) : null;
-  const fail = (): void => setProblem("That didn't go through. Nothing was changed.");
+  const fail = (r: { error: BaselinesClientError; reason?: string }): void => setProblem(baselineErrorText(r.error, r.reason));
 
   async function toConventions(): Promise<void> {
     setBusy(true); setProblem(null);
-    const r = await client.listCandidates(referenceId);
+    const r = await client.candidatesResponse(referenceId);
     setBusy(false);
-    if (!r.ok) return fail();
-    setCandidates(r.data); setPicked(new Set(r.data.filter((x) => x.eligible && x.kind === "directory").map((x) => x.id))); setStep(1);
+    if (!r.ok) return fail(r);
+    setCandidates(r.data.candidates); setInventory({ observedAt: r.data.observedAt, source: r.data.source, notes: r.data.notes });
+    setPicked(new Set(r.data.candidates.filter((x) => x.eligible && x.kind === "directory").map((x) => x.id))); setNow(new Date()); setStep(1);
   }
 
   async function save(): Promise<void> {
@@ -123,17 +130,17 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
     setBusy(true); setProblem(null);
     const r = await client.saveBaseline({ name: name.trim(), referenceId, conventionIds: [...picked] });
     setBusy(false);
-    if (!r.ok) return fail();
+    if (!r.ok) return fail(r);
     setBaseline(r.data); setStep(2);
   }
 
   async function runCompare(): Promise<void> {
     if (!baseline || !targetId) return;
     setBusy(true); setProblem(null);
-    const [r, h] = await Promise.all([client.compare(baseline.id, targetId), client.history(baseline.id, targetId)]);
+    const [r, h] = await Promise.all([client.comparison(baseline.id, targetId), client.history(baseline.id, targetId)]);
     setBusy(false);
-    if (!r.ok) return fail();
-    setRows(r.data); if (h.ok) setHistory(h.data);
+    if (!r.ok) return fail(r);
+    setRows(r.data.rows); setSeen({ observedAt: r.data.observedAt, source: r.data.source }); if (h.ok) setHistory(h.data);
     setNow(new Date());
   }
 
@@ -141,7 +148,7 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
     if (!baseline) return;
     setBusy(true); setProblem(null);
     const r = undo ? await client.unmarkIntentional(baseline.id, targetId, conventionId) : await client.markIntentional(baseline.id, targetId, conventionId, reason);
-    if (!r.ok) { setBusy(false); return fail(); }
+    if (!r.ok) { setBusy(false); return fail(r); }
     setRows(r.data);
     const h = await client.history(baseline.id, targetId);
     if (h.ok) setHistory(h.data);
@@ -153,15 +160,15 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
     setBusy(true); setProblem(null);
     const r = await client.createSetupPlan(baseline.id, targetId);
     setBusy(false);
-    if (!r.ok) return fail();
+    if (!r.ok) return fail(r);
     globalThis.location.assign(planPath(r.data.planId));
   }
 
   const toggle = (id: string): void => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const back = (n: number): void => { setProblem(null); setStep(n); if (n < 2) { setRows(null); setHistory([]); } };
+  const back = (n: number): void => { setProblem(null); setStep(n); if (n < 2) { setRows(null); setHistory([]); setSeen(null); } };
 
   return (
-    <CareShell fixture section="Baselines">
+    <CareShell fixture={fixture || servers.some((x) => x.simulated)} section="Baselines">
       <header className={c.header}>
         <h1 className={c.title} ref={titleRef} tabIndex={-1}>Baselines and server setup</h1>
         <p className={c.small}>Step {step + 1} of 4: {STEPS[step]}. Comparing copies and deletes nothing. A setup only ever happens through a plan you approve.</p>
@@ -194,8 +201,8 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
                   <label key={x.id} className={s.choice}>
                     <input type="radio" name={`${ids}-ref`} checked={referenceId === x.id} onChange={() => setReferenceId(x.id)} />
                     <span>
-                      <span className={s.choiceTitle}>{x.name} {x.production && <ProductionLabel />}</span>
-                      {x.role ?? "No role set"}. {age.text}.{age.old && <strong> The observation is more than a day old, so it may not describe the machine now.</strong>}
+                      <span className={s.choiceTitle}>{x.name} {x.production && <ProductionLabel />}{x.simulated && <> <span className={b.kind}>Simulated</span></>}</span>
+                      {x.role ?? "No role set"}. {age.text}.{age.old && <strong> {age.never ? "ServrSit has no facts about this machine yet." : "The observation is more than a day old, so it may not describe the machine now."}</strong>}
                     </span>
                   </label>
                 );
@@ -210,6 +217,8 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
         {step === 1 && reference && (
           <div className={s.form}>
             <p className={c.p}>From <strong>{reference.name}</strong>. Tick the conventions that should be part of the baseline.</p>
+            {inventory && <p className={c.small}>Listing {SOURCE_LABEL[inventory.source]}. {referenceAge({ observedAt: inventory.observedAt }, now, tz, uncertain).text}.</p>}
+            {inventory && inventory.notes.length > 0 && <div className={`${c.notice} ${c.noticeAttention}`} role="status"><p className={c.noticeTitle}>Not everything could be read</p><ul className={`${c.list} ${c.bullets}`}>{inventory.notes.map((n) => <li key={n}>{n}</li>)}</ul></div>}
             <fieldset className={s.fieldset}>
               <legend className={s.legend}>Eligible directories and Ubuntu packages</legend>
               {eligible.map((x) => (
@@ -244,7 +253,7 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
               {servers.filter((x) => x.id !== baseline.referenceId).map((x) => (
                 <label key={x.id} className={s.choice}>
                   <input type="radio" name={`${ids}-tgt`} checked={targetId === x.id} onChange={() => { setTargetId(x.id); setRows(null); setHistory([]); }} />
-                  <span><span className={s.choiceTitle}>{x.name} {x.production && <ProductionLabel />}</span>{x.role ?? "No role set"}. {referenceAge(x, now, tz, uncertain).text}.</span>
+                  <span><span className={s.choiceTitle}>{x.name} {x.production && <ProductionLabel />}{x.simulated && <> <span className={b.kind}>Simulated</span></>}</span>{x.role ?? "No role set"}. {referenceAge(x, now, tz, uncertain).text}.</span>
                 </label>
               ))}
             </fieldset>
@@ -253,6 +262,7 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
             {rows && groups && (
               <div role="region" aria-label="Comparison result" className={s.form}>
                 <p className={c.p} role="status">{summaryText(rows)}</p>
+                {seen && <p className={c.small}>Read {SOURCE_LABEL[seen.source]}. {referenceAge({ observedAt: seen.observedAt }, now, tz, uncertain).text}.</p>}
                 {groups.needsDecision.length > 0 && <><h3 className={s.h3}>Needs a decision</h3><ul className={b.rows}>{groups.needsDecision.map((r) => <Row key={r.conventionId} r={r} busy={busy} onMark={(why) => void mark(r.conventionId, why)} onUnmark={() => void mark(r.conventionId, null, true)} />)}</ul></>}
                 {groups.intentional.length > 0 && <><h3 className={s.h3}>Different by design</h3><ul className={b.rows}>{groups.intentional.map((r) => <Row key={r.conventionId} r={r} busy={busy} onMark={() => undefined} onUnmark={() => void mark(r.conventionId, null, true)} />)}</ul></>}
                 {groups.notChecked.length > 0 && <><h3 className={s.h3}>Not checked</h3><ul className={b.rows}>{groups.notChecked.map((r) => <Row key={r.conventionId} r={r} busy={busy} onMark={() => undefined} onUnmark={() => undefined} />)}</ul></>}
@@ -275,7 +285,7 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
             <p className={c.p}>Preparing <strong>{target.name}</strong> {target.production && <ProductionLabel />} from <strong>{baseline.name}</strong>.</p>
             <p className={c.p} role="status">{describeSetup(scope)}</p>
             {scope.directories.length > 0 && <><h3 className={s.h3}>Directories to create</h3><ul className={`${c.list} ${c.bullets}`}>{scope.directories.map((r) => <li key={r.conventionId}><span className={c.mono}>{r.label}</span>, {r.expected}</li>)}</ul></>}
-            {scope.packages.length > 0 && <><h3 className={s.h3}>Ubuntu packages to install</h3><ul className={`${c.list} ${c.bullets}`}>{scope.packages.map((r) => <li key={r.conventionId}><span className={c.mono}>{r.label}</span>, {r.expected}</li>)}</ul></>}
+            {scope.notIncluded.length > 0 && <><h3 className={s.h3}>Missing, not included</h3><ul className={`${c.list} ${c.bullets}`}>{scope.notIncluded.map((r) => <li key={r.conventionId}><span className={c.mono}>{r.label}</span>, {r.expected}: {NOT_INCLUDED_REASON}</li>)}</ul></>}
             {scope.leftAlone.length > 0 && <><h3 className={s.h3}>Left alone</h3><ul className={`${c.list} ${c.bullets}`}>{scope.leftAlone.map((x) => <li key={x.label}><span className={c.mono}>{x.label}</span>: {x.reason}</li>)}</ul></>}
             <div className={`${c.notice} ${c.noticeProgress}`}><p className={c.noticeTitle}>What a setup never touches</p><p>{EXCLUSION_STATEMENT}</p></div>
             {!target.writesEnabled && (

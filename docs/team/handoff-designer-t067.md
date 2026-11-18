@@ -127,3 +127,25 @@ Evidence: `docs/team/evidence/a11y-fixes/` (results and two screenshots). Not ru
 3. Activity filters run in the browser over the loaded records (up to 1000). Server-side filters (`type`, `server`, `result`, `from`, `to`, `q`) are not used yet.
 
 Next: T-078 (baselines), T-079 (settings).
+
+## Addendum 6: T-080 part 3 (baselines on the real T-078 client)
+
+**Merge:** `integration/next` merged into `feat/designer/t080` with no conflicts.
+
+**Changed**
+- `BaselineScreen` uses `api/baselines.ts` (T-078), no Coder file edited. The stub became `src/fixtures/baselinesFixture.ts`, implements the full real interface, and backs `/fixtures/baselines` (banner always on).
+- The `[FIXTURE DATA]` banner also shows on `/baselines` when the API lists a simulated server; those servers carry a "Simulated" tag.
+- Step 2 shows the inventory source, its age and the API's own notes ("Not everything could be read"). The comparison shows source and observation time.
+- Setup scope follows the contract: only missing directories (`actionable`) are planned. Missing packages appear under "Missing, not included" with the reason that no operation installs packages yet. The old "Ubuntu packages to install" list is gone.
+- Name validation uses the contract's `BASELINE_NAME`. A never-observed server reads "Never observed by ServrSit. ServrSit has no facts about this machine yet."
+- Error wording from `baselineErrorText`: `STALE_CANDIDATES` tells the owner to read the reference again; lost answers say the step may or may not have happened.
+
+**Checks**
+- `pnpm typecheck`, `pnpm test` (199 pass, 0 fail), `pnpm build`: clean.
+- Browser on my own API (:3005, fixture fleet) and preview (:5174): real step 1 and the real "could not read the server" answer (503 UNAVAILABLE, "Fixture mode: no server is inspected") display correctly. The full fixture flow (reference, conventions, save, compare, review plan) ran on `/fixtures/baselines`. axe wcag2a/aa/21aa: 0 violations on all four states. Evidence: `docs/team/evidence/t080/baselines-*`.
+
+**Not verified**
+- Steps 2 to 4 against the real API: fixture fleet mode refuses inventory (503), so save, compare, mark intentional and setup plan are covered by the fixture client and `api/baselines.test.ts` only.
+- A real setup plan opens `/plans/:planId`, but Plan review still runs on the care stub (`api/stubs/care.ts`); there is no real care client in `apps/web/src/api/`. Until Coder provides one, a real plan id will show "not found" there. Please confirm which task adds it.
+
+**Settings (T-079):** `apps/web/src/api/settings.ts` is not on `integration/next` yet, so the settings stub stays.

@@ -1,115 +1,25 @@
 /**
- * [FIXTURE] STUB client for baselines, comparison and server preparation
- * (T-073, PRD FR-09 and FR-15, UX Spec §12). No baseline API or contract
- * exists yet, so these types are local and PROVISIONAL; Coder should propose a
- * contract in packages/contracts and replace this file. Every server here is a
- * synthetic "Fixture …" machine: a comparison against a real server would have
- * to come from real observations of directories, which the API does not
- * collect yet. Proposed endpoints:
- *
- *   GET  /api/baselines/candidates?reference=:id         eligible and ineligible conventions with reasons
- *   POST /api/baselines {name, referenceId, conventionIds}  -> Baseline (versioned, with the source observation)
- *   POST /api/baselines/:id/compare {targetId}            -> ComparisonRow[] (read-only)
- *   PUT  /api/baselines/:id/exceptions {targetId, conventionId, reason?}   mark intentional (record only)
- *   DELETE /api/baselines/:id/exceptions/:targetId/:conventionId
- *   GET  /api/baselines/:id/history?target=:id            append-only record of marks and edits
- *   POST /api/baselines/:id/setup-plan {targetId}         -> {planId}: opens the canonical Plan review (/plans/:id)
- *
- * Rules the API must keep (the UI relies on them): a comparison copies and
- * deletes nothing; marking intentional changes only the exception record, never
- * the server; the setup plan excludes credentials, SSH host keys, application
- * data, databases, personal files and machine-specific network settings; every
- * real host's plan is blocked by writesEnabled=false like any other plan.
+ * [FIXTURE DATA] Baselines client (T-073, moved here by T-080). Implements the
+ * real BaselinesClient interface (api/baselines.ts) over an in-memory model of
+ * synthetic "Fixture …" servers. Used only by /fixtures/baselines. The real
+ * /baselines screen never imports this. A setup plan from here opens the
+ * fixture plans of the Plan review; nothing is sent anywhere.
  */
+import type { CompareStatus } from "@servrsit/contracts";
+import type { Baseline, BaselineServer, BaselinesClient, BaselinesResult, Candidate, CandidatesResponse, Comparison, ComparisonRow, HistoryEvent } from "../api/baselines";
+import { gate } from "../lib/fixtureState";
 
-import { gate } from "../../lib/fixtureState";
-
-export type ConventionKind = "directory" | "package";
-
-export interface BaselineServer {
-  readonly id: string;
-  readonly name: string;
-  readonly role: string | null;
-  readonly production: boolean;
-  /** False for every real host (ADR-014): a setup plan for it opens blocked. */
-  readonly writesEnabled: boolean;
-  /** When the facts about this server were last observed. */
-  readonly observedAt: string;
-}
-
-export interface Candidate {
-  readonly id: string;
-  readonly kind: ConventionKind;
-  /** The path or package name. */
-  readonly label: string;
-  /** For example "owner deploy:deploy, mode 0755" or "version 1.24.0". */
-  readonly detail: string;
-  readonly eligible: boolean;
-  /** Why an ineligible item cannot be part of a baseline. */
-  readonly ineligibleReason: string | null;
-}
-
-export interface Baseline {
-  readonly id: string;
-  readonly name: string;
-  readonly version: number;
-  readonly referenceId: string;
-  readonly referenceName: string;
-  readonly sourceObservedAt: string;
-  readonly createdAt: string;
-  readonly conventions: readonly Candidate[];
-}
-
-export type CompareStatus = "matches" | "missing" | "different-by-design" | "conflict" | "not-checked";
-
-export interface ComparisonRow {
-  readonly conventionId: string;
-  readonly kind: ConventionKind;
-  readonly label: string;
-  readonly expected: string;
-  /** What the target has, or null when nothing was found or it was not checked. */
-  readonly found: string | null;
-  readonly status: CompareStatus;
-  /** Our own explanation of the status. */
-  readonly reason: string;
-  /** Set when the owner marked this difference intentional on this machine. */
-  readonly intentional: { readonly reason: string | null; readonly markedAt: string } | null;
-}
-
-export interface HistoryEvent {
-  readonly at: string;
-  readonly text: string;
-}
-
-export interface SetupPlanResult {
-  /** Opens at /plans/:planId, the same Plan review used for updates. */
-  readonly planId: string;
-}
-
-export type BaselinesResult<T> = { readonly ok: true; readonly data: T } | { readonly ok: false; readonly error: "NOT_FOUND" | "NOT_ALLOWED" | "NETWORK" };
-
-export interface BaselinesClient {
-  listServers(): Promise<BaselinesResult<readonly BaselineServer[]>>;
-  listCandidates(referenceId: string): Promise<BaselinesResult<readonly Candidate[]>>;
-  saveBaseline(input: { name: string; referenceId: string; conventionIds: readonly string[] }): Promise<BaselinesResult<Baseline>>;
-  compare(baselineId: string, targetId: string): Promise<BaselinesResult<readonly ComparisonRow[]>>;
-  markIntentional(baselineId: string, targetId: string, conventionId: string, reason: string | null): Promise<BaselinesResult<readonly ComparisonRow[]>>;
-  unmarkIntentional(baselineId: string, targetId: string, conventionId: string): Promise<BaselinesResult<readonly ComparisonRow[]>>;
-  history(baselineId: string, targetId: string): Promise<BaselinesResult<readonly HistoryEvent[]>>;
-  createSetupPlan(baselineId: string, targetId: string): Promise<BaselinesResult<SetupPlanResult>>;
-}
-
-// ── [FIXTURE] in-memory model ────────────────────────────────────────────────
+// ── in-memory model ────────────────────────────────────────────────
 
 const wait = (): Promise<void> => new Promise((r) => globalThis.setTimeout(r, 150));
 
 export function createFixtureBaselinesClient(now: () => Date = () => new Date()): BaselinesClient {
   const ago = (min: number): string => new Date(now().getTime() - min * 60_000).toISOString();
   const servers: readonly BaselineServer[] = [
-    { id: "b-web1", name: "Fixture Web-1", role: "Web server (reference candidate)", production: true, writesEnabled: false, observedAt: ago(12) },
-    { id: "b-old", name: "Fixture Web-0", role: "Web server", production: false, writesEnabled: true, observedAt: ago(3 * 24 * 60) },
-    { id: "b-dev2", name: "Fixture Dev-2", role: "New development server", production: false, writesEnabled: true, observedAt: ago(8) },
-    { id: "b-web2", name: "Fixture Web-2", role: "New web server", production: true, writesEnabled: false, observedAt: ago(15) },
+    { id: "b-web1", name: "Fixture Web-1", role: "Web server (reference candidate)", production: true, writesEnabled: false, simulated: true, observedAt: ago(12) },
+    { id: "b-old", name: "Fixture Web-0", role: "Web server", production: false, writesEnabled: true, simulated: true, observedAt: ago(3 * 24 * 60) },
+    { id: "b-dev2", name: "Fixture Dev-2", role: "New development server", production: false, writesEnabled: true, simulated: true, observedAt: ago(8) },
+    { id: "b-web2", name: "Fixture Web-2", role: "New web server", production: true, writesEnabled: false, simulated: true, observedAt: ago(15) },
   ];
   const candidates: readonly Candidate[] = [
     { id: "d-app", kind: "directory", label: "/srv/app", detail: "owner deploy:deploy, mode 0755", eligible: true, ineligibleReason: null },
@@ -154,6 +64,7 @@ export function createFixtureBaselinesClient(now: () => Date = () => new Date())
       const intentionalOk = m !== null && (base.status === "missing" || base.status === "conflict");
       return {
         conventionId: c.id, kind: c.kind, label: c.label, expected: c.detail, found: base.found,
+        actionable: base.status === "missing" && c.kind === "directory",
         status: intentionalOk ? "different-by-design" : base.status,
         reason: intentionalOk ? "You marked this difference as intentional for this server only." : base.reason,
         intentional: intentionalOk ? m : null,
@@ -163,24 +74,34 @@ export function createFixtureBaselinesClient(now: () => Date = () => new Date())
   const note = (b: string, t: string, text: string): void => { const k = `${b}|${t}`; hist.set(k, [{ at: now().toISOString(), text }, ...(hist.get(k) ?? [])]); };
   return {
     async listServers() { await wait(); return gate<BaselinesResult<readonly BaselineServer[]>>(() => ({ ok: true, data: servers }), () => ({ ok: false, error: "NETWORK" })); },
-    async listCandidates(referenceId) { await wait(); return servers.some((s) => s.id === referenceId) ? { ok: true, data: candidates } : { ok: false, error: "NOT_FOUND" }; },
+    async listBaselines() { await wait(); return { ok: true, data: [...baselines.values()] }; },
+    async candidatesResponse(referenceId) {
+      await wait();
+      const ref = servers.find((s) => s.id === referenceId);
+      if (!ref) return { ok: false, error: "NOT_FOUND" };
+      const data: CandidatesResponse = { referenceId, observedAt: ref.observedAt ?? now().toISOString(), source: "simulated", candidates: [...candidates], notes: ["[FIXTURE DATA] Listing from a synthetic server."] };
+      return { ok: true, data };
+    },
+    async listCandidates(referenceId) { const r = await this.candidatesResponse(referenceId); return r.ok ? { ok: true, data: r.data.candidates } : r; },
     async saveBaseline(input) {
       await wait();
       const ref = servers.find((s) => s.id === input.referenceId);
       if (!ref) return { ok: false, error: "NOT_FOUND" };
       const chosen = candidates.filter((c) => input.conventionIds.includes(c.id));
       if (chosen.some((c) => !c.eligible) || chosen.length !== input.conventionIds.length) return { ok: false, error: "NOT_ALLOWED" };
-      const b: Baseline = { id: `baseline-${++n}`, name: input.name, version: 1, referenceId: ref.id, referenceName: ref.name, sourceObservedAt: ref.observedAt, createdAt: now().toISOString(), conventions: chosen };
+      const b: Baseline = { id: `baseline-${++n}`, name: input.name, version: 1, referenceId: ref.id, referenceName: ref.name, source: "simulated", sourceObservedAt: ref.observedAt ?? now().toISOString(), createdAt: now().toISOString(), conventions: chosen };
       baselines.set(b.id, b);
       return { ok: true, data: b };
     },
-    async compare(baselineId, targetId) {
+    async comparison(baselineId, targetId) {
       await wait();
       const b = baselines.get(baselineId);
       if (!b) return { ok: false, error: "NOT_FOUND" };
       const r = rows(b, targetId);
-      return r ? { ok: true, data: r } : { ok: false, error: "NOT_FOUND" };
+      const data: Comparison | null = r ? { baselineId, version: b.version, targetId, observedAt: servers.find((x) => x.id === targetId)?.observedAt ?? now().toISOString(), source: "simulated", rows: r } : null;
+      return data ? { ok: true, data } : { ok: false, error: "NOT_FOUND" };
     },
+    async compare(baselineId, targetId) { const r = await this.comparison(baselineId, targetId); return r.ok ? { ok: true, data: r.data.rows } : r; },
     async markIntentional(baselineId, targetId, conventionId, reason) {
       await wait();
       const b = baselines.get(baselineId);
@@ -203,7 +124,17 @@ export function createFixtureBaselinesClient(now: () => Date = () => new Date())
       await wait();
       const target = servers.find((s) => s.id === targetId);
       if (!baselines.has(baselineId) || !target) return { ok: false, error: "NOT_FOUND" };
-      return { ok: true, data: { planId: target.writesEnabled ? "fixture-plan-prepare" : "fixture-plan-prepare-blocked" } };
+      const b = baselines.get(baselineId);
+      const r = b ? rows(b, targetId) ?? [] : [];
+      const missing = r.filter((x) => x.status === "missing");
+      return {
+        ok: true,
+        data: {
+          planId: target.writesEnabled ? "fixture-plan-prepare" : "fixture-plan-prepare-blocked",
+          included: missing.filter((x) => x.actionable).length,
+          notIncluded: missing.filter((x) => !x.actionable).map((x) => ({ label: x.label, reason: "No supported operation installs packages yet." })),
+        },
+      };
     },
   };
 }
