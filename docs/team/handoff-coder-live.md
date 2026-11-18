@@ -1724,3 +1724,43 @@ Tester @1c9d5a7: auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, 
 ```
 
 Next: T-081.
+
+## T-081: registration defects (branch `feat/coder/registration-fixes`, from `integration/next`)
+
+These are the fixes for the Tester's report `test-report-registration-001` (on `feat/tester/server-registration`).
+
+- **R-1: production is now yes / no / not sure.** Requests keep `production` (true or false) and may add `productionStatus`. If both are sent they must agree; otherwise the request gets 400.
+  - "Not sure" is stored as `production = 1`, so the fleet, plans and approvals treat it as production everywhere. It needs the production acknowledgements, and a test checks this.
+  - Drafts and the PATCH response carry `productionStatus`. It is optional in the schema only so the Designer's existing fixtures still parse.
+  - The registry gets a `production_status` column through an in-place migration. Older rows derive the value from `production`.
+- **R-2: privilege check** (`packages/ssh/src/privilege.ts`).
+  - **What it runs:** exactly `sudo -n -l` as the login user. It lists the account's sudo rules, runs nothing as root, never prompts and never gives a password. There is no `sudo -n true` and no other sudo form; a script test checks the exact command.
+  - **When:** only in the first check of a new server, after a successful collection. It is never part of the 15-minute health check, whose no-sudo test is unchanged.
+  - **Disclosure:** `PRIVILEGE_CHECK.disclosure` in the contract. It mentions the auth-log entry and the possible email to the server's administrator. The check appears as the step "Checking sudo rules (sudo -n -l)" from the start of the check.
+  - **What is reported:** only a classification, never the output. `FirstCheck.privilege` is `{level: no-sudo-rules | passwordless-sudo | unknown, broad, summary}`. Passwordless sudo for every command (`(ALL) NOPASSWD: ALL` and similar) is `broad`, and the step's reason carries a warning. "A password is required" is `unknown`.
+  - **A failed check** marks the step unavailable and leaves `privilege` null. It never blocks the server.
+  - **Test fixtures** are recorded-style `sudo -n -l` outputs.
+- **D-R3: abandoned drafts.** Expired drafts and their private keys are now swept at start-up and every 15 minutes (`ServerRegistry.startSweeper`), and still on each new draft.
+- **D-R2: re-registering an existing server** under its own name now returns a draft whose `duplicateOf` names that server. It used to get a name error.
+- **D-R1: very long ids** (Fastify `maxParamLength: 2048`) now get the contract's 404 (`SERVER_NOT_FOUND` / `DRAFT_NOT_FOUND`). The path is no longer echoed.
+- **O-R1:** a rescan refused after confirmation now tells the owner to delete the draft and start again if the key changed.
+- **Not changed:** R-5 (disconnect reporting running work). Disconnect is still refused while any operation is unresolved, and `GET /api/servers/:id/disconnect-preview` (T-079) lists that work.
+
+**For the Tester:** the privilege check has a seam, `servers.privilegeProbe`, next to `servers.collector`. A binding must inject it. **Without it, the default runs real `/usr/bin/ssh`.**
+
+**For the Designer:**
+
+- To offer "Not sure", send `productionStatus: "not_sure"` with `production: true`.
+- Show `PRIVILEGE_CHECK.disclosure` before the first check starts, and show `FirstCheck.privilege.summary` after it, with the warning when `broad`.
+- `src/fixtures/serversFixture.ts` can add `productionStatus` and `privilege` when convenient. Both are optional in the schema.
+
+**Process note:** one local test run, before the probe seam existed, used the default privilege probe. That run spawned `/usr/bin/ssh` toward the synthetic test addresses `100.101.102.103` and `100.101.102.104` with freshly made keys that no server knows. No real server was registered or authorised for those keys. The addresses are fixtures in the Tailscale range. If a device holds one of them, it saw a failed public-key sign-in. Since the seam was added, every test injects the probe.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 242, ai 156, web 198, ssh 61, store 28, domain 22, worker 19, infra 9; typecheck all 9 exit 0; web build ok
+Tester @1c9d5a7: auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a, known), zt01 13/13 with the reviewed list
+```
+
+Next: T-082 (care client), then merge `feat/designer/t080` again.

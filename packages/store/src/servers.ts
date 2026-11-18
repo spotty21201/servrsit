@@ -105,6 +105,9 @@ export interface IssuedAccessKey {
   readonly createdAt: string;
 }
 
+/** T-081: "not_sure" counts as production everywhere (`production` is true). */
+export type ProductionStatus = "yes" | "no" | "not_sure";
+
 export interface StoredServer {
   readonly id: string;
   /** "import": came from hosts.json once. "registration": added through the API. */
@@ -112,7 +115,9 @@ export interface StoredServer {
   readonly access: "ssh" | "local";
   readonly name: string;
   readonly role: string | null;
+  /** True for "yes" and "not_sure": production precautions apply. */
   readonly production: boolean;
+  readonly productionStatus: ProductionStatus;
   readonly address: string | null;
   readonly port: number | null;
   readonly user: string | null;
@@ -130,7 +135,7 @@ export interface StoredServer {
   readonly disconnectedAt: string | null;
 }
 
-export type NewServer = Omit<StoredServer, "writesEnabled" | "disconnectedAt">;
+export type NewServer = Omit<StoredServer, "writesEnabled" | "disconnectedAt" | "production">;
 
 export interface StoredDraft {
   readonly id: string;
@@ -157,7 +162,7 @@ export interface ServerEvent {
 export type ServerUpdate = {
   readonly name?: string | undefined;
   readonly role?: string | null | undefined;
-  readonly production?: boolean | undefined;
+  readonly productionStatus?: ProductionStatus | undefined;
 };
 
 export type RegistryWriteResult =
@@ -169,7 +174,7 @@ export type ImportResult =
   | { readonly kind: "already-imported"; readonly at: string };
 
 interface ServerRow {
-  id: string; source: string; access: string; name: string; role: string | null; production: number;
+  id: string; source: string; access: string; name: string; role: string | null; production: number; production_status: string | null;
   address: string | null; port: number | null; user: string | null; identity_file: string | null;
   known_hosts_file: string | null; important_services: string; collect: number;
   collect_disabled_reason: string | null; host_key: string | null; access_key: string | null;
@@ -189,6 +194,7 @@ function toServer(r: ServerRow): StoredServer {
     name: r.name,
     role: r.role,
     production: r.production === 1,
+    productionStatus: (r.production_status as ProductionStatus | null) ?? (r.production === 1 ? "yes" : "no"),
     address: r.address,
     port: r.port,
     user: r.user,
@@ -236,6 +242,15 @@ export class SqliteServerStore {
   constructor(options: SqliteServerStoreOptions) {
     this.db = new DatabaseSync(options.path);
     this.db.exec(SCHEMA);
+    this.migrate();
+  }
+
+  /** T-081: production_status (yes/no/not_sure). Older rows keep NULL and derive it from `production`. */
+  private migrate(): void {
+    const cols = this.db.prepare("PRAGMA table_info(servers)").all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "production_status")) {
+      this.db.exec("ALTER TABLE servers ADD COLUMN production_status TEXT CHECK (production_status IS NULL OR production_status IN ('yes', 'no', 'not_sure'))");
+    }
   }
 
   private tx<T>(fn: () => T): T {
@@ -261,15 +276,16 @@ export class SqliteServerStore {
     this.db
       .prepare(
         `INSERT INTO servers (id, source, access, name, role, production, address, port, user, identity_file,
-           known_hosts_file, important_services, collect, collect_disabled_reason, host_key, access_key, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           known_hosts_file, important_services, collect, collect_disabled_reason, host_key, access_key, created_at, production_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
-        s.id, s.source, s.access, s.name, s.role, s.production ? 1 : 0, s.address, s.port, s.user, s.identityFile,
+        s.id, s.source, s.access, s.name, s.role, s.productionStatus === "no" ? 0 : 1, s.address, s.port, s.user, s.identityFile,
         s.knownHostsFile, JSON.stringify(s.importantServices), s.collect ? 1 : 0, s.collectDisabledReason,
         s.hostKey === null ? null : JSON.stringify(s.hostKey),
         s.accessKey === null ? null : JSON.stringify(s.accessKey),
         s.createdAt,
+        s.productionStatus,
       );
   }
 
@@ -343,10 +359,12 @@ export class SqliteServerStore {
         const next = {
           name: change.name ?? current.name,
           role: change.role === undefined ? current.role : change.role,
-          production: change.production ?? current.production,
+          productionStatus: change.productionStatus ?? current.productionStatus,
         };
-        this.db.prepare("UPDATE servers SET name = ?, role = ?, production = ? WHERE id = ?").run(next.name, next.role, next.production ? 1 : 0, id);
-        const before = { name: current.name, role: current.role, production: current.production };
+        this.db
+          .prepare("UPDATE servers SET name = ?, role = ?, production = ?, production_status = ? WHERE id = ?")
+          .run(next.name, next.role, next.productionStatus === "no" ? 0 : 1, next.productionStatus, id);
+        const before = { name: current.name, role: current.role, productionStatus: current.productionStatus };
         this.insertEvent(id, "updated", actor, { before, after: next }, now.toISOString());
         const updated = this.get(id);
         if (updated === null) throw new Error("updated server row is missing");

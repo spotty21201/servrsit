@@ -58,3 +58,5 @@ export {
   INVENTORY_SECTIONS,
 } from "./inventory.js";
 export type { Inventory, InventoryDeps, InventoryDirectory, InventoryResult, Part } from "./inventory.js";
+export { buildPrivilegeScript, classifySudo, PRIVILEGE_SUMMARIES, probePrivilegeViaSsh } from "./privilege.js";
+export type { PrivilegeDeps, PrivilegeLevel, PrivilegeProbeResult, PrivilegeResult } from "./privilege.js";
