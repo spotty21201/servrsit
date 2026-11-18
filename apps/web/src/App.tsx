@@ -14,10 +14,20 @@ import { useEffect, useState } from "react";
 import { useFleet } from "./api/useFleet";
 import { OverviewScreen } from "./components/overview/index.js";
 import { toOverviewVM } from "./components/overview/fleetViewModel.js";
+import { matchRoute } from "./lib/router";
+import { PlanScreen } from "./care/PlanScreen";
+import { OperationScreen } from "./care/OperationScreen";
 
 const CLOCK_TICK_MS = 30_000;
 
 export default function App() {
+  const route = matchRoute(globalThis.location.pathname);
+  if (route.name === "plan") return <PlanScreen planId={route.id} />;
+  if (route.name === "operation") return <OperationScreen operationId={route.id} />;
+  return <OverviewRoute />;
+}
+
+function OverviewRoute() {
   const fleet = useFleet();
   const [now, setNow] = useState(() => new Date());
 

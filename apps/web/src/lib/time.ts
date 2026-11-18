@@ -96,3 +96,20 @@ export function parseIso(iso: string | null | undefined): Date | null {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d;
 }
+
+/** "09:42:10" in the owner zone, for step lists and logs where seconds matter. */
+export function formatTimeSeconds(d: Date, tz: string): string {
+  return new Intl.DateTimeFormat(LOCALE, {
+    timeZone: resolveTimeZone(tz), hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+  }).format(d);
+}
+
+/** Time until `d`: "in 12 min", "in 45 s", or "expired". Not announced per second. */
+export function formatUntil(d: Date, now: Date): string {
+  const sec = Math.round((d.getTime() - now.getTime()) / 1000);
+  if (sec <= 0) return "expired";
+  if (sec < 60) return `in ${sec} s`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `in ${min} min`;
+  return `in ${Math.round(min / 60)} h`;
+}
