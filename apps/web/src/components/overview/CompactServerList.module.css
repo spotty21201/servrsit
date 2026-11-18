@@ -22,7 +22,8 @@
 .who { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
 .icon { flex: none; width: 32px; height: 32px; }
 .names { display: flex; flex-direction: column; min-width: 0; }
-.name { font-family: var(--font-pixel); font-size: 1rem; line-height: 1.25rem; color: var(--color-ink); overflow-wrap: anywhere; text-decoration: none; }
+/* 44 px tall link box (padding cancelled by an equal negative margin) plus the whole-row ::after hit area (D-U10). */
+.name { --link-pad: calc((var(--touch-target-min) - 1.25rem) / 2); display: block; padding-block: var(--link-pad); margin-block: calc(-1 * var(--link-pad)); font-family: var(--font-pixel); font-size: 1rem; line-height: 1.25rem; color: var(--color-ink); overflow-wrap: anywhere; text-decoration: none; }
 .name:hover { text-decoration: underline; text-decoration-thickness: 2px; }
 /* The whole row opens the server; the action link sits above it. */
 .name::after { content: ""; position: absolute; inset: 0; }

@@ -24,6 +24,7 @@
 .when { font-size: var(--text-compact-size); color: var(--color-muted-ink); }
 .title { font-weight: var(--font-weight-semibold); overflow-wrap: anywhere; }
 /* The whole row is the hit area for its link (44 px+), not just the title text. */
+.title a { display: block; --link-pad: calc((var(--touch-target-min) - 1.3rem) / 2); padding-block: var(--link-pad); margin-block: calc(-1 * var(--link-pad)); }
 .title a::after { content: ""; position: absolute; inset: 0; }
 .title a:focus-visible::after { outline: 2px solid var(--color-focus); outline-offset: -2px; border-radius: var(--radius-small); }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-1-half); font-size: var(--text-compact-size); color: var(--color-muted-ink); }

@@ -128,6 +128,7 @@
      2 lines, then ellipsis. The full name stays in the DOM (accessible name)
      and in the link's title attribute for pointer users. */
   overflow-wrap: anywhere;
+  /* Clamp to two lines (the link inside is inline, so the clamp keeps working). */
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -135,12 +136,16 @@
   overflow: hidden;
 }
 
+/* The link is an inline box whose own box is 44 px tall: vertical padding on an inline element does not move
+   the layout (the approved density is kept) but is part of its box, so the link measures 44 px. The ::after
+   below also stretches the hit area over the whole card (D-U10). */
 .nameLink {
+  --link-pad: calc((var(--touch-target-min) - var(--text-card-title-line-height)) / 2);
+  padding-block: var(--link-pad);
   color: inherit;
   text-decoration: none;
 }
 
-/* The whole card (not the 20 px name text) opens the server. The action button sits above it. */
 .nameLink::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
 .primaryAction { position: relative; z-index: 1; }
 
