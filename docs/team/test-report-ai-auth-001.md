@@ -1,7 +1,7 @@
 # Test Report: AI owner context (T-050), fact check (T-051), owner login (T-053)
 
 **Tester:** Kiro Tester  
-**Date:** 2026-11-17 (UTC)  
+**Date:** 2026-11-17 as stamped by Merauke's clock, which runs about 7 h fast (§9.4). True UTC is roughly 7 h earlier. Every absolute time in this report has that offset; durations and counts do not.  
 **Branch:** `feat/tester/ai-auth` (`3aa8fca`)  
 **Code tested:** `feat/coder/ai-context` commits `4ff055c` (T-050) and `7576a61` (T-051), with handoff `7332204`. Integration has since merged them (`fc84dd6`). Same commits.  
 **Method:** tests written from ADR-015, the owner-context draft, the DEF-L1/L2 incident record, Technical Spec §5, PRD FR-01 and your task list. For T-051 I wrote and ran my scenarios **before reading Coder's checker or handoff**.
@@ -12,7 +12,7 @@
 |---|---|
 | **T-050** owner context | **Tested.** Layering, caps, injection, fail-closed behaviour work. **One High finding:** the secret detector has blind spots (F1). |
 | **T-051** fact check | **Tested.** Catches the original incident and most invented or swapped numbers. **Two Medium findings:** it discards correct real answers (3 of 9) and misses many phrasings (F2, F3). |
-| **T-053** owner login | **NOT RUN. It has not landed.** Work is in progress on `feat/coder/owner-auth` (21 uncommitted files, nothing committed after a 9-minute watch). Baseline recorded; 27 scenarios written and self-validated, ready to bind (§4). |
+| **T-053** owner login | **Tested (§9, added later).** 27 scenarios bound and run: all pass after one scenario correction that was my mistake. 22 extra checks found 5 defects (2 Medium on denial of service, 3 Low on clock correction and setup). **Merauke's +7 h clock matters for login (§9.4).** |
 
 No product code was modified. No real server was contacted.
 
@@ -266,3 +266,129 @@ docs/team/test-report-ai-auth-001.md   this report
 ```
 
 Run: `cd apps/api && pnpm exec tsx --test --test-reporter=spec ../../tests/e2e/<folder>/<file>.test.mts`. Real calls only run with `AI_REAL_CALLS=1`; stored answers replay for free.
+
+
+---
+
+# 9. T-053 owner login: bound and run
+
+**Added after T-053 landed.** Code tested: `feat/coder/owner-auth` `2bfaa34`, handoff `aef7e3a`, merged into my branch as `e6ae0eb`. Section 4 above ("NOT RUN") is superseded by this section. Branch `feat/tester/ai-auth`. No production source was changed and no real host was contacted (the full-wiring runs use `mode: "fixture"` with start-up checks off). No AI calls were made (9 of 10 used earlier, 1 still in reserve).
+
+## 9.1 Result: PASS on the 27 scenarios, with 5 defects found by the extra checks (2 Medium, 3 Low)
+
+| Run | Result |
+|---|---|
+| 27 scenarios, isolated wiring (real `OwnerAuth`, guard and routes; generous limiter) | **27/27 pass** |
+| 10 of the scenarios again on the full `buildServer` wiring (AU-01a, 01c, 02a, 05a, 05b, 05c, 06a, 06b, 06c, 06d) | **10/10 pass** |
+| 22 extra checks (`auth-extra.test.mts`) | **17 pass, 5 `todo` that fail as predicted.** The 5 failing tests show 4 of the defects (D-A1, D-A3, D-A3b, D-A4). D-A2 is recorded by passing tests that print the measured lock lengths (§9.3). |
+| 401 route sweep (`routes-401`) | **7/7 pass.** Baseline against the old stub was 3 pass / 4 fail, with all 12 routes open. **F8 is closed.** |
+| My tests of the tests (reference model, 28 faults) | 30/30 still pass after the AU-04b change |
+| TOTP oracle against RFC 4226/6238 vectors | 5/5 |
+| Whole repo `pnpm test` | **430 pass, 0 fail** |
+
+**First run was 36 of 37, not 37 of 37.** AU-04b failed on its original text. That was my error, not a product defect (§9.5). The scenario was corrected and re-run, and the product was not changed.
+
+**Why two wirings.** `buildServer` cannot inject the rate limiter. The built-in one allows 10 auth POSTs per minute for everyone, and a login is 2 POSTs. On that wiring a lockout test would end in `RATE_LIMITED` and pass for the wrong reason. The isolated wiring uses the product's real code and its logger options, but gives the limiter a very high limit. The full wiring then confirms the same behaviour through the real server for scenarios that need at most 8 auth POSTs.
+
+**Independence.** Codes come from my own RFC 6238 implementation (`support/totp.mts`), not from the product's `otpauth` library or Coder's `testing.ts` helper. A "pass" therefore cannot be the product agreeing with itself.
+
+## 9.2 Scenario results
+
+| Area | Scenarios | Result |
+|---|---|---|
+| Setup token | AU-01a single use (wrong, empty, reuse, any token after enrolment refused); AU-01b five concurrent uses: exactly one wins and one secret exists; AU-01c login before setup is a clean 4xx; AU-01d token is long and not a placeholder | **4/4 PASS** |
+| TOTP | AU-02a correct code works and the secret is never echoed; AU-02b wrong, stale (-3 steps), future (+3) and 11 malformed shapes refused, and wrong/stale/future get **the same** answer; AU-02c +/-2 steps refused | **3/3 PASS** |
+| Replay | AU-03a used code refused from the same caller, another address and with no cookie; AU-03b still refused one step later; AU-03c next code works; AU-03d previous-step code | **4/4 PASS** |
+| Lockout | AU-04a after 10 wrong codes even the correct one is refused; AU-04b another address or cookie cannot bypass it (corrected, §9.5); AU-04c ends by itself; AU-04d two typos do not lock; AU-04e arrays/objects of guesses refused | **5/5 PASS** |
+| Sessions | AU-05a cookie HttpOnly, SameSite=Strict, path `/`, 43 characters, new on every login; AU-05b a planted cookie is never adopted and is dead after login; AU-05c logout kills the session on the server; AU-05d idle expiry; AU-05e 8-hour absolute limit while busy | **5/5 PASS** |
+| CSRF | AU-06a no, wrong and other-session token are each exactly **403** while the valid token passes; AU-06b foreign Origin and `Sec-Fetch-Site: cross-site` are 403 even with the right token; AU-06c GET needs no token; AU-06d no session is 401 | **4/4 PASS** |
+| No secrets | AU-07a no setup token, TOTP secret (base32 or hex), session id, CSRF token or submitted code in the log; AU-07b no refusal echoes input | **2/2 PASS** |
+
+**Checked that these passes mean something.** Each scenario has a positive control (a correct login succeeds in the same run). CSRF and origin refusals must be 403 specifically, so a 400 or 401 cannot hide a missing check. The log scenario asserts the log is not empty. The same scenarios catch all 28 injected faults in my reference model. **I did not mutate the real product code for this suite**, unlike the care loop. So "the scenarios would catch a regression in T-053" rests on the model check plus these controls.
+
+**`Sec-Fetch-Site: cross-site` is still refused.** I suspected the replacement of the old `CsrfGuard` had dropped it. It has not (`csrf.ts` `originAllowed`).
+
+## 9.3 Defects and observations from the extra checks
+
+Severity assumes the deployment in the steering files (one owner, reached over loopback or the private Tailscale network).
+
+| ID | Severity | Finding | Evidence |
+|---|---|---|---|
+| **D-A1** | **Medium** | **An anonymous caller can block the owner's login with 10 requests a minute.** One global limit (10 auth POSTs per 60 s) is checked in `admit()` **before** the body is validated and before any credential is looked at, and it is not per address. 10 empty-body POSTs to `/api/auth/login` made the owner's correct login return `429 RATE_LIMITED`. Repeating that every minute keeps the owner out. | X-05 (`todo`, fails). The 11th POST gets 429 with `Retry-After` and the window recovers (X-05b passes), so the limiter itself works. |
+| **D-A2** | **Medium** | **An anonymous caller with no credentials can lock the owner out, and keep them locked.** Five wrong passwords lock the account for 30 s; each further failure at expiry doubles it. Observed lock lengths: **30, 60, 120, 240, 480, 900, 900, 900 s** (cap 15 min). The owner's correct password and recovery codes are refused while locked. Sending 6 failures from 6 different addresses locked the owner. At the cap, one request every 15 minutes holds the lock indefinitely. This is the usual cost of account lockout; the missing part is anything that keeps the owner's own route open (for example, tracking the owner's known device or address separately). Invariant 10 is not violated for SSH, but the web owner route can be denied. | X-03, X-04 (pass: they record the behaviour). |
+| **D-A3** | Low | **Clock correction after the clock was fast leaves the owner locked out of TOTP for the length of the skew.** See §9.4. Recovery codes still work. | X-17 (`todo`, fails), X-17b measured **7.1 h**. |
+| **D-A3b** | Low | **A lock and a session idle timer set on a fast clock last for the skew after the clock is corrected.** A 30 s lock was still in force 2 minutes after a 7 h step back. A session idle for 2 hours was still valid (the idle limit is 60 minutes). | X-18, X-19 (`todo`, fail). |
+| **D-A4** | Low | **An abandoned enrolment strands the owner until the API is restarted.** If the owner closes the tab after the QR code, the setup token is already spent. A retry after the 15-minute ticket window returns `403 SETUP_UNAVAILABLE`. A restart issues a new token and works (X-14b passes), but the owner must know to do that. | X-14 (`todo`, fails), X-14b. |
+| O-A1 | Observation | The TOTP secret and the CSRF token are readable in the database file. The file is mode 0600, and the password, setup token, session ids, tickets and recovery codes are **not** present in plaintext. The TOTP secret is a known limit in ADR-017; the CSRF token is useless without the session id. | X-02 prints both facts. |
+| O-A2 | Observation | A request with **no Origin header** is allowed by `originAllowed` (the CSRF token is still required). Fine for non-browser callers. A browser always sends Origin on cross-origin POSTs. | `csrf.ts`; AU-06a/b. |
+| O-A3 | Observation, **not tested** | The default allowed origins include `http://100.104.220.8:5173` (plain HTTP on the Tailscale address). In production `secureCookies` is true, and browsers do not store `Secure` cookies from a plain-HTTP origin other than localhost. If the owner runs production mode over that address, login may appear to succeed but the session cookie would be dropped. I have no browser here. | Please test in a real browser before enabling production mode. |
+| O-A4 | Observation | Argon2id costs about 19 ms per login attempt on this machine, and a wrong username costs the same as a wrong password (median 19.0 vs 18.9 ms, same status and body). No enumeration by answer or time. | X-07 passes. |
+
+**Checked and held (no finding):** the replay race (5 concurrent logins with the same valid code, different tickets: exactly one succeeds, X-08); second-factor ticket single use and 5-minute expiry (X-09); recovery codes are 10 distinct, at least 10 characters, single use, need the password step, are refused while locked and never reach the log (X-06); no path variant, HEAD or OPTIONS request without a session returned data (15 paths × 3 methods, X-10); malformed JSON, wrong content type, oversized and odd-typed bodies on all four session-creating routes give a plain 4xx with no stack trace (X-11); enrolment, MFA and session cookies are HttpOnly, SameSite=Strict, path-scoped and have a Max-Age, and `Secure` follows configuration (X-12); a too-short password does not use up the setup token (X-13); the setup token goes to stderr once and not into the structured log (X-01).
+
+**Effective guess rate for someone who already has the password.** The first 5 guesses are free, then locks of 30, 60, 120, 240 and 480 s, then one guess per 15 minutes: about 100 guesses on the first day. Three codes are valid at any moment (+/-1 step), so about 3 in 1,000,000 per guess, or roughly 0.03% per day. That is sufficient for one owner. The password itself is also required.
+
+## 9.4 Merauke's clock (about 7 h fast, unsynced): what it affects
+
+**My own measurement agrees with yours.** Merauke is **+7.00 h (+25,201 s)** against the HTTP `Date` header of a public server, and `timedatectl` reports "System clock synchronized: no". I did not change it. I treat the targets as correct, as you said.
+
+**Not affected (controller-relative):** durations and counts in all my reports, freshness windows measured between two controller timestamps, the 15-minute plan expiry, and everything in my tests (they use an injected clock, so they can neither show nor suffer from the skew).
+
+**Affected:**
+
+| What | Effect | How I know |
+|---|---|---|
+| **Owner login with a real authenticator** | **Enrolment cannot be confirmed on Merauke.** A correct phone produces a code for true time. The server expects a code for Merauke's time, 7 h away, and the window is +/-1 step (30 s). Confirm returned `401 INVALID_CODE`. The same applies to every later login. Codes from a clock 7 h behind or 7 h ahead are refused (control: a code at the server's own time works). | X-15, X-16 (pass: they document the refusal) |
+| **Fixing the clock after logins exist** | T-053 stores the last accepted TOTP step and never accepts an older one. If any TOTP login happened while the clock was fast, correcting the clock leaves **TOTP refused for about 7.1 h** (measured). Locks and the idle timer also keep their fast-clock times (D-A3b). A recovery code does work during this period. | X-17, X-17b, X-18, X-19 |
+| Absolute times shown to the owner (plan expiry, "observed at") | About 7 h off real time. Differences between two controller times are right. | Derived from the measured offset. Not re-measured in the UI. |
+| Package-list age | Where the age is controller time minus a **target** timestamp (the DEF-L2 and AI-answer cases), it is inflated by about 7 h. The target is right and the controller is wrong. | Derived. I did not re-run the live checks for this. |
+| Future helper manifests | `issuedAt` and `acceptBefore` would be stamped by the controller and checked by the target's clock, so a manifest could stay acceptable about 7 h longer than intended. Technical Spec §8.2 requires a skew check that blocks changes and raises a time-sync finding. **That check is not implemented**, and the simulated target shares the controller's clock, so no current test can show it. | Flag for T-012 helper tests. |
+| The dates in my own earlier reports | Stamped with Merauke's clock, so true UTC is about 7 h earlier. | This report's header now says so. |
+
+**Recommendations for the clock:**
+
+1. **Fix time sync on Merauke before enrolling the owner**, and before `auth.db` has any login in it. That avoids D-A3 and D-A3b entirely.
+2. If the clock must be corrected after a login has happened, delete `auth.db` (the documented reset), or use a recovery code. Do not wait it out.
+3. Have the app compare the controller clock with an external reference and show a time-sync finding. Add the skew check from §8.2 and a test for it when T-012 starts.
+4. Consider making stored auth times tolerate a backwards step (clamp the last-accepted step and lock/idle times to the current clock). That is a Coder decision; I am only reporting the effect.
+
+## 9.5 My own mistakes in this round
+
+1. **AU-04b assumed a lock length.** I wrote that the correct code is still refused 2 minutes into a lock. No spec says so. T-053 locks for 30 s at the fifth failure. The test failed on first run, I classified it as my error, and changed the check to "still refused 10 seconds in". The original text is preserved in the commit history and the change is commented in `scenarios.mts`. Lock **length** is reported as D-A2 instead.
+2. **X-02 over-asserted.** I first required that the CSRF token not appear in the database. No spec says so, and the token is useless without the session id. I moved it to an observation (O-A1).
+3. **I misapplied Coder's patch the first time.** `git apply -p0 --check` said it would apply, and I applied it. The patch names its target as a path under `projects/servrsit-coder/`, so `git` deleted my two care-loop files and wrote the new content in a stray directory. Nothing was lost: I restored the files from git, moved the patched content into the original paths, deleted the stray directory, and then read the real diff (32 lines added, 13 removed). My earlier statement that the patch "applies with -p0" was true but incomplete, because I had not looked at the destination path.
+4. The strict typecheck of the test files reports two errors that are not in my new files: `apps/api/src/auth/testing.ts` (an optional-property type under my strict flags) and the patched care-loop `binding.mts` (a `SqliteAuthStore` imported from `packages/store/src` while the server expects the `dist` declaration). Both run correctly; I did not change either.
+
+## 9.6 The care-loop patch (`docs/team/t053-tester-gate.patch`)
+
+Reviewed hunk by hunk, applied, and re-run. It changes only plumbing: the harness now enrols a real owner and signs requests with that session instead of using the old `CsrfGuard`; `session: "none"` now means no cookie; the CSRF header stays under scenario control, so omit and wrong-token cases still reach the server as such; the reviewed route inventory gains the five new auth POSTs. **No assertion was weakened.**
+
+| Suite | Before (old stub) | After patch on T-053 |
+|---|---|---|
+| `care-loop` (42) | 35 pass, 6 fail, 1 not run | **36 pass, 5 fail, 1 not run.** The one change is **CL-02g "approval with no signed-in owner is refused": F1 is fixed.** F2 to F5 are unchanged (CL-04c, CL-07a/b/c, CL-09a fail; CL-03e not run). |
+| `zt01-real-hosts` (12) | 12 pass | **12 pass**, still with 0 spawn, socket or DNS attempts, so the five auth POSTs touch no server and no care record |
+| `static-config` (3) | 3 pass | 3 pass |
+
+These match what Coder reported.
+
+## 9.7 Recommendations
+
+1. **Decide on D-A1 and D-A2 before the owner's UI is exposed beyond loopback.** Cheapest fixes: count the rate limit only after the body parses and per address; keep a separate allowance for the enrolled owner's own session or address so an anonymous caller cannot consume it.
+2. **Fix Merauke's time sync first**, then enrol (§9.4). This is the most useful single action for login.
+3. Make the clock-step case safe (D-A3, D-A3b), or document "delete `auth.db` after correcting the clock". Recovery codes are the escape route now.
+4. D-A4: say in the setup screen that a spent setup token needs an API restart, or let the same token restart enrolment until it is confirmed.
+5. Test O-A3 in a real browser before enabling production mode on the Tailscale address.
+6. Add the §8.2 clock-skew check and test to T-012.
+7. Please decide whether the five `todo` tests become tasks. I have left them as `todo`, so the suite stays green while the defects stay visible. When a fix lands, remove the `todo` marker and the test then guards it.
+
+## 9.8 Files added or changed (tests only)
+
+```
+tests/e2e/auth/binding.mts            binding to T-053: isolated and full wiring, own TOTP oracle
+tests/e2e/auth/auth.test.mts          27 scenarios isolated + 10 on full wiring (37 tests, all pass)
+tests/e2e/auth/auth-extra.test.mts    22 checks (17 pass, 5 todo = confirmed defects)
+tests/e2e/auth/scenarios.mts          AU-04b corrected (comment explains)
+tests/e2e/care-loop/binding.mts, zt01-real-hosts.test.mts   Coder's patch, reviewed (commit 945f1ad)
+```
+
+Run: `cd apps/api && pnpm exec tsx --test --test-reporter=spec ../../tests/e2e/auth/auth.test.mts` (and `auth-extra.test.mts`). The extra checks print their measured values on lines starting with `# X-`.

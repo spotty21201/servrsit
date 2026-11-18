@@ -188,8 +188,12 @@ export const scenarios: Scenario[] = [
       for (let i = 0; i < 10; i++) await h.login({ code: wrongCode(secret, h, i) });
       refused(await h.login({ code: code(secret, h), client: "203.0.113.77" }), "correct code from a new address");
       refused(await h.login({ code: code(secret, h), existingCookie: null }), "correct code with no cookie");
-      await h.advance(2 * MIN);
-      refused(await h.login({ code: code(secret, h) }), "correct code 2 minutes into the lock");
+      // CORRECTED after the first run against T-053 (see test-report-ai-auth-001.md, "My own mistakes"):
+      // the original asserted the lock still held 2 minutes in. No spec gives a lock duration; T-053 locks
+      // 30 s at the 5th failure, so that assertion was my assumption. Lock LENGTH is reported separately
+      // (auth-extra.test.mts); this scenario only checks that time alone does not lift the lock at once.
+      await h.advance(10_000);
+      refused(await h.login({ code: code(secret, h) }), "correct code 10 seconds into the lock");
     },
   },
   {
