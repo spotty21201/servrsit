@@ -35,6 +35,8 @@ import { RecentActivity } from "./RecentActivity.js";
 import { ChatBar } from "./ChatBar.js";
 import type { OverviewVM } from "./fleetViewModel.js";
 import { CompactServerList } from "./CompactServerList.js";
+import { ScrollRegion } from "./ScrollRegion.js";
+import { PixelServerIcon } from "../server-card/PixelServerIcon.js";
 import {
   applyOrder, effectiveView, offersList, orderDiffers, orderIds, parsePrefs, PREFS_KEY, serializePrefs, SORT_LABEL,
   type OverviewPrefs, type SortKey,
@@ -77,6 +79,8 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
       <nav className={styles.nav} aria-label="Main navigation">
         <div className={styles.wordmark}>
           <span className="sr-only">ServrSit</span>
+          {/* The 88 px rail only has room for a compact mark; the full wordmark shows in the top bar below 1200 px and on every other page. */}
+          <PixelServerIcon variant="lilac" size={32} className={styles.railMark} />
           <span className={`${styles.wordmarkText} pixel-text`} aria-hidden="true">
             <span className={styles.wordmarkStack}>Servr</span>
             <span className={styles.wordmarkStack}>Sit</span>
@@ -223,13 +227,18 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
               </div>
             )}
 
-            {count > 0 && view === "list" && <CompactServerList servers={ordered} />}
-            {count > 0 && view === "cards" && (
-              <div className={styles.rosterGrid}>
-                {ordered.map((server) => (
-                  <ServerCard key={server.id} server={server} />
-                ))}
-              </div>
+            {count > 0 && (
+              <ScrollRegion label="Servers" className={styles.rosterScroll}>
+                {view === "list" ? (
+                  <CompactServerList servers={ordered} />
+                ) : (
+                  <div className={styles.rosterGrid}>
+                    {ordered.map((server) => (
+                      <ServerCard key={server.id} server={server} />
+                    ))}
+                  </div>
+                )}
+              </ScrollRegion>
             )}
           </section>
 
@@ -239,7 +248,7 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
             <RecentActivity operations={[]} />
           </div>
 
-          {!empty && <ChatBar servers={vm.servers.map((s) => ({ id: s.id, name: s.name }))} timeZone={vm.timeZone} />}
+          {!empty && <div className={styles.chatSlot}><ChatBar servers={vm.servers.map((s) => ({ id: s.id, name: s.name }))} timeZone={vm.timeZone} /></div>}
         </div>
       </main>
     </div>

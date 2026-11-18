@@ -148,3 +148,14 @@
   color: var(--color-muted-ink);
   margin: 0;
 }
+
+/* Desktop: the list gets the height left by the roster and chat and scrolls inside it
+   (no page scroll at 1200px and wider, T-076 review). Elsewhere it flows normally. */
+.scroll { min-height: 0; position: relative; }
+.scroll:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.footer, .moreNote { margin: var(--space-half) 0 0; font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); color: var(--color-muted-ink); }
+.footer a { display: inline-flex; align-items: center; min-height: var(--touch-target-min); color: var(--color-ink); font-weight: var(--font-weight-medium); text-decoration: underline; }
+@media (min-width: 1200px) and (min-height: 620px) {
+  .column { min-height: 0; max-height: 100%; }
+  .scroll { flex: 1 1 auto; overflow: auto; overscroll-behavior: contain; padding-right: var(--space-half); }
+}

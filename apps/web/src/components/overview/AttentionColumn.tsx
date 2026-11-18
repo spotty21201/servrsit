@@ -7,7 +7,9 @@
  * "Avoid filling every available gap. With no findings, it becomes a small quiet
  * note and the roster can expand."
  */
+import { useState } from "react";
 import type { AttentionItemVM } from "./fleetViewModel.js";
+import { ScrollRegion } from "./ScrollRegion.js";
 import styles from "./AttentionColumn.module.css";
 
 interface AttentionColumnProps {
@@ -37,6 +39,7 @@ function FindingIcon({ severity }: { severity: "attention" | "failed" }) {
 }
 
 export function AttentionColumn({ findings, unavailable = false, noServers = false }: AttentionColumnProps) {
+  const [hidden, setHidden] = useState(0);
   if (noServers) {
     return (
       <section className={styles.column} aria-labelledby="attention-heading">
@@ -72,6 +75,7 @@ export function AttentionColumn({ findings, unavailable = false, noServers = fal
           <span className="sr-only"> items</span>
         </span>
       </h2>
+      <ScrollRegion label="Needs attention, list of findings" className={styles.scroll} onHidden={setHidden}>
       <ul className={styles.list} role="list">
         {findings.map((finding) => (
           <li key={finding.id} className={`${styles.finding} ${styles[finding.severity]}`}>
@@ -93,6 +97,11 @@ export function AttentionColumn({ findings, unavailable = false, noServers = fal
           </li>
         ))}
       </ul>
+      </ScrollRegion>
+      <p className={styles.footer}>
+        {hidden > 0 && <span role="status">+{hidden} more, scroll the list. </span>}
+        <a href="/findings">View all findings</a>
+      </p>
     </section>
   );
 }

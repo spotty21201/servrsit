@@ -58,6 +58,9 @@
 
 .wordmarkStack { display: block; }
 
+/* Compact rail mark: shown only in the 88 px rail (≥1200px). Below that the top bar has room for the full wordmark. */
+.railMark { display: block; width: 32px; height: 32px; }
+
 .navList {
   list-style: none;
   display: flex;
@@ -448,3 +451,23 @@
 .orderNote { flex: 1 1 100%; font-size: var(--text-compact-size); color: var(--color-muted-ink); }
 .linkButton { display: inline; min-height: var(--touch-target-min); padding: 0 var(--space-half); color: var(--color-ink); font: inherit; font-weight: var(--font-weight-semibold); text-decoration: underline; }
 @media (forced-colors: active) { .viewToggle button[aria-pressed="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; } }
+
+/* ── Desktop: fit the window, no page scroll (founder review 001) ─────────
+ * ≥1200px and ≥620px tall: the shell is exactly the window. The roster takes
+ * the height left over and scrolls inside itself if it must; Needs attention
+ * and Recent activity share a capped band and scroll inside their own lists;
+ * the chat bar stays visible at the bottom. Shorter or narrower windows keep
+ * the normal flowing page. */
+@media (min-width: 1200px) and (min-height: 620px) {
+  .appShell { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+  .main { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .contentWrapper { flex: 1 1 auto; min-height: 0; padding-bottom: var(--space-2); gap: var(--space-1-half); }
+  .roster { flex: 1 1 auto; min-height: 9rem; display: flex; flex-direction: column; }
+  .rosterScroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+  .rosterScroll:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+  .lowerGrid { flex: 0 1 auto; min-height: 0; max-height: min(28dvh, 14rem); align-items: stretch; }
+  .chatSlot { flex: none; }
+}
+/* The rail exists from 1200px: compact mark there, full wordmark in the top bar below it. */
+@media (min-width: 1200px) { .wordmarkText { display: none; } }
+@media (max-width: 1199px) { .railMark { display: none; } }
