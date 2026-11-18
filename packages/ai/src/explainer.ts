@@ -43,7 +43,8 @@ export type AiUnavailableReason =
   | "provider_disabled"
   | "not_supported"
   | "unverified_time"
-  | "fact_mismatch";
+  | "fact_mismatch"
+  | "truncated_output";
 
 export interface ExplainMeta {
   readonly provider: ProviderId | "none";
