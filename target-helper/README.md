@@ -34,7 +34,12 @@ unit definition.
 | `/etc/servrsit/trust.json` | root:root 0644 | ServrSit's **public** signing key(s), by key id |
 | `/var/lib/servrsit/ledger/` | root:root 0700 | one JSON record per operation |
 | `/etc/sudoers.d/servrsit` | root:root 0440 | `<account> ALL=(root) NOPASSWD: /usr/lib/servrsit/bin/servrsit-helper ""` — validated with `visudo -c -f` before install and `visudo -c` after |
-| `~<account>/.ssh/authorized_keys` | the account, 0600 | one added line: `restrict,command="/usr/lib/servrsit/bin/servrsit-gateway" ssh-ed25519 …` |
+| `~<account>/.ssh/authorized_keys` | the account, 0600 | one added line: `restrict,command="/usr/lib/servrsit/bin/servrsit-gateway" ssh-ed25519 …`, written by `account-add-key.sh` running **as the account** (never by root inside its home; symlinks refused) |
+
+The sudoers template and both account-side key scripts are inside the
+checksum-verified package; bootstrap reads them only from there.
+`uninstall.sh` stops if the ledger has an unfinished operation or a
+`servrsit-op-*` unit is running, unless `--force` (and then keeps the ledger).
 
 Dependencies, from Ubuntu's archive only: `python3` (3.12), `python3-apt`,
 `python3-cryptography`. Nothing from pip. The package is a reproducible

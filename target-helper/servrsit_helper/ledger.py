@@ -2,14 +2,18 @@
 
 One JSON file per operation id in a root-only directory.
 
-  - claim() is atomic: the file is created with O_CREAT|O_EXCL under an
-    exclusive lock. The same id with the same digest returns the existing
+  - claim() is atomic: under an exclusive lock, the record is written to a
+    temporary file and renamed into place, so no reader ever sees a
+    half-written record (T-084, D-H2). Reads take the same lock. The same id with the same digest returns the existing
     record; the same id with another digest is refused; a second unresolved
     mutation on this server is refused.
   - A finished record is final: it is never changed again.
   - Every write goes to a new temporary file, is fsynced, then renamed over
     the record, and the directory is fsynced. A crash leaves the old or the
     new record, never half of one.
+  - A record that cannot be read (damaged by hand or by the disk) fails
+    closed: it counts as unresolved, so no new mutation is accepted, and
+    reading it raises LedgerError, never a crash.
   - Nothing follows symlinks (O_NOFOLLOW, lstat checks).
 """
 
@@ -28,6 +32,10 @@ MAX_EVIDENCE_TEXT = 300
 
 class LedgerError(Exception):
     pass
+
+
+class UnreadableRecord(LedgerError):
+    """A record exists but is not a readable ledger record."""
 
 
 class Ledger:
@@ -69,7 +77,14 @@ class Ledger:
         except FileNotFoundError:
             return None
         with os.fdopen(fd, "rb") as f:
-            return json.loads(f.read().decode("utf-8"))
+            raw = f.read(4 * 1024 * 1024)
+        try:
+            record = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError) as e:
+            raise UnreadableRecord(os.path.basename(path)) from e
+        if not isinstance(record, dict) or not isinstance(record.get("state"), str):
+            raise UnreadableRecord(os.path.basename(path))
+        return record
 
     def _write_new(self, path: str, record: dict) -> None:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
@@ -87,14 +102,21 @@ class Ledger:
         self._fsync_dir()
 
     def get(self, operation_id: str) -> dict | None:
-        return self._read(self._path(operation_id))
+        path = self._path(operation_id)
+        with self._locked():
+            return self._read(path)
 
     def unresolved(self) -> list[str]:
+        """Ids of records that are not final. An unreadable record counts (fail closed). Call under the lock."""
         out = []
         for name in os.listdir(self.directory):
             if not name.endswith(".json"):
                 continue
-            rec = self._read(os.path.join(self.directory, name))
+            try:
+                rec = self._read(os.path.join(self.directory, name))
+            except UnreadableRecord:
+                out.append(name[: -len(".json")])
+                continue
             if rec is not None and rec.get("state") != FINAL:
                 out.append(rec.get("operationId", ""))
         return out
@@ -122,8 +144,7 @@ class Ledger:
                 "finishedAt": None,
                 "evidence": [],
             }
-            self._write_new(path, record)
-            self._fsync_dir()
+            self._replace(path, record)
             return "accepted", record
 
     def update(self, operation_id: str, **changes) -> dict:

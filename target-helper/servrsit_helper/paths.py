@@ -59,8 +59,8 @@ def create_directory(root: str, path: str, uid: int, gid: int, mode: int) -> str
             return "existing"
         new = _open_dir(last, fd)
         try:
-            st = os.fstat(new)
-            if st.st_nlink != 2:
+            # T-084 (D-H6): emptiness by listing, not by link count (btrfs reports nlink 1 for directories).
+            if os.listdir(new):
                 raise PathRefused("the new directory is not empty")
             os.fchown(new, uid, gid)
             os.fchmod(new, mode)

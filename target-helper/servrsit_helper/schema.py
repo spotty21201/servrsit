@@ -6,6 +6,7 @@ mode rules as packages/domain/src/actions.ts. There is no field that can carry
 a command, an executable path, an environment or a unit definition.
 """
 
+import json
 import re
 
 SCHEMA_VERSION = 1
@@ -39,6 +40,37 @@ MAX_DIRECTORIES = 20
 
 class SchemaError(ValueError):
     """The input does not match the fixed schema. The message is our own text."""
+
+
+def _no_duplicates(pairs: list) -> dict:
+    out = {}
+    for key, value in pairs:
+        if key in out:
+            raise SchemaError("duplicate key")
+        out[key] = value
+    return out
+
+
+def parse_request(raw: bytes) -> dict:
+    """Bytes -> a schema-checked request, or SchemaError with our own text.
+
+    T-084: every way json.loads can fail is caught (including the ValueError
+    Python raises for integers over 4300 digits, D-H1), duplicate keys are
+    refused (D-H5), and NaN/Infinity are refused.
+    """
+    if len(raw) > MAX_REQUEST_BYTES:
+        raise SchemaError("the request is too large")
+    try:
+        data = json.loads(raw.decode("utf-8"), object_pairs_hook=_no_duplicates, parse_constant=_refuse_constant)
+    except SchemaError:
+        raise
+    except (UnicodeDecodeError, ValueError, RecursionError) as e:
+        raise SchemaError("the request is not valid JSON") from e
+    return check_request(data)
+
+
+def _refuse_constant(name: str) -> None:
+    raise SchemaError("NaN and Infinity are not allowed")
 
 
 def _exact(obj: object, keys: set, optional: set = frozenset(), where: str = "object") -> dict:

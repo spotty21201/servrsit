@@ -14,7 +14,7 @@ import json
 import subprocess
 import sys
 
-from .schema import MAX_REQUEST_BYTES, SchemaError, check_request
+from .schema import MAX_REQUEST_BYTES, SchemaError, parse_request
 
 HELPER = "/usr/lib/servrsit/bin/servrsit-helper"
 SUDO = "/usr/bin/sudo"
@@ -25,8 +25,8 @@ def forward(raw: bytes, run=subprocess.run) -> bytes:
     if len(raw) > MAX_REQUEST_BYTES:
         return json.dumps({"status": "rejected", "code": "INVALID_REQUEST", "detail": "the request is too large"}).encode()
     try:
-        check_request(json.loads(raw.decode("utf-8")))
-    except (UnicodeDecodeError, json.JSONDecodeError, SchemaError, RecursionError):
+        parse_request(raw)
+    except SchemaError:
         return json.dumps({"status": "rejected", "code": "INVALID_REQUEST"}).encode()
     try:
         r = run([SUDO, "-n", "--", HELPER], input=raw, capture_output=True, timeout=120, env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"}, shell=False, check=False)
