@@ -1160,3 +1160,50 @@ Tester gate, their files unchanged (temporary copy, removed): zt01-real-hosts 12
 1. **Merge order:** `feat/coder/package-origins` contains T-061 and T-062 and does not depend on T-053, so it can merge before it. Both it and `feat/coder/owner-auth` append to this handoff file, so merging the second one has a trivial conflict at the end of the file: keep both sections.
 2. **Sentani's clock is 7 h slow.** Fixing it is a change on the server (time sync), which only the founder may authorize. ServrSit now corrects package ages for it and shows a warning.
 3. **Next in my queue:** T-054 through T-059 (not started). ZT-01 and the route inventory remain the standing gate.
+
+## T-063: ServrSit checks its own clock (commit `9af148d`, branch `feat/coder/controller-clock`, from `integration/live-v1` at `8b29555`)
+
+**Correction to T-061.** The wrong clock is **Merauke's** (the controller), not the targets'. My T-061 handoff and finding text blamed Sentani. Sentani, Nabire and Timika are right.
+
+**How it works:**
+
+- **Evidence** (`apps/api/src/clock/controller-clock.ts`), on the health schedule, read-only:
+  - `timedatectl show --property=NTPSynchronized --value` (one fixed `execFile`, no shell, no sudo);
+  - HTTPS `HEAD` requests to google.com and cloudflare.com, comparing the `Date` header with the local clock;
+  - a static test checks that the code contains no clock-setting call.
+  - **ServrSit never changes the system clock.**
+- **Untrusted when:** NTP is not synchronised, the clock is more than 2 min off after uncertainty, the sources disagree, or nothing could verify it. Until the first check finishes, the clock is untrusted.
+- **Attribution:** if no HTTPS source gives an offset, but most targets agree with each other on one skew, that skew is put on the controller (`basis: "target-agreement"`).
+  - Target `time.skew.v1` now subtracts the controller's offset, so correct servers get no finding.
+  - A server that is really off is described against real time.
+  - With no verified controller clock, the finding says either clock could be wrong.
+- **`GET /api/fleet`** gains `controlPlane: {clock, findings}`. `control.clock.v1` is **critical**: "…Times, ages and expiries ServrSit shows may be wrong, and plan approval is blocked until the clock is fixed. ServrSit does not change the system clock." Designer needs to render it.
+- **Approval:** plans get the blocker `CONTROLLER_CLOCK_UNTRUSTED`, and the approval route re-checks the clock at approval time and returns 409 `PLAN_BLOCKED`.
+- **Assistant:** while untrusted, the observations carry `timesUncertain`, and the deterministic text starts with "ServrSit's own clock is about 7 h fast, so every time and age here may be wrong." (once per answer). It no longer says the host's clock is off.
+- **Tests and fixture mode:** with `startChecks: false` or in fixture mode, the clock is `not-checked` and does not block. This is why the Tester's I/O-guarded ZT-01 still spawns and fetches nothing.
+
+**Live evidence (one read-only run on Merauke, local clock 2026-11-18T03:50Z):** `ntpSynchronized false`; google.com offset +25201 s and cloudflare.com +25201 s; `status untrusted`, `offsetSeconds 25201 ± 2`, basis `https-date`.
+
+**Checks run (real output):**
+
+```
+pnpm -r test at 9af148d -> exit 0: 9, 17 (domain), 50, 48 (web), 11, 145 (ai), 18, 147 (api); fail 0
+typecheck: all 10 packages exit 0; key scan clean
+Gate (a) T-063 alone, Tester files as of 957b295: zt01 12/12, care-loop 35/6/1 (= baseline)
+Gate (b) throwaway merge of T-053 + T-063, Tester's current files (945f1ad, with my reviewed patch):
+  zt01 12/12, care-loop 36/5/1, routes-401 7/7, static-config 3/3, api suite 165/165
+```
+
+**Merge note for the Orchestrator:** merging `feat/coder/owner-auth` with this branch conflicts in two code files.
+
+- `apps/api/src/server.ts`: keep both option blocks (`controllerClock` and `auth`).
+- `apps/api/src/routes/care.test.ts`: keep `const sink = setupTokenSink();` and the `FleetService` with the `controllerClock` option, and drop `CsrfGuard`.
+- `handoff-coder-live.md`: keep both sections.
+
+I resolved exactly this way in the throwaway check above.
+
+**Limits:**
+
+- **Time sources:** the two HTTPS sources are fixed in code.
+- **Not covered yet:** the per-server explainer does not carry the `timesUncertain` note. T-064 O1 touches that path.
+- **Fixing Merauke's clock** is the founder's action (time sync failing to `123.235.232.172`). It needs sudo, which I do not use.
