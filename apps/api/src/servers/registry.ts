@@ -22,7 +22,9 @@
 
 import { randomUUID } from "node:crypto";
 import {
+  productionStatusOf,
   SERVER_DRAFT_TTL_HOURS,
+  treatedAsProduction,
   type AccessKey,
   type DisconnectResponse,
   type FirstCheck,
@@ -31,7 +33,7 @@ import {
   type ServerRegistrationErrorCode,
   type ServerUpdateRequest,
 } from "@servrsit/contracts";
-import { collectViaSsh, TargetRejectedError, type CollectionResult } from "@servrsit/ssh";
+import { collectViaSsh, probePrivilegeViaSsh, TargetRejectedError, type CollectionResult, type PrivilegeProbeResult } from "@servrsit/ssh";
 import type { NewServer, SqliteServerStore, StoredDraft, StoredServer } from "@servrsit/store";
 import { isSafeFromAddress, type AddressPolicy } from "./address.js";
 import { finishedCheck, runningCheck } from "./first-check.js";
@@ -46,6 +48,8 @@ export interface FirstCheckTarget {
 }
 
 export type FirstCheckCollector = (target: FirstCheckTarget) => Promise<CollectionResult>;
+/** T-081: runs exactly `sudo -n -l` (lists rules, runs nothing, never prompts). */
+export type PrivilegeProbe = (target: FirstCheckTarget) => Promise<PrivilegeProbeResult>;
 
 export interface ServerRegistryOptions {
   readonly store: SqliteServerStore;
@@ -56,6 +60,10 @@ export interface ServerRegistryOptions {
   readonly probe: (address: string, port: number) => Promise<boolean>;
   /** Default: the read-only collector over SSH, with the policy re-checking DNS. */
   readonly collector?: FirstCheckCollector | undefined;
+  /** Default: the `sudo -n -l` probe over SSH, after a successful collection only. */
+  readonly privilegeProbe?: PrivilegeProbe | undefined;
+  /** T-081 (D-R3): how often expired drafts and their keys are swept. Default 15 minutes. */
+  readonly sweepIntervalMs?: number | undefined;
   readonly now?: (() => Date) | undefined;
   readonly newId?: (() => string) | undefined;
   /** Called after a server was added (the fleet checks it right away). */
@@ -108,6 +116,8 @@ export class ServerRegistry {
   private readonly now: () => Date;
   private readonly newId: () => string;
   private readonly collector: FirstCheckCollector;
+  private readonly privilegeProbe: PrivilegeProbe;
+  private sweepTimer: NodeJS.Timeout | null = null;
   /** Running first checks, by draft id (tests await them). */
   private readonly checks = new Map<string, Promise<void>>();
 
@@ -127,6 +137,37 @@ export class ServerRegistry {
             },
           },
         ));
+    this.privilegeProbe =
+      o.privilegeProbe ??
+      ((t) =>
+        probePrivilegeViaSsh(
+          { host: t.host, port: t.port, user: t.user, identityFile: t.identityFile },
+          { knownHostsFile: t.knownHostsFile, allowedPorts: o.policy.allowedPorts },
+          {
+            checkResolution: async (host) => {
+              const check = await o.policy.check(host, t.port);
+              if (!check.ok) throw new TargetRejectedError(check.reason);
+            },
+          },
+        ));
+  }
+
+  /**
+   * T-081 (D-R3): sweep now and then on a timer, so an abandoned draft's
+   * private key does not stay on the controller until the next registration.
+   */
+  startSweeper(): void {
+    if (this.sweepTimer !== null) return;
+    void this.sweep().catch((error: unknown) => this.o.log?.warn({ err: error }, "servers: sweep failed"));
+    this.sweepTimer = setInterval(() => {
+      void this.sweep().catch((error: unknown) => this.o.log?.warn({ err: error }, "servers: sweep failed"));
+    }, this.o.sweepIntervalMs ?? 15 * 60_000);
+    this.sweepTimer.unref();
+  }
+
+  stopSweeper(): void {
+    if (this.sweepTimer !== null) clearInterval(this.sweepTimer);
+    this.sweepTimer = null;
   }
 
   // -------------------------------------------------------------------------
@@ -171,10 +212,12 @@ export class ServerRegistry {
     await this.sweep();
     const check = await this.o.policy.check(req.address, req.port);
     if (!check.ok) return fail("ADDRESS_REJECTED", check.reason);
-    if (this.o.store.listActive().some((s) => s.name.toLowerCase() === req.name.toLowerCase())) {
+    // T-081 (D-R2): the same address first, so re-registering a server under
+    // its own name leads to the existing record (duplicateOf), not a name error.
+    const existing = this.o.store.findActiveByEndpoint(check.host, check.port);
+    if (existing === null && this.o.store.listActive().some((s) => s.name.toLowerCase() === req.name.toLowerCase())) {
       return fail("INVALID_INPUT", "A server with this name already exists.");
     }
-    const existing = this.o.store.findActiveByEndpoint(check.host, check.port);
     const first = check.addresses[0];
     const reachable = first !== undefined && (await this.o.probe(first, check.port));
     const at = this.now();
@@ -186,7 +229,8 @@ export class ServerRegistry {
       user: req.user,
       name: req.name,
       role: req.role,
-      production: req.production,
+      production: treatedAsProduction(productionStatusOf(req.production, req.productionStatus)),
+      productionStatus: productionStatusOf(req.production, req.productionStatus),
       duplicateOf: existing === null ? null : { id: existing.id, name: existing.name },
       reachability: reachable ? { reachable: true, note: REACHABLE_NOTE } : { reachable: false, reason: UNREACHABLE_REASON },
       hostKey: null,
@@ -222,7 +266,7 @@ export class ServerRegistry {
     const d = loaded.value;
     const draft = this.body(d).draft;
     if (draft.state !== "draft" && draft.state !== "host-key-seen") {
-      return fail("STATE_CONFLICT", "The host key was already confirmed for this draft.");
+      return fail("STATE_CONFLICT", "The host key was already confirmed for this draft. If the server's key has changed, delete this draft and start again.");
     }
     const check = await this.o.policy.check(draft.address, draft.port);
     if (!check.ok) return fail("ADDRESS_REJECTED", check.reason);
@@ -340,9 +384,18 @@ export class ServerRegistry {
       this.o.log?.warn({ err: error, draftId: id }, "servers: first check threw");
       result = { ok: false, failure: { code: "COLLECTION_FAILED", message: "" }, attemptedAt: this.now().toISOString(), contacted: false };
     }
+    // T-081 (R-2): only after a successful collection, the disclosed `sudo -n -l`.
+    let privilege: PrivilegeProbeResult | null = null;
+    if (result.ok) {
+      try {
+        privilege = await this.privilegeProbe(target);
+      } catch (error) {
+        this.o.log?.warn({ err: error, draftId: id }, "servers: privilege check threw");
+      }
+    }
     const d = this.o.store.getDraft(id);
     if (d === null) return; // deleted meanwhile
-    const outcome = finishedCheck(id, result, this.now());
+    const outcome = finishedCheck(id, result, this.now(), privilege);
     const draft = this.body(d).draft;
     this.save(d, { ...draft, state: result.ok ? "checked" : "check-failed" }, { firstCheck: outcome as unknown as Record<string, unknown> });
     this.o.log?.info({ draftId: id, ok: result.ok, code: outcome.failureCode }, "servers: first check finished");
@@ -384,7 +437,7 @@ export class ServerRegistry {
       access: "ssh",
       name: draft.name,
       role: draft.role,
-      production: draft.production,
+      productionStatus: draft.productionStatus ?? (draft.production ? "yes" : "no"),
       address: draft.address,
       port: draft.port,
       user: draft.user,
@@ -415,7 +468,17 @@ export class ServerRegistry {
   }
 
   update(owner: string, id: string, change: ServerUpdateRequest): Outcome<StoredServer> {
-    const r = this.o.store.update(id, change, owner, this.now());
+    const r = this.o.store.update(
+      id,
+      {
+        name: change.name,
+        role: change.role,
+        productionStatus:
+          change.productionStatus ?? (change.production === undefined ? undefined : productionStatusOf(change.production)),
+      },
+      owner,
+      this.now(),
+    );
     if (r.ok) return ok(r.server);
     if (r.code === "DUPLICATE_NAME") return fail("INVALID_INPUT", "A server with this name already exists.");
     return fail("SERVER_NOT_FOUND");

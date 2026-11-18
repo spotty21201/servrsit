@@ -4,8 +4,8 @@
  * is copied into a reason.
  */
 
-import type { FirstCheck, FirstCheckStep } from "@servrsit/contracts";
-import { FAILURE_MESSAGES, type CollectionResult, type InspectionObservation } from "@servrsit/ssh";
+import { PRIVILEGE_CHECK, type FirstCheck, type FirstCheckStep } from "@servrsit/contracts";
+import { FAILURE_MESSAGES, type CollectionResult, type InspectionObservation, type PrivilegeProbeResult } from "@servrsit/ssh";
 import { coverageOf } from "../fleet/status.js";
 
 type StepId = FirstCheckStep["id"];
@@ -17,7 +17,12 @@ const STEPS: ReadonlyArray<{ readonly id: StepId; readonly label: string }> = [
   { id: "services", label: "Reading failed services" },
   { id: "clock", label: "Comparing the server's clock" },
   { id: "packages", label: "Reading package state" },
+  // T-081: disclosed before the check runs (PRIVILEGE_CHECK.disclosure).
+  { id: "privilege", label: PRIVILEGE_CHECK.label },
 ];
+
+/** The steps the first check will run, in order, for the connect flow to show before it starts. */
+export const FIRST_CHECK_STEPS: ReadonlyArray<{ readonly id: StepId; readonly label: string }> = STEPS;
 
 const NOT_RUN = "Not run because an earlier step failed.";
 
@@ -26,6 +31,7 @@ const UNAVAILABLE: Readonly<Record<Exclude<StepId, "connect" | "auth">, string>>
   services: "Failed services could not be read with this account.",
   clock: "The server's clock could not be read.",
   packages: "Package state could not be read with this account. Everything else still works.",
+  privilege: "The sudo rules could not be checked.",
 };
 
 /** Supported targets (Tech Spec §2): Ubuntu Server 24.04 LTS on x86-64. */
@@ -46,6 +52,7 @@ export function runningCheck(draftId: string): FirstCheck {
     finished: false,
     platform: null,
     coverage: null,
+    privilege: null,
     failureCode: null,
   };
 }
@@ -63,7 +70,7 @@ function failedStep(code: Extract<CollectionResult, { ok: false }>["failure"]["c
   return "connect";
 }
 
-export function finishedCheck(draftId: string, result: CollectionResult, at: Date): FirstCheck {
+export function finishedCheck(draftId: string, result: CollectionResult, at: Date, privilege: PrivilegeProbeResult | null = null): FirstCheck {
   const iso = at.toISOString();
   if (!result.ok) {
     const failed = failedStep(result.failure.code);
@@ -80,6 +87,7 @@ export function finishedCheck(draftId: string, result: CollectionResult, at: Dat
       finished: true,
       platform: null,
       coverage: null,
+      privilege: null,
       failureCode: result.failure.code,
     };
   }
@@ -100,10 +108,14 @@ export function finishedCheck(draftId: string, result: CollectionResult, at: Dat
       step("services", state(servicesOk), servicesOk ? null : UNAVAILABLE.services, iso),
       step("clock", state(clockOk), clockOk ? null : UNAVAILABLE.clock, iso),
       step("packages", state(packagesOk), packagesOk ? null : UNAVAILABLE.packages, iso),
+      privilege !== null && privilege.ok
+        ? step("privilege", "done", privilege.privilege.broad ? privilege.privilege.summary : null, iso)
+        : step("privilege", "unavailable", UNAVAILABLE.privilege, iso),
     ],
     finished: true,
     platform: platformOf(o),
     coverage: { passed: coverage.passed, total: coverage.total },
+    privilege: privilege !== null && privilege.ok ? { ...privilege.privilege } : null,
     failureCode: null,
   };
 }

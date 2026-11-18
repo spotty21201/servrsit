@@ -39,7 +39,7 @@ import { userInfo } from "node:os";
 import type { PlanRequest } from "@servrsit/contracts";
 import { ActivityService, InspectionRecorder } from "./activity/history.js";
 import { AddressPolicy, type Resolver } from "./servers/address.js";
-import { ServerRegistry, type FirstCheckCollector } from "./servers/registry.js";
+import { ServerRegistry, type FirstCheckCollector, type PrivilegeProbe } from "./servers/registry.js";
 import { createHostKeyScanner, createKeyVault, probeTcp, type HostKeyScanner, type KeyVault } from "./servers/ssh-tools.js";
 import { DEFAULT_OWNER_CONTEXT_PATH, OwnerContextFile } from "./owner-context-file.js";
 import { SqliteAuthStore, SqliteCareStore, SqliteServerStore, SqliteFindingStore, SqliteSettingsStore, SqliteActivityStore, SqliteBaselineStore, type CareStore, type NewServer, type StoredServer } from "@servrsit/store";
@@ -110,6 +110,10 @@ export interface ServerRegistryWiring {
   readonly scanner?: HostKeyScanner | undefined;
   readonly probe?: ((address: string, port: number) => Promise<boolean>) | undefined;
   readonly collector?: FirstCheckCollector | undefined;
+  /** T-081: the `sudo -n -l` probe. Tests must inject one; the default uses ssh. */
+  readonly privilegeProbe?: PrivilegeProbe | undefined;
+  /** T-081: draft sweep interval. Setting it starts the sweeper even when background checks are off (tests). */
+  readonly sweepIntervalMs?: number | undefined;
   readonly resolver?: Resolver | undefined;
   readonly selfAddresses?: (() => readonly string[]) | undefined;
   readonly now?: (() => Date) | undefined;
@@ -175,7 +179,7 @@ function importedServer(h: HostConfig, at: Date): NewServer {
     access: h.access,
     name: h.name,
     role: h.role,
-    production: h.production,
+    productionStatus: h.production ? "yes" : "no",
     address: h.access === "ssh" ? h.address : null,
     port: h.access === "ssh" ? h.port : null,
     user: h.access === "ssh" ? h.user : null,
@@ -261,6 +265,9 @@ export async function buildServer(options: BuildServerOptions = {}) {
   const config = options.config ?? (await loadFleetConfig());
   const mode = options.mode ?? (process.env["SERVRSIT_FLEET_MODE"] === "fixture" ? "fixture" : "live");
   const fastify = Fastify({
+    // T-081 (D-R1): long path parameters reach the routes, which answer with the
+    // contract's own error; Fastify's default error would echo the path.
+    routerOptions: { maxParamLength: 2048 },
     logger:
       options.logger === false
         ? false
@@ -411,6 +418,8 @@ export async function buildServer(options: BuildServerOptions = {}) {
     vault: options.servers?.vault ?? createKeyVault(options.servers?.keysDir ?? DEFAULT_SERVER_KEYS_DIR.pathname),
     probe: options.servers?.probe ?? probeTcp,
     collector: options.servers?.collector,
+    privilegeProbe: options.servers?.privilegeProbe,
+    sweepIntervalMs: options.servers?.sweepIntervalMs,
     now: options.servers?.now,
     newId: options.servers?.newId,
     hasUnresolvedOperation: (id) => careStore.unresolvedFor(id) !== null,
@@ -558,7 +567,10 @@ export async function buildServer(options: BuildServerOptions = {}) {
 
   if (mode === "live" && options.startChecks !== false) service.start();
   if (options.startChecks !== false) clockMonitor?.start();
+  // T-081 (D-R3): expired drafts and their unused keys are removed at start-up and every 15 minutes.
+  if (options.startChecks !== false || options.servers?.sweepIntervalMs !== undefined) registry.startSweeper();
   fastify.addHook("onClose", async () => {
+    registry.stopSweeper();
     await service.stop();
     await clockMonitor?.stop();
   });
