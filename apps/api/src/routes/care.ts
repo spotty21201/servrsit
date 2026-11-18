@@ -154,6 +154,20 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
       request.log.info({ planId: plan.id, result: "rejected", code: "CONTROLLER_CLOCK_UNTRUSTED" }, "care: approval");
       return reply.code(409).send({ error: "PLAN_BLOCKED", blockers: ["CONTROLLER_CLOCK_UNTRUSTED"] });
     }
+    // T-054 (F2, Tech Spec §9.2): re-check the target at approval time. If its package state is no
+    // longer the state the plan was prepared from, the plan is stale. Same rule as planning: a
+    // server whose writes are disabled, or a real one, is never contacted. A repeat of an approval
+    // that already exists is an idempotent replay (the state has moved on because it ran).
+    const target = o.targets.get(server.id);
+    const replay = o.store.hasApproval(plan.id, parsed.data.planVersion);
+    if (!replay && server.writesEnabled && server.kind === "simulated" && target !== undefined) {
+      const latest = o.store.getPlan(plan.id);
+      const current = await target.previewPackages();
+      if (latest !== null && (current === null || current.stateDigest !== latest.preconditions.previewDigest)) {
+        request.log.info({ planId: plan.id, result: "rejected", code: "PLAN_CHANGED" }, "care: approval");
+        return reply.code(409).send({ error: "PLAN_CHANGED" });
+      }
+    }
 
     const result = o.store.approve({
       planId: plan.id,

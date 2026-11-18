@@ -294,3 +294,31 @@ test("T-063 via the API: an untrusted controller clock blocks planning, and appr
     assert.equal((await h.approve(p)).statusCode, 201);
   } finally { await h.app.close(); }
 });
+
+// ---- T-054: approval re-checks the target ------------------------------------------
+
+test("T-054 (F2): if the target's packages change between plan and approval, approval is refused PLAN_CHANGED and nothing is queued", async () => {
+  const h = await start();
+  try {
+    const stale = await h.plan();
+    h.sim.addUpgrade({ name: "curl", arch: "amd64", from: "8.5.0-2ubuntu10.5", to: "8.5.0-2ubuntu10.6", origin: "Ubuntu:24.04/noble-security" });
+    const r = await h.approve(stale);
+    assert.deepEqual([r.statusCode, r.json()], [409, { error: "PLAN_CHANGED" }]);
+    assert.equal(h.store.unresolvedFor(SIM), null, "nothing was approved or queued");
+    const fresh = (await h.post(`/api/plans/${stale.id}/revisions`, {})).json() as typeof stale;
+    assert.equal((await h.approve(fresh, { idempotencyKey: "idem-key-0000000009" })).statusCode, 201, "a revised plan from the current state can be approved");
+  } finally { await h.app.close(); }
+});
+
+test("T-054: replaying an approval after its operation ran returns the same operation (the re-check does not apply to a replay)", async () => {
+  const h = await start();
+  try {
+    const p = await h.plan();
+    const first = await h.approve(p);
+    assert.equal(first.statusCode, 201);
+    for (let i = 0; i < 6; i++) { await h.dispatcher.runOnce(); h.clock.advance(1500); }
+    const again = await h.approve(p);
+    assert.equal(again.statusCode, 200);
+    assert.equal((again.json() as { operationId: string }).operationId, (first.json() as { operationId: string }).operationId);
+  } finally { await h.app.close(); }
+});

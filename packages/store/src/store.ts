@@ -85,6 +85,8 @@ export interface CareStore {
    * dispatch-outbox entry. All or nothing.
    */
   approve(input: ApproveInput): ApproveResult;
+  /** Whether this plan version already has an approval (a repeat request is then an idempotent replay). */
+  hasApproval(planId: string, planVersion: number): boolean;
   getOperation(id: string): StoredOperation | null;
   listEvents(operationId: string): OperationEvent[];
   /** Validated state change plus its event, atomically. Throws TransitionError. */

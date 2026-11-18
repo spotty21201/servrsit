@@ -203,6 +203,10 @@ export class SqliteCareStore implements CareStore {
     return row === undefined ? null : toOperation(row);
   }
 
+  hasApproval(planId: string, planVersion: number): boolean {
+    return this.db.prepare("SELECT 1 AS x FROM approvals WHERE plan_id = ? AND plan_version = ?").get(planId, planVersion) !== undefined;
+  }
+
   approve(input: ApproveInput): ApproveResult {
     return this.tx((): ApproveResult => {
       // Idempotent replay first: the same key for the same plan version returns
