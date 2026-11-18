@@ -1764,3 +1764,28 @@ Tester @1c9d5a7: auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, 
 ```
 
 Next: T-082 (care client), then merge `feat/designer/t080` again.
+
+## T-082: real care client (branch `feat/coder/care-client`, from `integration/next`)
+
+**What:** `apps/web/src/api/care.ts` keeps the Designer stub's `CareClient` interface and result shape (`{ok:false, kind, status?, code?}`). It adds:
+
+- `createActionPlan`, for the restart, reboot and prepare-directories kinds;
+- `requestStop`, whose result says `stop: requested | cancelled | already-final`;
+- `reconcile`;
+- `newIdempotencyKey()`.
+
+**Rules it follows:**
+
+- **CSRF:** every POST carries the session's CSRF token from `./auth`. A `CSRF_INVALID` reply re-reads the session and retries once.
+- **Idempotency:** each approval carries an idempotency key. Keep the same key when retrying one decision, and the API returns the same operation (`replayed`).
+- **Error codes:** only known codes are passed on, and `PLAN_BLOCKED` comes with its blocker codes. Response bodies are never shown.
+- **Plan kinds:** only the four catalog kinds are accepted. Non-package plans get `scope.packages: []`, and their own scope is in `detail`.
+- **Simulated work:** `simulated` is required on every operation, so simulated work is always labelled.
+
+**Checks:**
+
+- **Client tests:** 5/5 web tests.
+- **Against the real API:** a throwaway script (not committed) ran the client's own parsers on real API responses for every kind on a `[SIMULATED]` server, plus a real-host package plan, approve, get operation and stop request. All of them parse.
+- **Fastify warning fixed:** `maxParamLength` (T-081) now goes through `routerOptions`, which removes the FSTDEP022 deprecation warning.
+
+**For the Designer:** move the Plan review and operation screens from `stubs/care.ts` to `../care` (same names). `PlanView.verification` is now a loose record (it still has `expectInstalled`), and the old `prepare` field is gone. For a setup plan, use `detail.directories`, `detail.existing` and `detail.requested`.
