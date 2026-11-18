@@ -34,6 +34,13 @@ export function fixtureFleet(overrides: Partial<FleetResponse> = {}): FleetRespo
     healthIntervalMinutes: 15,
     ownerTimeZone: "Asia/Jakarta",
     nextCheckAt: null,
+    controlPlane: {
+      clock: {
+        status: "not-checked", checkedAt: null, ntpSynchronized: null, offsetSeconds: null, uncertaintySeconds: null,
+        basis: "none", sources: [], reason: "[FIXTURE DATA] Fixture mode does not check ServrSit's own clock.",
+      },
+      findings: [],
+    },
     servers: [
       fixtureServer(),
       fixtureServer({

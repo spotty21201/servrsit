@@ -24,7 +24,7 @@ function makePlan(over: Partial<Parameters<typeof buildPlan>[0]> = {}): Plan {
   return buildPlan({
     id: "plan-1", version: 1, operation: "apply.packages.v1",
     server: { id: SERVER, production: true, writesEnabled: true },
-    preview, unresolved: null, now: NOW, ...over,
+    preview, unresolved: null, now: NOW, controllerClockTrusted: true, ...over,
   });
 }
 

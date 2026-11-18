@@ -18,7 +18,7 @@ const preview = (over: Partial<TransactionPreview> = {}): TransactionPreview => 
 });
 const server = { id: "00000000-0000-4000-8000-00000000s001", production: true, writesEnabled: true };
 const plan = (over: Partial<Parameters<typeof buildPlan>[0]> = {}) =>
-  buildPlan({ id: "p1", version: 1, operation: "apply.packages.v1", server, preview: preview(), unresolved: null, now: NOW, ...over });
+  buildPlan({ id: "p1", version: 1, operation: "apply.packages.v1", server, preview: preview(), unresolved: null, now: NOW, controllerClockTrusted: true, ...over });
 
 // ---- canonical JSON -------------------------------------------------------
 
@@ -205,4 +205,12 @@ test("T-062: a missing, unrecognised, backports or mixed origin is excluded (fai
     ["c", "Ubuntu:24.04/noble-updates, Docker CE:noble"],
     ["d", "(unknown)"],
   ]);
+});
+
+// ---- T-063: ServrSit's own clock ---------------------------------------------------
+
+test("T-063: an untrusted controller clock blocks the plan with CONTROLLER_CLOCK_UNTRUSTED", () => {
+  const p = plan({ controllerClockTrusted: false });
+  assert.deepEqual(p.blockers.map((b) => b.code), ["CONTROLLER_CLOCK_UNTRUSTED"]);
+  assert.match(p.blockers[0]!.message, /ServrSit's own clock/);
 });

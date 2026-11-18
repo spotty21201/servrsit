@@ -175,3 +175,33 @@ test("O1: an unverified host is 'none'", async () => {
   await service.refreshAll();
   assert.deepEqual([server("Alpha").status, server("Alpha").source], ["unverified-host", "none"]);
 });
+
+// ---- T-063: the fleet view puts the clock skew on the right machine -------------------
+
+test("T-063: three servers agree they are 7 h behind ServrSit, and ServrSit has no internet time: ServrSit is blamed, not them", async () => {
+  const three = FleetConfigSchema.parse({
+    healthIntervalMinutes: 15,
+    hosts: ["Timika", "Nabire", "Sentani"].map((name, i) => ({
+      id: `${i + 1}${i + 1}${i + 1}${i + 1}${i + 1}${i + 1}${i + 1}${i + 1}-1111-4111-a111-111111111111`, name, access: "ssh", address: name.toLowerCase(), port: 22, user: "spotty", role: null, production: false, collect: true,
+    })),
+  });
+  const blind = {
+    status: "untrusted" as const, checkedAt: "2026-11-18T03:34:00.000Z", ntpSynchronized: false, offsetSeconds: null,
+    uncertaintySeconds: null, basis: "none" as const, sources: [], reason: "ServrSit's own clock is not synchronised with a time server.",
+  };
+  const service = new FleetService({
+    config: three, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned",
+    collector: async () => ({ ok: true, observation: makeObservation({ clockSkewSeconds: -25202 }) }),
+    controllerClock: () => blind,
+  });
+  await service.refreshAll();
+  const snap = service.snapshot();
+  assert.deepEqual([snap.controlPlane.clock.basis, snap.controlPlane.clock.offsetSeconds], ["target-agreement", 25202]);
+  assert.deepEqual(snap.controlPlane.findings.map((f) => f.rule), ["control.clock.v1"]);
+  for (const s of snap.servers) assert.equal(s.findings.some((f) => f.id === "clock-skew"), false, `${s.name} is not blamed`);
+});
+
+test("T-063: without a controller clock source the control plane says not checked, with no finding", () => {
+  const { service } = setup(() => success(new Date()));
+  assert.deepEqual([service.snapshot().controlPlane.clock.status, service.snapshot().controlPlane.findings], ["not-checked", []]);
+});

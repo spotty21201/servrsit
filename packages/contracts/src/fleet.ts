@@ -85,6 +85,42 @@ export const FleetServerSchema = z.object({
   observation: InspectionObservationSchema.nullable(),
 });
 
+/**
+ * T-063: ServrSit's OWN clock (the controller), checked against NTP status and
+ * two HTTPS Date sources. Every time ServrSit shows and every expiry it sets
+ * comes from this clock, so while it is untrusted they are uncertain and plan
+ * approval is blocked. ServrSit never changes the system clock.
+ */
+export const ControllerClockSchema = z.object({
+  /**
+   * "trusted": synchronized and within 2 minutes. "untrusted": not synchronized, off by more
+   * than 2 minutes, sources disagree, or nothing could verify it (blocks approval).
+   * "not-checked": this process does not run the check (tests and fixture mode only).
+   */
+  status: z.enum(["trusted", "untrusted", "not-checked"]),
+  checkedAt: z.string().datetime().nullable(),
+  /** From `timedatectl`: null when it could not be read. */
+  ntpSynchronized: z.boolean().nullable(),
+  /** ServrSit's clock minus real time, in seconds. Positive: ServrSit is fast. Null when unknown. */
+  offsetSeconds: z.number().int().nullable(),
+  uncertaintySeconds: z.number().int().nonnegative().nullable(),
+  /** How offsetSeconds was established. */
+  basis: z.enum(["https-date", "target-agreement", "none"]),
+  sources: z
+    .array(z.object({ name: z.string().max(64), ok: z.boolean(), offsetSeconds: z.number().int().nullable() }))
+    .max(4),
+  /** Our own fixed text explaining the status. */
+  reason: z.string().max(300),
+});
+export type ControllerClock = z.infer<typeof ControllerClockSchema>;
+
+export const ControlPlaneSchema = z.object({
+  clock: ControllerClockSchema,
+  /** Findings about ServrSit itself, not about any server. */
+  findings: z.array(FindingSchema),
+});
+export type ControlPlane = z.infer<typeof ControlPlaneSchema>;
+
 export const FleetResponseSchema = z.object({
   mode: z.enum(["live", "fixture"]),
   generatedAt: z.string().datetime(),
@@ -96,6 +132,8 @@ export const FleetResponseSchema = z.object({
    */
   ownerTimeZone: z.string().min(1).max(64),
   nextCheckAt: z.string().datetime().nullable(),
+  /** T-063: the state of ServrSit itself (its own clock). */
+  controlPlane: ControlPlaneSchema,
   servers: z.array(FleetServerSchema),
 });
 

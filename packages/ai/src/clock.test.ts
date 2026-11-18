@@ -63,3 +63,18 @@ test("T-062: the model and the owner see which pending updates come from outside
   assert.deepEqual(checkFacts("Sentani has 3 pending updates, all 3 from Docker's repository, and 0 from Ubuntu.", inputs, prompt), { ok: true });
   assert.equal(checkFacts("Sentani has 3 pending updates, 2 from Docker's repository.", inputs, prompt).ok, false);
 });
+
+// ---- T-063: ServrSit's own clock is wrong --------------------------------------------
+
+test("T-063: with ServrSit's clock untrusted, answers say every time may be wrong, once, and the host is not blamed", async () => {
+  const { deterministicOverview, buildAssistantPrompt: prompt } = await import("./assistant.js");
+  const ctx = { ...CTX, controllerClock: { status: "untrusted" as const, offsetSeconds: 25200 } };
+  const servers = [server({ name: "Sentani" }, SENTANI), server({ name: "Nabire" })];
+  const text = deterministicOverview(servers, ctx);
+  assert.ok(text.startsWith("ServrSit's own clock is about 7 h fast, so every time and age here may be wrong.\n\n"));
+  assert.equal(text.split("ServrSit's own clock").length - 1, 1, "the warning appears once");
+  assert.doesNotMatch(text, /The host's clock is/);
+  const user = prompt(servers.map((s) => buildAiInput(s, ctx)), "status?", ctx);
+  assert.ok(user.includes('"timesUncertain":"ServrSit\'s own clock is about 7 h fast, so every time and age here may be wrong."'));
+  assert.equal(prompt(servers.map((s) => buildAiInput(s, CTX)), "status?", CTX).includes("timesUncertain"), false, "no note when not checked");
+});

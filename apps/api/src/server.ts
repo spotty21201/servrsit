@@ -24,6 +24,7 @@ import { DEFAULT_OWNER_CONTEXT_PATH, OwnerContextFile } from "./owner-context-fi
 import { SqliteCareStore, type CareStore } from "@servrsit/store";
 import { SshWriteTarget, type WriteTarget } from "@servrsit/worker";
 import { buildFixtureFleet } from "./fleet/fixture.js";
+import { ControllerClockMonitor, NOT_CHECKED_CLOCK } from "./clock/controller-clock.js";
 import { createLoggerOptions, installResponseRedaction, type LogStream } from "./redaction.js";
 
 const isDev = process.env["NODE_ENV"] !== "production";
@@ -54,6 +55,12 @@ export interface BuildServerOptions {
    * null disables it (tests).
    */
   readonly ownerContextPath?: string | null | undefined;
+  /**
+   * T-063: ServrSit's own clock check. Default: a monitor that runs with the
+   * background checks (live mode, startChecks not false); otherwise none, and
+   * the clock is reported "not-checked".
+   */
+  readonly controllerClock?: ControllerClockMonitor | null | undefined;
 }
 
 /** A simulated server, injectable only in code (tests and local demos), never via config or API. */
@@ -196,15 +203,28 @@ export async function buildServer(options: BuildServerOptions = {}) {
   // ---------------------------------------------------------------------------
   await fastify.register(healthPlugin);
 
+  const clockMonitor =
+    options.controllerClock !== undefined
+      ? options.controllerClock
+      : mode === "live" && options.startChecks !== false
+        ? new ControllerClockMonitor({ intervalMs: config.healthIntervalMinutes * 60_000, log: fastify.log })
+        : null;
   const service =
     options.fleetService ??
-    new FleetService({ config, knownHostsFile: knownHostsPath(), log: fastify.log });
+    new FleetService({
+      config,
+      knownHostsFile: knownHostsPath(),
+      log: fastify.log,
+      ...(clockMonitor === null ? {} : { controllerClock: () => clockMonitor.current() }),
+    });
+  const controllerClock = () => (mode === "fixture" ? NOT_CHECKED_CLOCK : service.controlPlane().clock);
   await fastify.register(fleetPlugin, { mode, service, config });
   await fastify.register(assistantRoutes, {
     assistant: options.assistant ?? createAssistant(resolveAiConfig({ AI_PROVIDER: "none" })),
     fleet: () => (mode === "fixture" ? buildFixtureFleet(config, new Date()) : service.snapshot()),
     timeZone: config.ownerTimeZone,
     now: options.now,
+    controllerClock,
     ownerContext: ownerContextSource(options, fastify.log),
   });
   const care = careWiring(config, options.care);
@@ -217,12 +237,15 @@ export async function buildServer(options: BuildServerOptions = {}) {
     // AUTH STUB (D3): a fixed owner until Cognito sessions (T-023).
     owner: () => "owner-dev-stub",
     now: options.care?.now,
+    controllerClock,
   });
 
   // Fixture mode never contacts any server.
   if (mode === "live" && options.startChecks !== false) service.start();
+  if (options.startChecks !== false) clockMonitor?.start();
   fastify.addHook("onClose", async () => {
     await service.stop();
+    await clockMonitor?.stop();
   });
 
   return fastify;
