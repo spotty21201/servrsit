@@ -7,10 +7,11 @@ import {
 } from "./index.js";
 
 const NOW = new Date("2026-11-17T10:00:00.000Z");
+const UBUNTU = "Ubuntu:24.04/noble-updates";
 const preview = (over: Partial<TransactionPreview> = {}): TransactionPreview => ({
   upgrades: [
-    { name: "openssl", arch: "amd64", from: "3.0.13-0ubuntu3.4", to: "3.0.13-0ubuntu3.5" },
-    { name: "libssl3t64", arch: "amd64", from: "3.0.13-0ubuntu3.4", to: "3.0.13-0ubuntu3.5" },
+    { name: "openssl", arch: "amd64", from: "3.0.13-0ubuntu3.4", to: "3.0.13-0ubuntu3.5", origin: UBUNTU },
+    { name: "libssl3t64", arch: "amd64", from: "3.0.13-0ubuntu3.4", to: "3.0.13-0ubuntu3.5", origin: UBUNTU },
   ],
   removals: [], downgrades: [], held: [], locked: false, stateDigest: "sha256:state1",
   ...over,
@@ -155,4 +156,53 @@ test("signatures verify; any change, wrong key or unknown key id fails", () => {
   assert.equal(verifyManifestSignature(signManifest(manifest, other), trusted), false, "unknown key id");
   assert.equal(verifyManifestSignature({ ...signManifest(manifest, other), keyId: signer.keyId }, trusted), false, "wrong key");
   assert.equal(verifyManifestSignature({ ...signed, signature: "AAAA" }, trusted), false);
+});
+
+// ---- T-062: updates from outside Ubuntu's archive -------------------------------------
+
+/** The form Sentani reported on 2026-11-17. */
+const DOCKER = [
+  { name: "docker-ce", arch: "amd64", from: "5:29.9.3-1~ubuntu.24.04~noble", to: "5:29.10.0-1~ubuntu.24.04~noble", origin: "Docker CE:noble" },
+  { name: "docker-ce-cli", arch: "amd64", from: "5:29.9.3-1~ubuntu.24.04~noble", to: "5:29.10.0-1~ubuntu.24.04~noble", origin: "Docker CE:noble" },
+];
+
+test("T-062: updates from outside Ubuntu's archive are listed as excluded and never enter the transaction", () => {
+  const p = plan({ preview: preview({ upgrades: [...preview().upgrades, ...DOCKER] }) });
+  assert.deepEqual(p.scope.packages.map((c) => c.name), ["libssl3t64", "openssl"]);
+  assert.ok(p.scope.packages.every((c) => !("origin" in c)), "the transaction carries no origin labels");
+  assert.deepEqual(p.scope.excludedPackages.map((c) => [c.name, c.origin, c.reason]), [
+    ["docker-ce", "Docker CE:noble", "outside-ubuntu-archive"],
+    ["docker-ce-cli", "Docker CE:noble", "outside-ubuntu-archive"],
+  ]);
+  assert.deepEqual(Object.keys(p.verification.expectInstalled).sort(), ["libssl3t64:amd64", "openssl:amd64"]);
+  assert.deepEqual(p.blockers, []);
+  assert.ok(verifyPlanDigest(p));
+});
+
+test("T-062: when every pending update is from outside Ubuntu, the plan is blocked ONLY_EXCLUDED_PACKAGES", () => {
+  const p = plan({ preview: preview({ upgrades: DOCKER }) });
+  assert.deepEqual(p.scope.packages, []);
+  assert.deepEqual(p.blockers.map((b) => b.code), ["ONLY_EXCLUDED_PACKAGES"]);
+});
+
+test("T-062: a missing, unrecognised, backports or mixed origin is excluded (fail safe)", () => {
+  const base = { arch: "amd64", from: "1", to: "2" };
+  const p = plan({
+    preview: preview({
+      upgrades: [
+        { ...base, name: "a" },
+        { ...base, name: "b", origin: "Ubuntu:24.04/noble-backports" },
+        { ...base, name: "c", origin: "Ubuntu:24.04/noble-updates, Docker CE:noble" },
+        { ...base, name: "d", origin: "evil`id`" },
+        { ...base, name: "e", origin: "Ubuntu:24.04/noble-security" },
+      ],
+    }),
+  });
+  assert.deepEqual(p.scope.packages.map((c) => c.name), ["e"]);
+  assert.deepEqual(p.scope.excludedPackages.map((c) => [c.name, c.origin]), [
+    ["a", "(unknown)"],
+    ["b", "Ubuntu:24.04/noble-backports"],
+    ["c", "Ubuntu:24.04/noble-updates, Docker CE:noble"],
+    ["d", "(unknown)"],
+  ]);
 });

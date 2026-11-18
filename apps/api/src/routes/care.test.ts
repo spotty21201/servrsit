@@ -256,3 +256,14 @@ test("unknown plans and operations are 404, with no detail", async () => {
     assert.equal(r.statusCode, 404);
   } finally { await h.app.close(); }
 });
+
+test("T-062 via the API: a simulated server's Docker updates are listed as excluded and not planned", async () => {
+  const h = await start();
+  try {
+    h.sim.addUpgrade({ name: "docker-ce", arch: "amd64", from: "5:29.9.3-1~ubuntu.24.04~noble", to: "5:29.10.0-1~ubuntu.24.04~noble", origin: "Docker CE:noble" });
+    const p = (await h.plan()) as unknown as { scope: { packages: Array<{ name: string }>; excludedPackages: Array<{ name: string; origin: string; reason: string }> }; approvable: boolean };
+    assert.deepEqual(p.scope.packages.map((c) => c.name), ["openssl"], "the simulated Ubuntu update is planned");
+    assert.deepEqual(p.scope.excludedPackages, [{ name: "docker-ce", arch: "amd64", from: "5:29.9.3-1~ubuntu.24.04~noble", to: "5:29.10.0-1~ubuntu.24.04~noble", origin: "Docker CE:noble", reason: "outside-ubuntu-archive" }]);
+    assert.equal(p.approvable, true);
+  } finally { await h.app.close(); }
+});

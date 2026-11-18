@@ -97,6 +97,7 @@ export function coverageOf(observation: InspectionObservation): NonNullable<Flee
     memory: h.memory,
     filesystems: h.filesystems,
     inodes: h.inodes,
+    clock: h.clock,
     failedUnits: observation.services.failedUnits,
     pendingPackages: p.pendingCount,
     heldBackPackages: p.heldBackCount,

@@ -11,7 +11,7 @@ import { FileIntentStore, IntentConflictError, SqliteCareStore } from "./index.j
 const NOW = new Date("2026-11-17T10:00:00.000Z");
 const SERVER = "00000000-0000-4000-8000-0000000051a1";
 const preview: TransactionPreview = {
-  upgrades: [{ name: "openssl", arch: "amd64", from: "3.0.13-0ubuntu3.4", to: "3.0.13-0ubuntu3.5" }],
+  upgrades: [{ name: "openssl", arch: "amd64", from: "3.0.13-0ubuntu3.4", to: "3.0.13-0ubuntu3.5", origin: "Ubuntu:24.04/noble-updates" }],
   removals: [], downgrades: [], held: [], locked: false, stateDigest: "sha256:s",
 };
 

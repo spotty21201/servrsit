@@ -19,6 +19,8 @@ import {
   parseAptSimulation,
   parseAptStamp,
   parseBootId,
+  parseClock,
+  correctTargetTime,
   parseCpuCount,
   parseDf,
   parseDfInodes,
@@ -30,6 +32,7 @@ import {
   parseUptime,
   rebootRequiredFrom,
   splitSections,
+  type AptSimulation,
   type RawSection,
 } from "./parse.js";
 import { unavailable, ok, type Field } from "./schema.js";
@@ -97,6 +100,8 @@ export interface BuildInput {
   readonly stdout: string;
   readonly nonce: string;
   readonly source: "ssh" | "local";
+  /** When ServrSit started the collection (T-061: the clock is measured against [startedAt, collectedAt]). */
+  readonly startedAt: Date;
   readonly collectedAt: Date;
   readonly durationMs: number;
   readonly outputTruncated: boolean;
@@ -110,6 +115,12 @@ export function buildObservation(input: BuildInput): InspectionObservation {
   const truncatedSections = [...sections.values()].filter((s) => s.truncated).map((s) => s.name);
 
   const apt = fromSection(get("apt"), (lines) => parseAptSimulation(lines));
+  const clock = fromSection(get("clock"), (lines) => parseClock(lines, input.startedAt, input.collectedAt));
+  // The stamp is written by the target's clock; put it into ServrSit's time (T-061).
+  const aptStamp = correctTargetTime(
+    fromSection(get("aptstamp"), (lines) => parseAptStamp(lines, input.collectedAt)),
+    clock,
+  );
 
   const observation = {
     schemaVersion: OBSERVATION_SCHEMA_VERSION,
@@ -130,6 +141,7 @@ export function buildObservation(input: BuildInput): InspectionObservation {
       memory: fromSection(get("meminfo"), parseMeminfo),
       filesystems: fromSection(get("df"), parseDf),
       inodes: fromSection(get("dfi"), parseDfInodes),
+      clock,
     },
     services: {
       collector: "inspect.services.v1" as const,
@@ -141,9 +153,10 @@ export function buildObservation(input: BuildInput): InspectionObservation {
         apt.status === "ok" ? ok(apt.value.pendingCount) : unavailable<number>(apt.reason),
       heldBackCount:
         apt.status === "ok" ? ok(apt.value.heldBackCount) : unavailable<number>(apt.reason),
-      metadataUpdatedAt: fromSection(get("aptstamp"), (lines) =>
-        parseAptStamp(lines, input.collectedAt),
-      ),
+      pendingOutsideUbuntu:
+        apt.status === "ok" ? ok(apt.value.outsideUbuntu) : unavailable<AptSimulation["outsideUbuntu"]>(apt.reason),
+      metadataUpdatedAt: aptStamp.stamp,
+      metadataClock: aptStamp.basis,
       rebootRequired: rebootRequiredFrom(get("rebootreq")),
     },
   };
@@ -196,6 +209,7 @@ async function runCollector(
       stdout: result.stdout,
       nonce,
       source,
+      startedAt: started,
       collectedAt: finished,
       durationMs: finished.getTime() - started.getTime(),
       outputTruncated: result.stdoutTruncated,

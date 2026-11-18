@@ -73,6 +73,7 @@ function syntheticObservation(o: ObservationShape): InspectionObservation {
         ],
         skippedLineCount: 0,
       }),
+      clock: ok({ targetEpochSeconds: Math.floor(o.at.getTime() / 1000), skewSeconds: 0, uncertaintySeconds: 1 }),
     },
     services: {
       collector: "inspect.services.v1",
@@ -82,8 +83,10 @@ function syntheticObservation(o: ObservationShape): InspectionObservation {
       collector: "inspect.packages.v1",
       pendingCount: ok(o.pending),
       heldBackCount: ok(0),
+      pendingOutsideUbuntu: ok({ count: 0, packages: [] }),
       metadataUpdatedAt: ok(new Date(o.at.getTime() - 6 * 60 * MIN).toISOString()),
       rebootRequired: ok(false),
+      metadataClock: "in-sync",
     },
   };
 }

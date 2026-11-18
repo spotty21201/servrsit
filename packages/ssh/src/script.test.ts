@@ -50,6 +50,8 @@ test("every collector command is on the reviewed allowlist", () => {
     /^\$T apt-get -s -o Debug::NoLocking=1 upgrade$/,
     /^stat -c %Y \/var\/lib\/apt\/periodic\/update-success-stamp$/,
     /^test -e \/var\/run\/reboot-required$/,
+    // T-061: prints the time; cannot set it (that needs -s or a date argument, and root).
+    /^date \+%s$/,
   ];
   for (const s of COLLECTOR_SECTIONS) {
     assert.ok(allowed.some((re) => re.test(s.command)), `unreviewed command: ${s.command}`);

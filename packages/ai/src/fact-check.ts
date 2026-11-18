@@ -189,6 +189,11 @@ function numericFacts(input: AiServerInput): Set<number> {
     add(m.memoryUsedPercent);
     add(m.uptimeDays);
     add(m.pendingUpdates);
+    // T-062: "3 from Docker's repository", "0 from Ubuntu".
+    if (m.pendingOutsideUbuntu !== null) {
+      add(m.pendingOutsideUbuntu.count);
+      if (m.pendingUpdates !== null) add(m.pendingUpdates - m.pendingOutsideUbuntu.count);
+    }
     add(failedCount(input));
     for (const f of m.filesystems ?? []) add(f.usedPercent);
     for (const f of m.inodes ?? []) add(f.usedPercent);

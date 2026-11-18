@@ -11,7 +11,7 @@ export {
   PRODUCTION_ACK,
   verifyPlanDigest,
 } from "./plan.js";
-export type { Blocker, BlockerCode, BuildPlanInput, PackageChange, Plan, PlanServer, TransactionPreview } from "./plan.js";
+export type { Blocker, BlockerCode, BuildPlanInput, ExcludedPackage, PackageChange, Plan, PlanServer, TransactionPreview } from "./plan.js";
 export {
   ALL_STATES,
   assertTransition,

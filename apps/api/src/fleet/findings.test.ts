@@ -99,3 +99,34 @@ test("O2: other failures do not raise the host-key finding", () => {
     assert.equal(f.some((x) => x.id === "host-key-changed"), false, String(code));
   }
 });
+
+// ---- T-061: clock skew -------------------------------------------------------------
+
+test("T-061: a target clock 7 hours slow (Sentani's case) is a time-sync warning on the first observation", () => {
+  const f = run(makeObservation({ clockSkewSeconds: -7 * 3600 }), null).find((x) => x.id === "clock-skew");
+  assert.equal(f?.rule, "time.skew.v1");
+  assert.equal(f?.severity, "warning");
+  assert.match(f?.summary ?? "", /^This server's clock is about 7 h behind ServrSit's clock\. /);
+  assert.match(run(makeObservation({ clockSkewSeconds: 600 }), null).find((x) => x.id === "clock-skew")?.summary ?? "", /about 10 min ahead of ServrSit's clock\./);
+});
+
+test("T-061: within 2 minutes, or a clock that could not be read, is not a skew finding", () => {
+  for (const skew of [0, 90, -120, 121]) {
+    assert.equal(run(makeObservation({ clockSkewSeconds: skew }), null).some((x) => x.id === "clock-skew"), false, `skew ${skew} s with 1 s uncertainty`);
+  }
+  assert.equal(run(makeObservation({ clockSkewSeconds: 122 }), null).some((x) => x.id === "clock-skew"), true, "122 s - 1 s > 120 s");
+  assert.equal(run(makeObservation({ clockSkewSeconds: null }), null).some((x) => x.id === "clock-skew"), false);
+});
+
+// ---- T-062: updates from outside Ubuntu's archive ---------------------------------------
+
+test("T-062: the pending-updates finding names what comes from outside Ubuntu and says plans leave it out", () => {
+  const docker = ["docker-ce-cli", "docker-ce", "docker-ce-rootless-extras"].map((name) => ({ name, origin: "Docker CE:noble" }));
+  const f = run(makeObservation({ pending: 3, outsideUbuntu: docker }), null).find((x) => x.id === "updates-pending");
+  assert.equal(
+    f?.summary,
+    "3 package updates pending, from the host's existing package information (not refreshed by ServrSit). 3 of them come from outside Ubuntu's archive (docker-ce-cli, docker-ce, docker-ce-rootless-extras from Docker CE:noble) and are left out of update plans.",
+  );
+  const plain = run(makeObservation({ pending: 2 }), null).find((x) => x.id === "updates-pending");
+  assert.doesNotMatch(plain?.summary ?? "", /outside Ubuntu/);
+});
