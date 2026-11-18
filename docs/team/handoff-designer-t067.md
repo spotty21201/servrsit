@@ -96,3 +96,12 @@ Same fixes applied to the new screens (titles, reasons, 44 px targets, stretched
 - `registrationError()` handles the client's new codes: TIMEOUT, CSRF_INVALID, UNAUTHENTICATED. A lost or unreadable answer on a state-changing call no longer says "Nothing was changed": it says the step may or may not have happened and to reload (the draft is resumed from the stored id).
 - Checked against the real API on my own instance (:3005, own registry and auth databases): the screen's `POST /api/servers/drafts` carried the session CSRF header and the API's answer ("That address is not allowed. This private address is outside every route enrolled for ServrSit.") is shown. The later steps need a reachable SSH host, so they are covered by the fixture flow and Coder's client tests, not run against a real host.
 - Tests: 182 web tests pass, build ok. Findings, Activity, Baselines and Settings keep their stubs until T-076 to T-079 land.
+
+# Addendum 4: test-report-ui-a11y-002 fixes (branch `feat/designer/t080`)
+| Defect | Fix | Commit |
+|---|---|---|
+| D-U16 (Medium) focus hidden under the sticky top nav at 768/1024 px | `html { scroll-padding-top: banner height + nav height + 8px }` (tokens.css); the Overview publishes the sticky nav's height as `--nav-h` (0 when the nav is not sticky). Reproduced before (7 hidden stops at 1024×768) and probed after at 768, 1024 and 390 px on the Overview cards and list, Activity and Settings: none hidden. | `D-U16` |
+| D-U10 decision: stretched hit area | Server-name links are real 44 px boxes (inline padding on the clamped name, so the approved density is unchanged; 156×49 for a two-line name), plus the stretched `::after` over the whole card; the compact list and activity titles do the same. Article/heading semantics and the separate action button are unchanged: a click on blank card space opens the server, the action button goes to its own target. Audited every non-prose link on 8 screens at 1440 and 390: all at least 44 px. | `D-U10` |
+| D-U14 `aria-label` on a span | Empty values: `aria-hidden` dash plus visually hidden "No value." | `D-U14` |
+| D-U15 "Server not found" without `<h1>` | Already closed by the T-075 fix (page-level failures render their title as `<h1>`); verified in Chromium: h1 "Server not found". Evidence only. | `D-U15` |
+Evidence: `docs/team/evidence/a11y-fixes/` (results and two screenshots). Not run: the Tester's own suite against this branch.
