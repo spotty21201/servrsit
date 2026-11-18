@@ -252,6 +252,15 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 
 **Reason:** Enrolling while the controller clock is 7 h fast leaves TOTP unusable after the correction (D-A3), and an un-merged login keeps the founder's current dev UI working. Risk accepted meanwhile: the dev API stays open on loopback and, via the Vite proxy, to the founder's tailnet (F8). Writes remain disabled on all real hosts.
 
+## ADR-019 — `integration/next` branch for work that depends on login
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-18 (controller clock) |
+| **Status** | [AGENT DECISION] (within ADR-016) |
+
+**Decision:** Coder creates `integration/next` = `integration/live-v1` + `feat/coder/owner-auth` + `feat/coder/server-registration`, resolving the repeated API conflicts once (auth guard, clock check, registration, care routes). From then on Coder, Designer and Tester base new work on `integration/next`. `integration/live-v1` stays the founder's running app until ADR-018's conditions are met (clock fixed); then `integration/next` is merged into it.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
