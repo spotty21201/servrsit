@@ -28,11 +28,13 @@ import assistantRoutes from "./routes/assistant.js";
 import careRoutes, { type CareServer } from "./routes/care.js";
 import { DEFAULT_ALLOWED_ORIGINS } from "./csrf.js";
 import serverRoutes from "./routes/servers.js";
+import findingRoutes, { PAUSE_KEY, type PausedSetting } from "./routes/findings.js";
+import { FindingTracker } from "./findings/tracker.js";
 import { AddressPolicy, type Resolver } from "./servers/address.js";
 import { ServerRegistry, type FirstCheckCollector } from "./servers/registry.js";
 import { createHostKeyScanner, createKeyVault, probeTcp, type HostKeyScanner, type KeyVault } from "./servers/ssh-tools.js";
 import { DEFAULT_OWNER_CONTEXT_PATH, OwnerContextFile } from "./owner-context-file.js";
-import { SqliteAuthStore, SqliteCareStore, SqliteServerStore, type CareStore, type NewServer, type StoredServer } from "@servrsit/store";
+import { SqliteAuthStore, SqliteCareStore, SqliteServerStore, SqliteFindingStore, SqliteSettingsStore, type CareStore, type NewServer, type StoredServer } from "@servrsit/store";
 import { SshWriteTarget, type WriteTarget } from "@servrsit/worker";
 import { buildFixtureFleet } from "./fleet/fixture.js";
 import { ControllerClockMonitor, NOT_CHECKED_CLOCK } from "./clock/controller-clock.js";
@@ -76,6 +78,14 @@ export interface BuildServerOptions {
   readonly controllerClock?: ControllerClockMonitor | null | undefined;
   /** T-069 server registry wiring. Defaults: in-memory registry, real OpenSSH tools. */
   readonly servers?: ServerRegistryWiring | undefined;
+  /** T-076 findings and scheduler. Defaults: in-memory stores (the entry point passes files). */
+  readonly findings?: FindingsWiring | undefined;
+}
+
+export interface FindingsWiring {
+  readonly store?: SqliteFindingStore | undefined;
+  readonly settings?: SqliteSettingsStore | undefined;
+  readonly now?: (() => Date) | undefined;
 }
 
 export interface ServerRegistryWiring {
@@ -293,6 +303,8 @@ export async function buildServer(options: BuildServerOptions = {}) {
   );
   const registryHosts = () => registryStore.listActive().map(fleetHost);
 
+  // T-076: findings are recorded after every pass; bound once the tracker exists.
+  let onPass: () => void = () => undefined;
   const service =
     options.fleetService ??
     new FleetService({
@@ -300,6 +312,7 @@ export async function buildServer(options: BuildServerOptions = {}) {
       hosts: registryHosts,
       knownHostsFile: knownHostsPath(),
       log: fastify.log,
+      onPassComplete: () => onPass(),
       ...(clockMonitor === null ? {} : { controllerClock: () => clockMonitor.current() }),
     });
   const controllerClock = () => (mode === "fixture" ? NOT_CHECKED_CLOCK : service.controlPlane().clock);
@@ -370,6 +383,29 @@ export async function buildServer(options: BuildServerOptions = {}) {
   });
 
   // Fixture mode never contacts any server.
+  // T-076: findings and the scheduler. Fixture mode keeps its [FIXTURE DATA]
+  // findings in memory only, never in the persistent store.
+  const settings = options.findings?.settings ?? new SqliteSettingsStore({ path: ":memory:" });
+  const findingStore = mode === "fixture" ? new SqliteFindingStore({ path: ":memory:" }) : (options.findings?.store ?? new SqliteFindingStore({ path: ":memory:" }));
+  const fleetSnapshot = () => (mode === "fixture" ? buildFixtureFleet(config, new Date()) : service.snapshot());
+  const tracker = new FindingTracker({ store: findingStore, fleet: fleetSnapshot, now: options.findings?.now });
+  onPass = () => tracker.sync();
+  await fastify.register(findingRoutes, {
+    mode,
+    tracker,
+    store: findingStore,
+    settings,
+    service,
+    fleet: fleetSnapshot,
+    owner: (request) => {
+      if (request.authSession === null) throw new Error("findings route reached without a session");
+      return request.authSession.info.username;
+    },
+    now: options.findings?.now,
+  });
+  // A pause survives restarts.
+  if (mode === "live" && settings.get<PausedSetting>(PAUSE_KEY) !== null) service.pause();
+
   if (mode === "live" && options.startChecks !== false) service.start();
   if (options.startChecks !== false) clockMonitor?.start();
   fastify.addHook("onClose", async () => {
