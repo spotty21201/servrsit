@@ -21,14 +21,14 @@
 .topbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-1) var(--space-3);
   padding: var(--space-1-half) var(--content-padding-mobile);
   border-bottom: 2px solid var(--color-ink);
   background-color: var(--color-surface);
 }
 
-.brand { font-size: 16px; line-height: 20px; color: var(--color-ink); }
+.brand { display: inline-flex; align-items: center; min-height: var(--touch-target-min); font-size: 16px; line-height: 20px; color: var(--color-ink); }
 .brand:hover { text-decoration: none; }
 
 .crumbs {
@@ -39,7 +39,8 @@
   line-height: var(--text-compact-line-height);
   color: var(--color-muted-ink);
 }
-.crumbs a { text-decoration: underline; }
+.crumbs { align-items: center; }
+.crumbs a { display: inline-flex; align-items: center; min-height: var(--touch-target-min); text-decoration: underline; }
 .crumbs [aria-current="page"] { color: var(--color-ink); font-weight: var(--font-weight-semibold); }
 
 .main {
@@ -202,6 +203,7 @@
   align-items: start;
   padding: var(--space-1);
   border: 1px solid var(--color-control-boundary);
+  min-height: var(--touch-target-min);
   border-radius: var(--radius-input);
   font-size: var(--text-compact-size);
   line-height: var(--text-compact-line-height);
@@ -261,7 +263,9 @@
 .sCurrent { color: var(--color-state-progress-fg); }
 .sFailed { color: var(--color-state-failed-fg); }
 .sUnknown { color: var(--color-state-unknown-fg); }
-.sPending { color: var(--color-control-boundary); }
+/* Text uses Muted ink (5.8:1 on white), never the control-boundary grey (3.8:1): D-U9 */
+.sPending { color: var(--color-muted-ink); }
+.sPending .stepIcon, .stepIcon.sPending { color: var(--color-muted-ink); }
 
 /* ── Operation: receipt ────────────────────────────────────────────────── */
 
@@ -312,4 +316,18 @@
 
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
+}
+
+/* ── Forced colors / Windows high contrast (D-U11). Focus uses outline, which is kept.
+   Backgrounds are dropped in this mode, so anything that relied on a fill alone
+   gets system colours and a border. ─────────────────────────────────────────── */
+@media (forced-colors: active) {
+  .step::before { background-color: CanvasText; }
+  .stepIcon { border-color: CanvasText; }
+  .stateTag, .chip, .simLabel, .productionLabel { border: 1px solid CanvasText; forced-color-adjust: none; color: CanvasText; background-color: Canvas; }
+  .productionLabel { background-color: Highlight; color: HighlightText; }
+  .primary { forced-color-adjust: none; background-color: ButtonFace; color: ButtonText; border: 2px solid ButtonText; }
+  .primary:disabled, .secondary:disabled, .primary[aria-disabled="true"], .secondary[aria-disabled="true"] { color: GrayText; border-color: GrayText; }
+  .check:has(input:checked) { border: 2px solid Highlight; }
+  .transcript { border: 1px solid CanvasText; }
 }

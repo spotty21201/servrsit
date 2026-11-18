@@ -35,6 +35,13 @@
 .caveat { display: block; color: var(--color-muted-ink); }
 .bar { display: block; height: 6px; border: 1px solid var(--color-ink); border-radius: 3px; overflow: hidden; background: var(--color-surface); }
 .bar > span { display: block; height: 100%; background: var(--color-ink); }
+@media (forced-colors: active) {
+  .bar { border-color: CanvasText; }
+  .bar > span { forced-color-adjust: none; background: Highlight; }
+  .stepper li { border-top-color: CanvasText; }
+  .stepper li[data-state="todo"] { border-top-style: dotted; }
+  .choice:has(input:checked) { border: 2px solid Highlight; }
+}
 
 @media (min-width: 1024px) { .cols { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
 
