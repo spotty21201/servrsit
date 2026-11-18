@@ -179,3 +179,24 @@ These were temporary edits in my throwaway worktree, each reverted with `git che
 5. **D-H7 (Low):** have uninstall list unresolved ledger records and running `servrsit-op-*` units, and stop (or require `--force`) before removing the helper.
 6. **T-012 (disposable VM)** must prove everything in the box at the top before any live use: APT commit and locking, `systemd-run` surviving SSH disconnect, restart and reboot verification, root ownership, the real sudoers rule with `sudo -n`, sshd's `restrict` plus forced command, and bootstrap and uninstall end to end, including the D-H3 planted-link case.
 7. When D-H1 to D-H4 are fixed, I re-run this suite against the new pinned commit, with the same mutants.
+
+---
+
+## Addendum A — T-084 status check (2026-11-18)
+
+**Status: PENDING. T-084 has not landed on integration/next. D-H1 to D-H7 all remain OPEN.**
+
+- **Where T-084 stands:** T-084 exists only as a task-board line (`53d5fa5`, on `integration/live-v1`), with status `todo`. No helper code has changed: `git diff 6c7df23 42b490e -- target-helper` is empty.
+- **Re-run on the integration/next head `42b490e`** (throwaway worktree, removed afterwards): 118 passed, 7 failed, 1 xfailed. The failures are the same tests as in §2: H18, H21, H21b ×2, H45 and H46, plus the intermittent H12-threads (D-H2). H04b is the strict xfail (D-H5).
+
+| Defect | Status at `42b490e` | Evidence |
+|---|---|---|
+| D-H1 | Open | H21 [5,000-digit integer], H21b ×2 |
+| D-H2 | Open | H18; H12-threads failed in this run |
+| D-H3 | Open | H45 |
+| D-H4 | Open | H46 |
+| D-H5 | Open (Info) | H04b strict xfail |
+| D-H6 | Open (Info, not tested) | code reading only |
+| D-H7 | Open | static review |
+
+**Next:** when T-084 is merged to integration/next, I re-run against that pinned commit, repeat H12 ×10 and the 10 mutants, and record the close or re-open decision for each defect in Addendum B.
