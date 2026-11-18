@@ -143,7 +143,7 @@ Then my own instance on **port 3002 via the real `index.ts` entry point** (Coder
 - **Identity:** four distinct hostnames and four distinct boot ids, and **each boot id is identical to the one the founder's independent instance reported**, so no key answered for another machine.
 - **Merauke checked independently** from the machine itself: hostname, boot id `fdd6f28c`, `apt-get -s` "0 upgraded … 1 not upgraded", no reboot-required. All match.
 - **Findings** (advisory only): Nabire 1 pending update, Sentani 6 pending updates, both worded "from the host's existing package information (not refreshed by ServrSit)". Nothing critical or warning.
-- **Leaks:** my scanner now has real key paths to look for. Fleet body, headers and server log: **CLEAN** (`PRIVATE KEY`, `id_ed25519`, `/.ssh/`, `.ssh`, `identityFile`, the owner home-directory path, `BEGIN OPENSSH`, AWS-key shape all 0).
+- **Leaks:** my scanner now has real key paths to look for. Fleet body, headers and server log: **CLEAN** (every pattern in `tests/live/leak-scan.sh`: 0 matches).
 - **Contacts:** 4 `check finished`, 0 `check failed`. Process stopped well before its 15-minute timer; shutdown took 0.1 s.
 - **Caveat:** this shows the read path works, not that the dedicated Sentani/Timika keys follow least privilege. I did not and must not read them.
 
