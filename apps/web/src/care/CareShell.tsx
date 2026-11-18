@@ -5,7 +5,7 @@
  * banner is rendered whenever the page is backed by fixtures.
  */
 import type { ReactNode } from "react";
-import { FixtureBanner } from "../components/FixtureBanner/index.js";
+import { TopBanners } from "../clock/TopBanners";
 import { SignOutButton } from "../auth/SignOutButton";
 import styles from "./care.module.css";
 
@@ -19,7 +19,7 @@ interface CareShellProps {
 export function CareShell({ fixture, section, children }: CareShellProps) {
   return (
     <div className={styles.shell}>
-      {fixture && <FixtureBanner />}
+      <TopBanners fixture={fixture} />
       <header className={styles.topbar}>
         <a href="/" className={`${styles.brand} pixel-text`} aria-label="ServrSit, back to Overview">ServrSit</a>
         <nav aria-label="Breadcrumb" className={styles.crumbs}>

@@ -79,3 +79,13 @@ test("diffScope reports added, removed and changed packages", () => {
   assert.deepEqual(d.removed, [b]);
   assert.deepEqual(d.changed, [{ before: a, after: a2 }]);
 });
+
+test("clock untrusted: approval is paused with the clock reason, expiry and ages are marked ≈", () => {
+  const vm = toPlanVM(plan(), NOW, TZ, null, true);
+  assert.equal(vm.disposition.canApprove, false);
+  assert.equal(vm.disposition.title, "Approvals are paused");
+  assert.match(vm.disposition.reason, /clock is wrong/);
+  assert.equal(vm.expiry.relative, "≈ in 12 min");
+  assert.match(vm.createdText, /≈ 3 min ago/);
+  assert.equal(toPlanVM(plan(), NOW, TZ, null, false).disposition.canApprove, true);
+});

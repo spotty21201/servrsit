@@ -260,7 +260,7 @@ function buildReceipt(op: OperationView["operation"], events: readonly Operation
   return { title, receipt: { changed, verified, stillNeeded, couldNotVerify: couldNot } };
 }
 
-export function toOperationVM(view: OperationView, plan: PlanView | null, now: Date, tz: string): OperationVM {
+export function toOperationVM(view: OperationView, plan: PlanView | null, now: Date, tz: string, agesUncertain = false): OperationVM {
   const { operation: op, events } = view;
   const serverName = plan?.target.name ?? "this server";
   const state = op.state;
@@ -309,6 +309,6 @@ export function toOperationVM(view: OperationView, plan: PlanView | null, now: D
       requested: op.stopRequested,
     },
     recheck: state === "outcome_unknown",
-    updatedText: updated ? formatClockWithAge(updated, now, tz) : "unknown",
+    updatedText: updated ? formatClockWithAge(updated, now, tz, agesUncertain) : "unknown",
   };
 }

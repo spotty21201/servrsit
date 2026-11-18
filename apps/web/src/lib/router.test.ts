@@ -13,6 +13,8 @@ test("anything else is the overview, including unsafe ids", () => {
   }
 });
 
+test("fixture clock page route", () => { assert.deepEqual(matchRoute("/fixtures/clock"), { name: "fixtureClock" }); });
+
 test("path builders encode", () => {
   assert.equal(planPath("a b"), "/plans/a%20b");
   assert.equal(operationPath("x"), "/operations/x");

@@ -5,12 +5,14 @@
 export type Route =
   | { readonly name: "overview" }
   | { readonly name: "plan"; readonly id: string }
-  | { readonly name: "operation"; readonly id: string };
+  | { readonly name: "operation"; readonly id: string }
+  | { readonly name: "fixtureClock" };
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 export function matchRoute(pathname: string): Route {
   const clean = pathname.replace(/\/+$/, "");
+  if (clean === "/fixtures/clock") return { name: "fixtureClock" };
   const m = /^\/(plans|operations)\/([^/]+)$/.exec(clean);
   if (m?.[1] && m[2]) {
     let id: string;

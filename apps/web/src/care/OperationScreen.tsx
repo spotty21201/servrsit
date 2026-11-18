@@ -19,6 +19,7 @@
  */
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchFleet } from "../api/fleet";
+import { useClock } from "../clock/ClockContext";
 import { createCareClient, type CareClient, type OperationView, type PlanView } from "../api/stubs/care";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
 import { planPath } from "../lib/router";
@@ -121,6 +122,7 @@ export function OperationScreen({ operationId, client: injected }: { operationId
   const [now, setNow] = useState(() => new Date());
   const planTried = useRef<string | null>(null);
   const stopHelpId = useId();
+  const clockView = useClock().view;
 
   useEffect(() => {
     if (fixture) return;
@@ -166,7 +168,7 @@ export function OperationScreen({ operationId, client: injected }: { operationId
     void client.getPlan(planId).then((r) => { if (r.ok) setPlan(r.data); });
   }, [client, planId]);
 
-  const vm = view ? toOperationVM(view, plan, now, tz) : null;
+  const vm = view ? toOperationVM(view, plan, now, tz, clockView?.agesUncertain ?? false) : null;
 
   return (
     <CareShell fixture={fixture} section="Operation">
