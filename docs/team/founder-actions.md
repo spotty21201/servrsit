@@ -25,7 +25,7 @@ sudo date -u -s "$(curl -sI https://www.google.com | grep -i '^date:' | cut -d' 
 
 ## 2. Review the new screens
 
-Open http://100.104.220.8:5173/review-001/index.html (48 screenshots, desktop and phone, all [FIXTURE] sample data). These screens are built but not yet in your running app, because they come with the new login (see ADR-018). Noticed so far: the overview no longer fits one screen when there are 5 attention items, and the SERVRSIT logo wraps in the side rail.
+Latest: http://100.104.220.8:5173/review-002/index.html (74 screenshots of the integrated release candidate, including sign-in). Earlier: http://100.104.220.8:5173/review-001/index.html (48 screenshots, desktop and phone, all [FIXTURE] sample data). These screens are built but not yet in your running app, because they come with the new login (see ADR-018). Noticed so far: the overview no longer fits one screen when there are 5 attention items, and the SERVRSIT logo wraps in the side rail.
 
 ## 3. Decisions still open
 - Disposable Ubuntu server for write testing (you said: after development).
