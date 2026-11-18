@@ -1638,3 +1638,55 @@ Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21,
 **For the Tester:** add `POST /api/exports` to ZT-01's list. It reads only ServrSit's own records and never contacts a server.
 
 Next: T-078.
+
+## T-078: baselines, comparison and setup plans (branch `feat/coder/baselines`, from `integration/next`)
+
+**Contract** (`packages/contracts/src/baselines.ts`):
+
+- `GET /api/baselines/servers`
+- `GET /api/baselines`
+- `GET /api/baselines/candidates?reference=`
+- `POST /api/baselines` (new baseline, or the next version when `baselineId` is set)
+- `GET /api/baselines/:id`
+- `POST /api/baselines/:id/compare`
+- `PUT` and `DELETE /api/baselines/:id/exceptions...`
+- `GET /api/baselines/:id/history?target=`
+- `POST /api/baselines/:id/setup-plan`
+
+**New read-only inventory** (`packages/ssh/src/inventory.ts`). It runs only when the owner asks for candidates or a comparison, never on the schedule, and goes through the same check queue (`FleetService.exclusive`). It uses the same transport and pinning rules as the health check: an unpinned host is never contacted. The fixed script lists:
+
+- directories under `/srv` (two levels deep) and the login user's home (one level, not hidden), with owner, group and mode, using `find -printf`;
+- installed packages and versions, using `awk` on `/var/lib/dpkg/status`;
+- which installed versions appear in Ubuntu's own archive lists, using `awk` on `/var/lib/apt/lists/*ubuntu.com_ubuntu_dists_*_Packages`.
+
+The script uses no sudo, writes nothing, has no pipes and no `-exec`, and does no network access. A reviewed-allowlist test covers it, like the collector. On Merauke it read 705 installed packages, 703 of them confirmed from Ubuntu's archive, in about 1.7 s. That run was local and read-only. **I did not run it on any remote server.** On a server with a mirror outside `*.ubuntu.com`, no package can be confirmed, and the response says so.
+
+**Rules:**
+
+- **Candidates.** A directory is eligible only if `directoryAllowed` would accept creating it: under `/srv` or `/home/<user>`, plain path, no setuid/setgid/sticky bit, not world-writable. A package is eligible only if its installed version is in Ubuntu's archive. Every ineligible item carries a reason.
+- **Home conventions** are stored relative to the home, with the owner and group recorded as the login user. They are then compared against the target's own user and home.
+- **Comparison** reports `matches`, `missing`, `conflict`, `different-by-design` (marked intentional) or `not-checked` (part of the listing could not be read). It copies and deletes nothing.
+- **Exceptions** change only their own record. Every mark and removal goes into an append-only history.
+- **Setup plan.** It holds only the missing directories (at most 20, parents first) and is built by the same care planner (`exposePlanner`) as every other plan, as `prepare.directories.v1`. A server with writes disabled gets a plan blocked `WRITES_DISABLED`. The response lists everything else under `notIncluded`, with reasons.
+
+**Not done, Orchestrator decision needed:**
+
+- **Package installation from a baseline is not implemented.** There is no install operation (`install.packages.v1`) in the catalog, the worker or the simulated target. Missing packages are reported with "Installing packages is not a supported operation yet". Adding that operation is a new write capability and needs its own task and review.
+
+**New file:** `.data/baselines.db` (gitignored).
+
+**Web:** `apps/web/src/api/baselines.ts` keeps the stub's methods and return shapes. It adds `listBaselines`, `candidatesResponse` and `comparison`, which return the full responses with source, time and notes.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 232, ai 156, web 96, ssh 56, store 27, domain 22, worker 19, infra 9; typecheck all 9 exit 0
+Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a, known),
+  zt01 13/13 with the reviewed list (adds POST /api/baselines, /:id/compare, PUT and DELETE /:id/exceptions, /:id/setup-plan)
+```
+
+**For the Tester:**
+
+- **ZT-01 review.** Of the new routes, only `setup-plan` produces something that could later change a server, and it goes through the existing plan and approval path, so the hard gate still applies. Compare and candidates contact a server read-only.
+
+Next: T-079.

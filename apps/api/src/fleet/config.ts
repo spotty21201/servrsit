@@ -113,6 +113,8 @@ export const DEFAULT_REGISTRY_PATH = new URL("../../.data/servers.db", import.me
 export const DEFAULT_FINDINGS_PATH = new URL("../../.data/findings.db", import.meta.url);
 /** T-077: inspection history and exports (gitignored). */
 export const DEFAULT_ACTIVITY_PATH = new URL("../../.data/activity.db", import.meta.url);
+/** T-078: baselines (gitignored). */
+export const DEFAULT_BASELINES_PATH = new URL("../../.data/baselines.db", import.meta.url);
 /** T-076/T-079: installation settings, such as the scheduler pause (gitignored). */
 export const DEFAULT_SETTINGS_PATH = new URL("../../.data/settings.db", import.meta.url);
 /** T-069: one 0700 directory per registered server, holding its key pair and pinned known_hosts (gitignored). */
