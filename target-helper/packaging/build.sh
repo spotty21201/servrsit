@@ -8,9 +8,12 @@ OUT=${1:?output directory}
 VERSION=$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import servrsit_helper; print(servrsit_helper.HELPER_VERSION)' "$HERE")
 STAGE=$(mktemp -d)
 trap 'rm -rf -- "$STAGE"' EXIT
-mkdir -p "$STAGE/servrsit-helper/servrsit_helper" "$STAGE/servrsit-helper/bin" "$OUT"
+mkdir -p "$STAGE/servrsit-helper/servrsit_helper" "$STAGE/servrsit-helper/bin" "$STAGE/servrsit-helper/packaging" "$OUT"
 cp "$HERE"/servrsit_helper/*.py "$STAGE/servrsit-helper/servrsit_helper/"
 cp "$HERE"/bin/servrsit-* "$STAGE/servrsit-helper/bin/"
+# T-084 (D-H4): the sudoers template and the account-side key scripts are part
+# of the checksum-verified package; bootstrap reads them only from there.
+cp "$HERE"/packaging/sudoers.in "$HERE"/packaging/account-add-key.sh "$HERE"/packaging/account-remove-key.sh "$STAGE/servrsit-helper/packaging/"
 printf '%s\n' "$VERSION" > "$STAGE/servrsit-helper/VERSION"
 NAME="servrsit-helper-$VERSION.tar.gz"
 tar --sort=name --mtime='2026-01-01 00:00Z' --owner=0 --group=0 --numeric-owner --mode='go-w' \

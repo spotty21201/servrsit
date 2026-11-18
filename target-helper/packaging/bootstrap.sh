@@ -14,7 +14,8 @@
 #      /var/lib/servrsit/ledger (root:root 0700)
 #   4. only with --create-account: creates the system account --account
 #   5. adds ONE line to that account's ~/.ssh/authorized_keys, forcing the
-#      gateway: restrict,command="/usr/lib/servrsit/bin/servrsit-gateway" <key>
+#      gateway: restrict,command="/usr/lib/servrsit/bin/servrsit-gateway" <key>.
+#      This step runs AS the account (runuser), never as root inside its home.
 #   6. writes the sudoers rule to a temporary file, checks it with
 #      `visudo -c -f`, installs it 0440 as /etc/sudoers.d/servrsit, then checks
 #      the whole sudoers configuration with `visudo -c` and removes the rule
@@ -38,7 +39,6 @@ umask 022
 PACKAGE=""; SHA256=""; INSTALLATION_ID=""; TRUST=""; ACCOUNT=""; KEY=""
 CREATE_ACCOUNT=0; HOME_USER=""; UNITS=""; INSTALL_DEPS=0; DRY_RUN=0
 ROOT="${SERVRSIT_ROOT:-/}"
-HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 die() { printf 'bootstrap: %s\n' "$1" >&2; exit 1; }
 step() { printf 'bootstrap: %s\n' "$1"; }
@@ -98,6 +98,9 @@ WORK=$(mktemp -d)
 trap 'rm -rf -- "$WORK"' EXIT
 tar -xzf "$PACKAGE" -C "$WORK" --no-same-owner --no-same-permissions
 [ -f "$WORK/servrsit-helper/VERSION" ] || die "the package is not a ServrSit helper package"
+# T-084 (D-H4): everything below comes from the verified package, not from beside this script.
+PKG="$WORK/servrsit-helper/packaging"
+for f in sudoers.in account-add-key.sh; do [ -f "$PKG/$f" ] && [ ! -L "$PKG/$f" ] || die "the package has no $f; nothing was installed"; done
 LIB="${ROOT%/}/usr/lib/servrsit"; ETC="${ROOT%/}/etc/servrsit"; VAR="${ROOT%/}/var/lib/servrsit"
 step "installing the helper into $LIB"
 run install -d -m 0755 -o root -g root "$LIB" "$LIB/bin" "$LIB/servrsit_helper"
@@ -122,22 +125,23 @@ fi
 if [ "$DRY_RUN" -eq 0 ]; then id -u "$ACCOUNT" >/dev/null 2>&1 || die "the account $ACCOUNT does not exist (pass --create-account to create it)"; fi
 
 # --- 5. the forced-command key ------------------------------------------------
+# T-084 (D-H3): root never writes inside the account's home. The key line is
+# added by account-add-key.sh running AS the account (runuser), which refuses
+# symlinks and anything the account does not own.
 LINE="restrict,command=\"/usr/lib/servrsit/bin/servrsit-gateway\" $KEY"
 if [ "$DRY_RUN" -eq 1 ]; then
-  step "would add to ~$ACCOUNT/.ssh/authorized_keys: $LINE"
+  step "would run as $ACCOUNT: account-add-key.sh <home> with the line: $LINE"
 else
   HOMEDIR=$(getent passwd "$ACCOUNT" | cut -d: -f6)
-  [ -n "$HOMEDIR" ] && [ -d "$HOMEDIR" ] || die "the account has no home directory"
-  install -d -m 0700 -o "$ACCOUNT" -g "$(id -gn "$ACCOUNT")" "$HOMEDIR/.ssh"
-  AK="$HOMEDIR/.ssh/authorized_keys"
-  [ ! -L "$AK" ] || die "$AK is a symlink; nothing was changed"
-  touch "$AK"; chown "$ACCOUNT:$(id -gn "$ACCOUNT")" "$AK"; chmod 0600 "$AK"
-  grep -qxF -- "$LINE" "$AK" || printf '%s\n' "$LINE" >> "$AK"
+  [ -n "$HOMEDIR" ] && [ -d "$HOMEDIR" ] && [ ! -L "$HOMEDIR" ] || die "the account has no plain home directory"
+  [ ! -L "$HOMEDIR/.ssh" ] || die "$HOMEDIR/.ssh is a symlink; nothing was changed"
+  runuser -u "$ACCOUNT" -- /bin/sh -s -- "$HOMEDIR" "$LINE" < "$PKG/account-add-key.sh" || die "the key line could not be added as $ACCOUNT"
 fi
 
 # --- 6. sudoers, validated before and after -----------------------------------
 SUDOERS="${ROOT%/}/etc/sudoers.d/servrsit"
-sed "s/@ACCOUNT@/$ACCOUNT/g" "$HERE/sudoers.in" > "$WORK/sudoers"
+sed "s/@ACCOUNT@/$ACCOUNT/g" "$PKG/sudoers.in" > "$WORK/sudoers"
+if [ "$DRY_RUN" -eq 1 ]; then step "the sudoers rule from the package: $(grep -v '^#' "$WORK/sudoers" | tail -n 1)"; fi
 step "checking the sudoers rule with visudo -c -f"
 visudo -c -f "$WORK/sudoers" >/dev/null || die "the sudoers rule did not validate; nothing was installed"
 run install -m 0440 -o root -g root "$WORK/sudoers" "$SUDOERS"

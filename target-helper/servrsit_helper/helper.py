@@ -19,11 +19,13 @@ from datetime import datetime, timedelta, timezone
 from . import HELPER_VERSION
 from .adapters import RealSystem, System, precondition_digest
 from .canonical import CanonicalizationError, digest_of
-from .ledger import FINAL, Ledger, LedgerError
-from .schema import MAX_REQUEST_BYTES, QUERY, SchemaError, check_manifest, check_request
+from .ledger import FINAL, Ledger, LedgerError, UnreadableRecord
+from .schema import MAX_REQUEST_BYTES, QUERY, SchemaError, check_manifest, parse_request
 from .signature import TrustError, load_trust, verify_manifest
 
 CONFIG_FILE = "/etc/servrsit/helper.json"
+#: T-084 (O-1): a manifest may not ask to stay acceptable for longer than this.
+MAX_ACCEPT_WINDOW = timedelta(minutes=30)
 TRUST_FILE = "/etc/servrsit/trust.json"
 LEDGER_DIR = "/var/lib/servrsit/ledger"
 
@@ -111,6 +113,8 @@ def submit(signed: dict, config: Config, system: System) -> dict:
         return _rejected("EXPIRED", "CLOCK_SKEW: the manifest was issued in this server's future")
     if now > _time(manifest["acceptBefore"]):
         return _rejected("EXPIRED")
+    if _time(manifest["acceptBefore"]) - _time(manifest["issuedAt"]) > MAX_ACCEPT_WINDOW:
+        return _rejected("EXPIRED", "the manifest's acceptance window is longer than this helper allows")
     if manifest["preconditionDigest"] == "none" or precondition_digest(system, manifest) != manifest["preconditionDigest"]:
         return _rejected("PRECONDITION_CHANGED")
 
@@ -149,13 +153,16 @@ def handle(raw: bytes, config: Config, system: System) -> dict:
     if len(raw) > MAX_REQUEST_BYTES:
         return _rejected("INVALID_REQUEST", "the request is too large")
     try:
-        req = check_request(json.loads(raw.decode("utf-8")))
-    except (UnicodeDecodeError, json.JSONDecodeError, SchemaError, RecursionError):
+        req = parse_request(raw)
+    except SchemaError:
         return _rejected("INVALID_REQUEST")
     try:
         if req["op"] == QUERY:
             return query(req["operationId"], config, system)
         return submit(req["signed"], config, system)
+    except UnreadableRecord:
+        # Fail closed (D-H2): no new change is accepted while a record cannot be read.
+        return _rejected("HELPER_UNAVAILABLE", "a ledger record cannot be read; the owner must check /var/lib/servrsit/ledger")
     except (LedgerError, OSError):
         return _rejected("HELPER_UNAVAILABLE", "the helper could not read or write its ledger")
 

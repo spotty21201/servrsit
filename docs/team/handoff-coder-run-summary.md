@@ -1,14 +1,15 @@
 # Coder run summary (T-050 … T-083)
 
-**Branch state at the end of this run:** `integration/next` at `c2588c4`, which includes the Designer's `feat/designer/t080` (care-client swap and review pack 002). `integration/live-v1`, the founder's running app, still has only the pre-login work (see "Where it is").
+**Branch state at the end of this run:** `integration/next`, which includes the Designer's `feat/designer/t080` (care-client swap and review pack 002, `c2588c4`) and T-084 (helper fixes). `integration/live-v1`, the founder's running app, still has only the pre-login work (see "Where it is").
 
 **The detailed record per task, with real output,** is in `docs/team/handoff-coder-live.md`. This file is the overview.
 
-## Last checks (on `c2588c4`)
+## Last checks (after T-084)
 
 ```
 pnpm -r --workspace-concurrency=1 run test   exit 0
-  api 242, web 215, ai 156, ssh 61, store 28, domain 22, worker 19, infra 9, target-helper 51 (unittest)
+  api 242, web 215, ai 156, ssh 61, store 28, domain 22, worker 19, infra 9, target-helper 66 (unittest)
+Tester's helper suite (tests/helper, run against this tree): 123 passed, 3 failed (H00 pin, H04b strict xfail now passing, H44 static pattern moved)
 typecheck: all 9 TypeScript packages exit 0            web build: ok (vite)
 Tester suites @1c9d5a7 (temporary copy, nothing of theirs committed):
   auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a: their binding lacks the T-059 kinds)
@@ -37,12 +38,13 @@ Tester suites @1c9d5a7 (temporary copy, nothing of theirs committed):
 | T-081 | Registration fixes: production yes / no / not sure (not sure is treated as production); the disclosed `sudo -n -l` privilege check in the first check only; timed sweep of abandoned drafts and their keys; duplicate shown first when re-registering; no path echo for long ids. | next |
 | T-082 | Real care client in the web app: plans of every kind, revisions, approvals with CSRF and an idempotency key, operations, stop request, reconcile. | next |
 | T-083 | Target helper (Python): gateway, root helper, transient runner, signed-manifest checks (ADR-020), atomic root-only ledger, adapters, bootstrap and uninstall with `visudo` checks. | next |
+| T-084 | Tester's helper-001 defects fixed: atomic first claim and fail-closed unreadable records (D-H2); the key line written and removed only as the account, never by root inside its home (D-H3); clean refusal of huge integers (D-H1); sudoers template and key scripts inside the verified package (D-H4); uninstall stops on unfinished work (D-H7); duplicate JSON keys refused (D-H5); emptiness checked by listing (D-H6); 30-minute cap on the acceptance window (O-1). | next |
 
 Each task also has a web client in `apps/web/src/api/` matching the Designer's stub (T-069, T-076 to T-079, T-082), and each new API is guarded by the login (T-053).
 
 ## Build-only (exists and is tested, never used on a real server)
 
-- **The target helper** (T-083). It is not copied to, installed on or run on any server. The tests use a fake system: no APT, no systemd, no reboot, no sudo. So nothing yet proves APT, systemd or reboot behaviour.
+- **The target helper** (T-083, T-084). It is not copied to, installed on or run on any server. The tests use a fake system: no APT, no systemd, no reboot, no sudo. So nothing yet proves APT, systemd or reboot behaviour.
 - **Every write path in the care loop** (T-048, T-054 to T-059, T-078 setup plans). Approvals and dispatch run only against in-process `[SIMULATED]` targets.
 - **The manifest signer.** The key lives in memory; there is no persistent controller key yet (ADR-020).
 
@@ -59,6 +61,7 @@ Each task also has a web client in `apps/web/src/api/` matching the Designer's s
 - **Package installation from a baseline** has no operation (`install.packages.v1` is missing). Setup plans list missing packages as not included. Adding it is a new write capability and needs its own task.
 - **`plan.packages.v1` (the package preview on the target) is not built.** Its precondition digest must equal the helper's `digest_of({"installed": …})`.
 - **The controller side of the helper protocol is missing:** no persistent signing key, no SSH write target that speaks submit and query.
+- **T-012 must also prove** `runuser` for the key step, and the D-H3 planted-link case run as root.
 - **No separate daily deeper check.** The daily time in settings is stored but not used (`dailyTimeInEffect: false`).
 - **Registration:**
   - R-5: disconnect is still refused while work is unresolved; the preview lists that work.
@@ -68,6 +71,7 @@ Each task also has a web client in `apps/web/src/api/` matching the Designer's s
   - To register the Tailscale servers, `hosts.json` needs `registration.enrolledRoutes` (for example `100.64.0.0/10`) and `registration.controllerAddress`.
   - A schedule saved in Settings takes priority over `hosts.json`.
 - **Tester follow-ups:**
+  - Helper suite: re-pin H00 to the T-084 commit, turn H04b into a plain test, and point H44's removal check at `account-remove-key.sh`.
   - Add the 22 reviewed mutating routes to ZT-01.
   - Their `feat/tester/server-registration` care-loop and auth files predate T-057 and T-066 (6/41 and 36/37 on any recent tree).
   - Registration bindings must inject `servers.privilegeProbe`, or the default runs real `ssh`.

@@ -1855,3 +1855,39 @@ $ visudo -c -f <rendered sudoers.in>   parsed OK      (a broken copy: syntax err
 - **pytest is not installed on Merauke,** and pip from the internet is not allowed. The tests are unittest-based and pytest can collect them (`tests/conftest.py`).
 
 **For the Orchestrator:** review ADR-020 and D-HELPER-01. Bootstrap installs persistent files on managed servers, so it needs the founder's acceptance before T-012.
+
+## T-084: helper defects from test-report-helper-001 (branch `feat/coder/helper-fixes`, from `integration/next`), BUILD ONLY
+
+| ID | Fix |
+|---|---|
+| **D-H2** (Medium) | `ledger.claim()` now writes the first record by temp file + fsync + rename, under the lock, like every other write, so no reader can see half a record. `get()` reads under the lock. A record that cannot be parsed raises `UnreadableRecord`. `unresolved()` counts such a record as unresolved, so no new change is accepted while it exists (fail closed). `handle()` turns it into `HELPER_UNAVAILABLE` with a fixed reason. Nothing crashes. |
+| **D-H3** (Medium) | Root no longer writes inside the account's home. The key line is added by `account-add-key.sh` and removed by `account-remove-key.sh`, both run **as the account** (`runuser -u <account> -- /bin/sh -s`, with the script on stdin, so the account never reads root's temporary directory). Both scripts refuse a symlinked home, `.ssh` or `authorized_keys`, and anything the account does not own. Bootstrap also refuses a symlinked `.ssh` before starting. |
+| **D-H1** (Low) | A new `schema.parse_request()` is used by both the gateway and the helper. It catches every way `json.loads` can fail, including the `ValueError` Python raises for integers over 4300 digits, and also refuses NaN/Infinity. The reply is always `INVALID_REQUEST`, never a traceback. |
+| **D-H4** (Low) | `sudoers.in` and both account-side key scripts are now inside the checksum-verified package. Bootstrap reads them only from there and stops if one is missing. In a dry run it prints the rule taken from the package. |
+| **D-H7** (Low) | Before removing anything, uninstall lists ledger records that are not finished and any `servrsit-op-*` units. If there are any, it stops, unless `--force`; with `--force` it always keeps the ledger. |
+| D-H5 (Info) | Duplicate JSON keys are refused at every level. The Tester's strict-xfail H04b now passes, so that test should become a plain test. |
+| D-H6 (Info) | A new directory's emptiness is checked by listing it, not by link count (btrfs reports 1). |
+| O-1 | A manifest whose acceptance window is longer than 30 minutes gets `EXPIRED`, with a reason. |
+
+**Checks:**
+
+```
+$ cd target-helper/tests && PYTHONPATH=..:. python3 -m unittest
+Ran 66 tests in 1.673s
+OK                                    (51 before + 15 new in test_t084.py)
+  concurrency tests (16 threads x 10 rounds, process races) repeated 10 times: 10/10 OK
+  with logging stubs for sudo, runuser, systemctl, systemd-run, apt, apt-get, useradd, userdel, install, ssh first on PATH: 0 calls
+
+Tester's own suite (tests/helper @ feat/tester/next, read-only, nothing of theirs changed; SERVRSIT_HELPER_SRC = this tree):
+  123 passed, 3 failed
+  H18, H21 (all), H21b (both), H12 (threads; 5 more runs: 5/5), H45 and H46 now PASS
+  remaining failures are expected:
+    H00   pinned to 6c7df23 (re-pin to the new commit)
+    H04b  strict xfail now passes (duplicate keys refused, D-H5)
+    H44   static check looks for the removal check in uninstall.sh; it now lives in account-remove-key.sh (`grep -qF -- "$PREFIX" "$F"` after the move)
+
+pnpm -r --workspace-concurrency=1 run test   exit 0 (target-helper 66, api 242, web 215, ai 156, ssh 61, store 28, domain 22, worker 19, infra 9)
+typecheck: all 9 TS packages exit 0
+```
+
+**Still NOT PROVEN** (as in T-083): APT, systemd and `systemd-run`, restart, reboot, real root ownership, `sudo`, sshd's `restrict`, and running bootstrap or uninstall for real. That includes `runuser` itself and the planted-link case done as root. This all belongs to T-012 on a disposable VM.
