@@ -170,10 +170,29 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
               <section className={styles.panel} aria-labelledby={sectionId("scope")}>
                 <h2 id={sectionId("scope")} className={styles.h2}>Scope</h2>
                 <p className={styles.p}>{vm.scopeSummary}</p>
+                {vm.directories.length > 0 && (
+                  <>
+                    <p className={styles.rowLabel}>Directories to create</p>
+                    <ul className={styles.pkgGrid} aria-label="Directories to create">
+                      {vm.directories.map((d) => <li key={d.path}>{d.path}</li>)}
+                    </ul>
+                  </>
+                )}
                 {vm.packages.length > 0 && (
-                  <ul className={styles.pkgGrid} aria-label="Packages in this plan">
-                    {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}</li>)}
-                  </ul>
+                  <>
+                    {vm.directories.length > 0 && <p className={styles.rowLabel}>Packages to install</p>}
+                    <ul className={styles.pkgGrid} aria-label="Packages in this plan">
+                      {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}</li>)}
+                    </ul>
+                  </>
+                )}
+                {vm.leftAlone.length > 0 && (
+                  <>
+                    <p className={styles.rowLabel}>Left alone</p>
+                    <ul className={`${styles.list} ${styles.bullets}`} aria-label="Left alone">
+                      {vm.leftAlone.map((x) => <li key={x.label}><span className={styles.mono}>{x.label}</span>: {x.reason}</li>)}
+                    </ul>
+                  </>
                 )}
                 <ul className={`${styles.list} ${styles.bullets}`} aria-label="Not included">
                   {vm.exclusions.map((e) => <li key={e}>{e}</li>)}
@@ -208,7 +227,8 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
                   <summary>Technical details</summary>
                   <ul className={styles.diffList} aria-label="Package versions">
                     {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}:{p.arch} {p.from} → {p.to}</li>)}
-                    {vm.packages.length === 0 && <li>No package versions: nothing was prepared.</li>}
+                    {vm.directories.map((d) => <li key={`d-${d.path}`}>create {d.path} owner {d.owner} mode {d.mode}</li>)}
+                    {vm.packages.length === 0 && vm.directories.length === 0 && <li>No versions or directories: nothing was prepared.</li>}
                   </ul>
                   <p className={styles.small}>Operation: apply.packages.v1 · Plan ID <span className={styles.mono}>{vm.id}</span> · Digest <span className={styles.mono}>{vm.digestShort}…</span></p>
                 </details>

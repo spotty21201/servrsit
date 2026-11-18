@@ -13,7 +13,7 @@
  *   - Natural-language assent can never approve; only the authenticated
  *     control can (invariant). Nothing here approves anything.
  */
-import type { PackageChange, PlanView } from "../api/stubs/care";
+import type { PackageChange, PlanView, PrepareDirectory } from "../api/stubs/care";
 import { formatClock, formatClockWithAge, formatUntil, parseIso } from "../lib/time";
 
 export const WRITES_OFF_TEXT = "Changes are switched off for this server until testing on a disposable server is complete.";
@@ -54,6 +54,10 @@ export interface PlanVM {
   readonly simulated: boolean;
   readonly title: string;
   readonly packages: readonly PackageChange[];
+  /** Directories a setup plan would create; empty for a package update. */
+  readonly directories: readonly PrepareDirectory[];
+  /** Setup plan only: items deliberately left alone, with the reason. */
+  readonly leftAlone: readonly { readonly label: string; readonly reason: string }[];
   readonly scopeSummary: string;
   readonly exclusions: readonly string[];
   readonly impact: readonly string[];
@@ -133,6 +137,16 @@ export function approveLabelFor(serverName: string): string {
   return `Approve update on ${serverName}`;
 }
 
+export function approveSetupLabelFor(serverName: string): string {
+  return `Approve setup of ${serverName}`;
+}
+
+const PREPARE_EXCLUSIONS = [
+  "Not copied from the reference: credentials, SSH host keys, application data, databases, personal files and network settings.",
+  "No existing directory is changed, and nothing is changed recursively.",
+  "No service restarts. No reboot.",
+] as const;
+
 export const CLOCK_PAUSED_REASON = "ServrSit's own clock is wrong, so expiry times can't be trusted. Approvals are paused until it is fixed.";
 
 /**
@@ -148,6 +162,7 @@ export function toPlanVM(plan: PlanView, now: Date, tz: string, notice: PlanNoti
   const blockers = plan.blockers.map((b) => ({ code: b.code, message: blockerText(b) }));
   const n = plan.scope.packages.length;
   const hasPreview = plan.preconditions.previewDigest !== "none";
+  const prep = plan.prepare ?? null;
 
   const preconditions: PreconditionRow[] = [
     created && hasPreview
@@ -202,30 +217,44 @@ export function toPlanVM(plan: PlanView, now: Date, tz: string, notice: PlanNoti
     serverId: plan.target.serverId,
     isProduction: production,
     simulated: plan.target.simulated,
-    title: `Update packages on ${name}`,
+    title: prep ? `Prepare ${name} from ${prep.baselineName}` : `Update packages on ${name}`,
     packages: plan.scope.packages,
-    scopeSummary: n === 0 ? "No package changes were prepared." : `${n} package update${n === 1 ? "" : "s"}, plan version ${plan.version}.`,
-    exclusions: ["No service restarts.", "No reboot.", "No package removals."],
-    impact: [
-      "Updating a package can briefly interrupt a service that uses it. ServrSit cannot tell in advance which ones.",
-      "This plan restarts no services and does not reboot. A reboot may still be needed afterward; that would be a separate plan and approval.",
-    ],
+    directories: prep?.directories ?? [],
+    leftAlone: prep?.leftAlone ?? [],
+    scopeSummary: prep
+      ? n + prep.directories.length === 0
+        ? "Nothing to create or install: this server already matches the baseline."
+        : `${prep.directories.length} director${prep.directories.length === 1 ? "y" : "ies"} to create and ${n} package${n === 1 ? "" : "s"} to install, from ${prep.baselineName} version ${prep.baselineVersion} (reference: ${prep.referenceName}), plan version ${plan.version}.`
+      : n === 0 ? "No package changes were prepared." : `${n} package update${n === 1 ? "" : "s"}, plan version ${plan.version}.`,
+    exclusions: prep ? [...PREPARE_EXCLUSIONS] : ["No service restarts.", "No reboot.", "No package removals."],
+    impact: prep
+      ? [
+          "Creating directories is routine. Installing a package can briefly interrupt a service that uses it, and ServrSit cannot tell in advance which ones.",
+          "Existing directories and their contents are left exactly as they are. Where the server conflicts with the baseline, that item is listed as left alone.",
+          "This plan restarts no services and does not reboot.",
+        ]
+      : [
+          "Updating a package can briefly interrupt a service that uses it. ServrSit cannot tell in advance which ones.",
+          "This plan restarts no services and does not reboot. A reboot may still be needed afterward; that would be a separate plan and approval.",
+        ],
     preconditions,
-    verifyChecks:
-      n === 0
+    verifyChecks: prep
+      ? n + prep.directories.length === 0
+        ? ["Nothing will be checked because nothing is planned."]
+        : ["After it finishes, ServrSit checks every requested convention on its own: each directory exists with the expected owner and mode, and each package is installed at the planned version."]
+      : n === 0
         ? ["Nothing will be checked because nothing is planned."]
         : [`After it finishes, ServrSit re-reads the installed version of each of the ${n} package${n === 1 ? "" : "s"} and compares it with this plan.`],
-    verifyCannot: [
-      "Whether the services on this server still behave correctly.",
-      "Whether a reboot is needed.",
-    ],
+    verifyCannot: prep
+      ? ["Whether the services on this server behave correctly.", "Whether this server is otherwise the same as the reference. Only the listed conventions are checked."]
+      : ["Whether the services on this server still behave correctly.", "Whether a reboot is needed."],
     expiry: {
       absolute: expires ? formatClock(expires, now, tz) : "unknown",
       relative: expires ? formatUntil(expires, now, clockPaused) : "unknown",
       expired,
     },
     createdText: created ? formatClockWithAge(created, now, tz, clockPaused) : "unknown",
-    approveLabel: approveLabelFor(name),
+    approveLabel: prep ? approveSetupLabelFor(name) : approveLabelFor(name),
     acknowledgements,
     acknowledgementTokens: production ? [...plan.requiredAcknowledgements, ACK_RECOVERY, ACK_INTERRUPTION] : [...plan.requiredAcknowledgements],
     blockers,

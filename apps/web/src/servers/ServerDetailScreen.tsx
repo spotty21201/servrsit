@@ -151,7 +151,7 @@ function Sections({ vm, section }: { vm: ServerDetailVM; section: "settings" | "
             </Fact>
             <Fact label="Held back" v={care.heldBack} />
             <Fact label="Reboot" v={care.reboot} />
-            <Fact label="Baseline" v={care.baseline} />
+            <Fact label="Baseline" v={care.baseline}><a className={styles.inlineLink} href="/baselines">Compare with a baseline</a></Fact>
             <Fact label="Recent operations" v={care.operations} />
           </dl>
           ) : (

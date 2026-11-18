@@ -79,3 +79,5 @@
 .nav > * { flex: 1 1 10rem; }
 .progress { list-style: none; display: flex; flex-direction: column; gap: var(--space-half); }
 .progress li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-1); font-size: var(--text-compact-size); }
+
+.inlineLink { display: inline-flex; align-items: center; min-height: var(--touch-target-min); text-decoration: underline; font-weight: var(--font-weight-semibold); }

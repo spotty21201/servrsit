@@ -280,7 +280,7 @@ export function toServerDetailVM(s: FleetServer, index: number, now: Date, tz: s
       reboot: pk ? fromField(pk.rebootRequired, (v) => (v ? "Reboot required" : "No reboot flagged by the server")) : missing(NO_OBSERVATION),
       reviewDisabledReason: WRITES_OFF_TEXT,
       operations: missing("Operation history is not available from the API yet."),
-      baseline: missing("Baseline comparison is not available yet."),
+      baseline: missing("Comparing this server with a baseline runs on sample data for now, not on this server's own directories."),
     },
     settings: {
       name: s.name,
