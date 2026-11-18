@@ -352,3 +352,5 @@ export * from "./fleet.js";
 export * from "./assistant.js";
 
 export * from "./care.js";
+
+export * from "./auth.js";

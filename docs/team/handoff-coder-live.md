@@ -1160,3 +1160,88 @@ Tester gate, their files unchanged (temporary copy, removed): zt01-real-hosts 12
 1. **Merge order:** `feat/coder/package-origins` contains T-061 and T-062 and does not depend on T-053, so it can merge before it. Both it and `feat/coder/owner-auth` append to this handoff file, so merging the second one has a trivial conflict at the end of the file: keep both sections.
 2. **Sentani's clock is 7 h slow.** Fixing it is a change on the server (time sync), which only the founder may authorize. ServrSit now corrects package ages for it and shows a warning.
 3. **Next in my queue:** T-054 through T-059 (not started). ZT-01 and the route inventory remain the standing gate.
+## T-053: local owner auth with mandatory TOTP (commit `2bfaa34`, branch `feat/coder/owner-auth`, rebased on `integration/live-v1` at `39ae4af`)
+
+Fixes Tester finding **F1**. Decision record: `docs/decisions/ADR-017-local-owner-auth.md`.
+
+**What it does:**
+
+- **One owner account.** The password is hashed with argon2id via `@node-rs/argon2` 2.2.2 (pinned, prebuilt, no install script): 19 MiB, 2 passes, 1 lane.
+- **TOTP is required before any session exists.** RFC 6238 via `otpauth` 9.6.0 (pinned), ±1 step. A time step is accepted once, and never one older than the last accepted step. The database enforces this with a conditional update.
+- **First run:** a one-time setup token is printed to the API's **stderr**, not the structured log, and stored as SHA-256. It works once, and a restart replaces it.
+  - `POST /api/auth/setup` returns the TOTP secret.
+  - `POST /api/auth/setup/confirm` with a valid code creates the owner, issues the session and returns 10 recovery codes (SHA-256 stored, shown once, each single use).
+- **Sessions** are opaque (32 random bytes, only SHA-256 stored). The cookie `servrsit_session` is HttpOnly, SameSite=Strict, Path=/, and Secure in production or over HTTPS. Limits: 60 minutes idle, 8 hours absolute.
+- **Global guard (`onRequest`):** every `/api` route, registered or not, returns 401 `{"error":"UNAUTHENTICATED"}` without a session. The 401 comes before CSRF, validation or 404.
+  - **Exceptions:** `/api/auth/{setup, setup/confirm, login, totp, session, logout}`, which check Origin themselves. `/health` stays open.
+  - **Every POST, PUT, PATCH or DELETE** also needs an allowed Origin and **this session's** `X-CSRF-Token`; otherwise 403 `CSRF_INVALID`.
+- **Brute force:** 10 auth requests per minute. From the 5th consecutive failure, sign-in locks for 30 s, doubling up to 15 min, and the right password is refused while locked. A sign-in ticket allows 5 code attempts.
+- **No disclosure:** an unknown user, a wrong password and "no account yet" all return the same 401 body, after the same argon2 cost.
+- **Storage:** `SqliteAuthStore` in `packages/store`, file `apps/api/.data/auth.db` (mode 0600, gitignored; `SERVRSIT_AUTH_DB` overrides the path). `buildServer()` without a store uses memory, so tests never touch `.data`, and auth is still enforced.
+- **Web data layer:** `apps/web/src/api/auth.ts` provides `getSession`, `startSetup`, `confirmSetup`, `login`, `verifySecondFactor`, `logout` and `csrfHeaders()`. The CSRF token is kept in memory only. `askAssistant` now sends the token.
+- **Removed:** the auth stub, `@fastify/session` and `SESSION_SECRET`, and the per-process `CsrfGuard`. `/api/csrf` now returns the caller's session token and requires a session.
+- **Not changed:** the dev server binding. `HOST` is still `127.0.0.1` in `src/index.ts`.
+
+**Tests:**
+
+- `apps/api/src/auth/auth.test.ts`, 18 tests:
+  - every route returns 401 (route-tree sweep); unauthenticated POST gets 401 before CSRF
+  - setup token single use; setup confirm; password alone gives no session
+  - wrong TOTP; replayed TOTP; older step refused
+  - no disclosure; lockout and doubling; second-factor lockout; rate limit; recovery codes
+  - cookie attributes, including Secure when configured
+  - idle and absolute expiry; logout needs CSRF; CSRF and Origin on two routes
+  - no secret in the log or the database file (also checks file mode 0600)
+- `apps/web/src/api/auth.test.ts`, 3 tests.
+- Existing API tests now sign in through the real flow (`src/auth/testing.ts`: `enrolOwner` and `signedInServer`; no bypass). `process.test.ts` now sends the auth database to a temp file. Before I fixed that, it had created a real `apps/api/.data/auth.db` in my worktree. The file held only a setup-token hash and no account, and I deleted it.
+
+**Mutation checks:** each change was made to the production file, the suite was run, and the file was restored and confirmed byte-identical with `cmp`.
+
+| Fault injected | Caught by |
+|---|---|
+| Replay allowed (store) | the replay test |
+| Guard skips `/api/plans` | the sweep and the unauthenticated-POST test |
+| No lockout | both lockout tests |
+| Idle limit ignored | the expiry test |
+
+In my first run, the three later mutations also showed a replay failure. The cause was my script: it did not rebuild the store's `dist` after restoring the first mutation. The final rebuild restored it, and 6 clean full runs passed 18 of 18.
+
+**Checks run (real output, after the rebase onto `39ae4af`):**
+
+```
+pnpm -r --workspace-concurrency=1 run test  -> exit 0
+  suites 9, 13, 40, 51 (web), 11, 140 (ai), 18, 148 (api); fail 0 everywhere
+typecheck: ai, contracts, domain, ssh, store, ui, api, web, worker, infra -> exit 0 each
+key scan of the staged diff -> clean; private-key headers 0; no .db or .data file staged
+apps/api/.data after the full run -> known_hosts only
+```
+
+**The Tester's standing gate, run against T-053** (their files copied in temporarily, run, then removed; nothing of theirs is committed):
+
+| Tester suite | Unchanged files | With `docs/team/t053-tester-gate.patch` |
+|---|---|---|
+| `auth/routes-401` (their F1 sweep) | **7/7 pass** | 7/7 |
+| `care-loop/zt01-real-hosts` (ZT-01 + route inventory) | fails at import (`CsrfGuard` removed) | **12/12 pass** |
+| `care-loop/care-loop` | fails at import | **36 pass, 5 fail, 1 not run**. Their baseline was 35/6/1. CL-02g (F1) now passes. The 5 failures are F2 (CL-04c), F3 (CL-07a–c) and F4 (CL-09a); CL-03e (F5) is still not run. These are T-054, T-055, T-059 and T-056. |
+| `care-loop/static-config`, `auth/totp`, both self-checks | pass | pass |
+
+**Why the gate cannot pass without a test change:**
+
+- **Requests without a session:** ZT-01 and the care-loop binding send plans and approvals with no session, which F1 forbids.
+- **New mutating routes:** the route inventory fails on purpose when a mutating route appears, and T-053 adds 5 auth POSTs (`login`, `logout`, `setup`, `setup/confirm`, `totp`). None of them touch a server or a care record.
+
+**The patch** (45 changed lines, `git apply --check` passes on `feat/tester/ai-auth`; checked, not applied):
+
+- signs the owner in through the real setup flow;
+- keeps one auth store across the binding's app rebuilds;
+- maps CL-02g's `session: "none"` to "no cookie";
+- adds the 5 auth routes to the reviewed inventory.
+
+The **Tester should review and apply it**, since those files are theirs.
+
+## Needs Orchestrator action (T-053)
+
+1. **Do not merge T-053 into the founder's running UI without a login screen.** After the merge, every `/api` call from the web UI returns 401 until Designer builds the setup and sign-in screens on `apps/web/src/api/auth.ts`. The founder's current instance (PID 458878, running from `/projects/servrsit`) is unaffected until it picks up this code.
+2. **First run on a real instance:** read the setup token from the API's stderr, which goes to `/tmp/api-dev.log` for the current watcher. Then `POST /api/auth/setup` and `/setup/confirm`. The recovery codes are shown once.
+3. **Tester:** review and apply `docs/team/t053-tester-gate.patch` so ZT-01 and the route inventory stay a standing gate.
+4. **ADR-017 limits:** TOTP secret stored in plain text in a 0600 file; no re-authentication flow; no reset except deleting `auth.db` on the host. Each must be resolved before hosted deployment or real writes.
