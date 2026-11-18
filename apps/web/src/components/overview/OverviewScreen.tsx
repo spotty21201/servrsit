@@ -33,6 +33,8 @@ import { AttentionColumn } from "./AttentionColumn.js";
 import { RecentActivity } from "./RecentActivity.js";
 import { ChatBar } from "./ChatBar.js";
 import type { OverviewVM } from "./fleetViewModel.js";
+import { SignOutButton } from "../../auth/SignOutButton";
+import { useSession } from "../../auth/session";
 import styles from "./OverviewScreen.module.css";
 
 interface OverviewScreenProps {
@@ -42,6 +44,7 @@ interface OverviewScreenProps {
 
 export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
   const hasData = vm.phase === "ready";
+  const session = useSession();
   return (
     <div className={styles.appShell}>
       {vm.anyFixture && <FixtureBanner />}
@@ -77,9 +80,13 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
         </ul>
 
         <div className={styles.navAccount}>
-          <button type="button" className={styles.accountButton} aria-label="Account settings">
-            <span aria-hidden="true">S</span>
-          </button>
+          {session ? (
+            <SignOutButton variant="rail" />
+          ) : (
+            <button type="button" className={styles.accountButton} aria-label="Account settings">
+              <span aria-hidden="true">S</span>
+            </button>
+          )}
         </div>
       </nav>
 

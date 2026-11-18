@@ -1,0 +1,240 @@
+/**
+ * Sign-in / setup styles (UX-01). White page, 2px Ink border, Lilac offset
+ * shadow, pixel title, Geist body. Inputs are 44 px tall at 16 px text (no
+ * mobile zoom). Labels sit above fields; no placeholders carry meaning.
+ *
+ * MOBILE ANCHORING: no 100vw, nothing fixed or sticky, grid/flex children get
+ * min-width: 0, long keys and codes wrap with overflow-wrap: anywhere.
+ */
+
+.page {
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  background-color: var(--color-page);
+  color: var(--color-ink);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 30rem;
+  min-width: 0;
+  padding: var(--space-4) var(--content-padding-mobile) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+}
+
+.brand { font-size: 16px; line-height: 20px; text-align: center; }
+.tagline { text-align: center; font-size: var(--text-compact-size); color: var(--color-muted-ink); }
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-card-inner);
+  min-width: 0;
+  padding: var(--space-2);
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-card);
+  box-shadow: 6px 6px 0 var(--color-lilac);
+}
+
+.title {
+  font-family: var(--font-pixel);
+  font-weight: var(--font-weight-regular);
+  font-size: var(--text-page-title-size);
+  line-height: var(--text-page-title-line-height);
+  overflow-wrap: anywhere;
+}
+.title:focus { outline: none; }
+.title:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 4px; }
+
+.form { display: flex; flex-direction: column; gap: var(--space-1-half); min-width: 0; }
+.field { display: flex; flex-direction: column; gap: var(--space-half); min-width: 0; }
+.field > label { font-size: var(--text-compact-size); font-weight: var(--font-weight-semibold); }
+
+.field input[type="text"],
+.field input[type="password"] {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-1-half);
+  border: 2px solid var(--color-control-boundary);
+  border-radius: var(--radius-input);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+}
+.field input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; border-color: var(--color-ink); }
+.field input[aria-invalid="true"] { border-color: var(--color-state-failed-fg); }
+.mono, .codeInput { font-family: var(--font-mono) !important; }
+.codeInput { letter-spacing: 0.15em; font-variant-numeric: tabular-nums; }
+
+.inputRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1); align-items: stretch; }
+.toggle {
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  padding: 0 var(--space-1-half);
+  border: 2px solid var(--color-control-boundary);
+  border-radius: var(--radius-input);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--text-compact-size);
+  font-weight: var(--font-weight-semibold);
+}
+.toggle[aria-pressed="true"] { border-color: var(--color-ink); background-color: var(--color-canvas); }
+
+.p { font-size: var(--text-body-size); line-height: var(--text-body-line-height); min-width: 0; }
+.help { font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); color: var(--color-muted-ink); min-width: 0; overflow-wrap: anywhere; }
+
+.primary, .secondary, .secondaryLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target-min);
+  max-width: 100%;
+  padding: var(--space-half) var(--space-3);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-button);
+  color: var(--color-ink);
+  font-size: var(--text-compact-size);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  white-space: normal;
+  text-decoration: none;
+}
+.primary { width: 100%; background-color: var(--color-tangerine); }
+.primary:hover:not(:disabled) { background-color: var(--color-citron); }
+.secondary, .secondaryLink { background-color: var(--color-surface); }
+.secondary:hover:not(:disabled), .secondaryLink:hover { background-color: var(--color-canvas); text-decoration: none; }
+.primary:disabled, .secondary:disabled {
+  cursor: not-allowed;
+  background-color: var(--color-state-unknown-bg);
+  color: var(--color-state-unknown-fg);
+  border-color: var(--color-control-boundary);
+}
+
+.altRow { font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); color: var(--color-muted-ink); }
+.link {
+  display: inline;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-half);
+  color: var(--color-ink);
+  font-size: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+}
+.row { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; }
+
+/* ── Notices ───────────────────────────────────────────────────────────── */
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-half);
+  min-width: 0;
+  padding: var(--space-1-half) var(--space-2);
+  border: 2px solid currentColor;
+  border-radius: var(--radius-panel);
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+}
+.notice p { color: var(--color-ink); overflow-wrap: anywhere; }
+.noticeTitle { font-weight: var(--font-weight-semibold); color: inherit !important; }
+.nFailed { color: var(--color-state-failed-fg); background-color: var(--color-state-failed-bg); }
+.nAttention { color: var(--color-state-attention-fg); background-color: var(--color-state-attention-bg); }
+.nPassed { color: var(--color-state-passed-fg); background-color: var(--color-state-passed-bg); }
+.nUnknown { color: var(--color-state-unknown-fg); background-color: var(--color-state-unknown-bg); }
+.nProgress { color: var(--color-state-progress-fg); background-color: var(--color-state-progress-bg); }
+
+/* ── Setup ─────────────────────────────────────────────────────────────── */
+
+.steps { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-half) var(--space-2); font-size: var(--text-compact-size); color: var(--color-muted-ink); }
+.steps li > span { display: inline-grid; place-items: center; width: 1.25rem; height: 1.25rem; border: 1.5px solid currentColor; border-radius: var(--radius-pill); font-size: 0.75rem; }
+.stepOn { color: var(--color-ink); font-weight: var(--font-weight-semibold); }
+.stepOn > span { background-color: var(--color-ink); color: var(--color-surface); }
+
+.meter { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-half); }
+.meter span { height: 6px; border-radius: 3px; background-color: var(--color-soft-line); }
+.meter[data-level="short"] span:nth-child(1) { background-color: var(--color-state-failed-fg); }
+.meter[data-level="ok"] span:nth-child(-n+2) { background-color: var(--color-state-attention-fg); }
+.meter[data-level="good"] span { background-color: var(--color-state-passed-fg); }
+
+.instructions { padding-left: var(--space-3); display: flex; flex-direction: column; gap: var(--space-half); font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); }
+
+.qrWrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); justify-items: start; }
+.qrWrap svg { border: 2px solid var(--color-ink); border-radius: var(--radius-small); }
+.keyBlock { display: flex; flex-direction: column; gap: var(--space-half); min-width: 0; width: 100%; }
+.keyLabel { font-size: var(--text-compact-size); font-weight: var(--font-weight-semibold); }
+.key { font-family: var(--font-mono); font-size: 1.0625rem; line-height: 1.5; overflow-wrap: anywhere; user-select: all; }
+
+.codes {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-half) var(--space-2);
+  padding: var(--space-1-half);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-panel);
+  background-color: var(--color-canvas);
+  font-family: var(--font-mono);
+  font-size: var(--text-technical-size);
+  line-height: 1.6;
+}
+.codes li { min-width: 0; white-space: nowrap; user-select: all; }
+@media (max-width: 479px) { .codes { grid-template-columns: minmax(0, 1fr); } }
+
+.check {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  gap: var(--space-1);
+  align-items: center;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-1);
+  border: 1px solid var(--color-control-boundary);
+  border-radius: var(--radius-input);
+  font-size: var(--text-compact-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+.check input { width: 1.25rem; height: 1.25rem; accent-color: var(--color-ink); }
+
+/* ── Sign-out control ──────────────────────────────────────────────────── */
+
+.signOutBar { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin-left: auto; min-width: 0; }
+.signedInAs { font-size: var(--text-compact-size); color: var(--color-muted-ink); overflow-wrap: anywhere; }
+.signOutBtnBar, .signOutBtnRail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-half);
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  padding: 0 var(--space-1-half);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-button);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--text-compact-size);
+  font-weight: var(--font-weight-semibold);
+}
+.signOutBtnBar:hover:not(:disabled), .signOutBtnRail:hover:not(:disabled) { background-color: var(--color-lilac); }
+.signOutBtnBar:disabled, .signOutBtnRail:disabled { cursor: progress; color: var(--color-muted-ink); }
+.signOutRail { display: inline-flex; flex-direction: column; align-items: center; gap: var(--space-half); width: 100%; }
+.signOutBtnRail { flex-direction: column; gap: 2px; width: calc(100% - var(--space-2)); font-size: 0.75rem; padding: var(--space-half); }
+.signOutProblem { font-size: 0.75rem; color: var(--color-state-failed-fg); text-align: center; }
+
+@media (max-width: 1199px) {
+  .signOutRail { width: auto; flex-direction: row; }
+  .signOutBtnRail { flex-direction: row; width: auto; font-size: var(--text-compact-size); }
+}
+
+@media (min-width: 768px) {
+  .card { padding: var(--space-3); }
+  .qrWrap { grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+}

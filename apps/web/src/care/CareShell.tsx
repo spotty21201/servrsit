@@ -6,6 +6,7 @@
  */
 import type { ReactNode } from "react";
 import { FixtureBanner } from "../components/FixtureBanner/index.js";
+import { SignOutButton } from "../auth/SignOutButton";
 import styles from "./care.module.css";
 
 interface CareShellProps {
@@ -26,6 +27,7 @@ export function CareShell({ fixture, section, children }: CareShellProps) {
           <span aria-hidden="true">/</span>
           <span aria-current="page">{section}</span>
         </nav>
+        <SignOutButton variant="bar" />
       </header>
       <main id="main-content" className={styles.main}>{children}</main>
     </div>

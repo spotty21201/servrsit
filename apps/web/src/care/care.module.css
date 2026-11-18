@@ -132,14 +132,14 @@
 
 .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap-section); align-items: start; }
 
-.stack { display: flex; flex-direction: column; gap: var(--gap-cards); min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: var(--space-1-half); min-width: 0; }
 
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-card-inner);
+  gap: var(--space-half) var(--space-1);
   min-width: 0;
-  padding: var(--pad-card);
+  padding: var(--space-1) var(--space-1-half);   /* T-065 polish: tighter than the 12px all round of T-060 */
   background-color: var(--color-surface);
   border: 2px solid var(--color-ink);
   border-radius: var(--radius-panel);
@@ -240,7 +240,8 @@
 }
 .primary, .secondary { width: 100%; }
 
-.statusLine { font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); font-weight: var(--font-weight-semibold); min-height: 1.25rem; }
+.statusLine { font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); font-weight: var(--font-weight-semibold); }
+.statusLine:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 .diffList { list-style: none; display: flex; flex-direction: column; gap: var(--space-half); font-family: var(--font-mono); font-size: var(--text-technical-size); }
 .diffList > li { overflow-wrap: anywhere; }
