@@ -37,3 +37,54 @@ Back works on every step and clears later-step state (entered fingerprint, trust
 
 ## Next
 Orchestrator: merge `feat/designer/t067`. Coder: address/key fields in `/api/fleet`, the servers endpoints, then swap the stub.
+
+---
+
+# Addendum 2: contract alignment, T-070, T-071, T-072 (same branch, `feat/designer/t067`)
+
+## T-068 aligned to the T-069 contract (`e2a8631`)
+- `api/stubs/servers.ts` now imports every type and schema from `@servrsit/contracts` (`ServerDraft`, `ServerDraftRequest`, `HostKey`, `FirstCheck`, `ActivateResponse`, `ServerRegistrationError`, …). No local copies. It holds the real HTTP client `createServersClient()` (the contract's routes, session CSRF header from `api/auth.ts`, responses parsed with the contract schemas) and `createFixtureServersClient()`, an in-memory model of the contract's state machine and error codes. The screen uses the fixture until the routes exist; switching is one line in `ConnectScreen` (`createFixtureServersClient()` → `createServersClient()`).
+- **Step order changed to the contract's:** Meet the server, **Verify identity**, **Set up access**, First check. The contract enforces host key → owner confirms fingerprint → access key (STATE_CONFLICT otherwise), so the dedicated key line can only be shown after the owner has confirmed the fingerprint. **UX Spec §7.3 lists access before identity: Orchestrator, please log the deviation.** The independent-fingerprint-first interaction is kept (owner types theirs, then ServrSit scans and compares, then `host-key/confirm` with the scanned value).
+- Form maps to the contract: `purpose` became the optional `role`; classification becomes `production: boolean` (Not sure is sent as production); name, user and role validated with the contract's own regexes (`SERVER_DISPLAY_NAME`, `SSH_USER`, `SERVER_ROLE`, `SSH_FINGERPRINT`). The draft now lives on the server (24 h, no secret); the browser stores only the whitelisted form fields and the draft id (a UUID), and resumes by `GET draft`.
+- Contract error codes all have fixed wording; the first-check `failureCode`s too. Activate is refused while `duplicateOf` is set.
+- Tests: `stubs/servers.test.ts` checks that every fixture response parses with the contract schemas and that out-of-order calls give the contract's codes.
+
+## T-070 Findings UI (`/findings`) (commit "T-070")
+- `api/stubs/findings.ts` ([FIXTURE], provisional local types because no findings-state contract exists; proposed endpoints and rules are in the file header for Coder). `findings/` holds the view model, `FindingsScreen`, `SchedulerNotice`.
+- States New / Acknowledged / Snoozed / Resolved / "Previously detected, not rechecked", each with a sentence on what it does not mean ("Acknowledged is not resolved…", "Snoozing only delays notifications. It is not resolved…"). Resolved shows the observation that established recovery. First and last observed times in the owner zone with ages. **Acknowledge** and **Snooze (1 hour / 1 day / 1 week)** are separate controls with separate availability. Stage A statement that external alerts are unavailable.
+- Scheduler notices "Checks paused", "Check delayed", "Scheduler unavailable" (never an all-clear). On the **real Overview** only "Check delayed" is shown, derived from the live `nextCheckAt` being more than 2 minutes overdue (tested). Paused and unavailable need the findings API and are previewed on `/findings` with a clearly labelled fixture control.
+- Not linked from the live Overview (its data is fixture); open `/findings` directly.
+
+## T-071 Activity page (`/activity`) (commit "T-071")
+- `api/stubs/activity.ts` ([FIXTURE], provisional; proposed endpoints in the header). Filters: server, result, period, type (default operations + findings; routine checks one checkbox away). Search matches server name, title and id only (never summaries). Operation results use UX §11 wording. Day groups (Today / Yesterday / date) in the owner zone, ≈ ages when ServrSit's clock is untrusted.
+- Export: choose report or JSON, the page states count, date range, time zone and the redaction statement before and after. The result is a **persistent panel** with a Download link plus a "Recent exports" list (kept in sessionStorage in the fixture, so it survives reload; the real API should list exports). Whole-row link hit areas (stretched) for the record titles.
+
+## T-072 accessibility defects D-U1 to D-U12 (commit per group)
+| ID | Fix | Commit group |
+|---|---|---|
+| D-U1 | `lib/pageTitle.ts`: every screen and state sets a descriptive title ("Plan review: Update packages on Nabire · ServrSit", "Sign in: enter your code", "Connect a server: step 2 of 4, Verify identity" …); `RouteAnnouncer` says "Navigated to …" on later changes; loading placeholders are silent. `index.html` title is just "ServrSit". | `9defb25` |
+| D-U9 | `.sPending` text uses Muted ink (measured 6.39:1 on white), not the control-boundary grey. | D-U9/10/11 |
+| D-U10 | Brand and breadcrumb links 44 px (measured 44); server-name link has a stretched hit area over the card (action button above it); acknowledgement rows min-height 44. | same |
+| D-U11 | `forced-colors: active` rules for the password meter, storage bar, stepper, step connectors, tags, primary button, checked rows. Not rendered in forced-colors emulation (see gaps). | same |
+| D-U2 | `SkipLink` is the first Tab stop on every page and moves focus to `<main id="main-content" tabIndex=-1>` (verified: first Tab = "Skip to main content", Enter → MAIN). Overview main has the same id. | D-U2/8/12 |
+| D-U8 | `aria-label` removed from the brand `<p>`. | same |
+| D-U12 | Overview nav: DOM order = visual order (wordmark, account/Sign out, nav list); all `order:` rules removed. The desktop rail now has Sign out directly under the wordmark. Verified Tab order: Sign out, Overview, Activity, Settings. | same |
+| D-U3 | Sign-in and setup errors have ids; the fields point to them with `aria-describedby`, and the right field gets `aria-invalid`. | D-U3…7 |
+| D-U4 | `ReasonButton`: unusable buttons use `aria-disabled` (stay focusable), ignore the click, and show the reason as text tied by `aria-describedby`. Applied to sign-in (3 steps), setup (3 buttons), plan approval, and the Connect flow's Compare, Trust and Continue. Reasons are pure functions with tests. | same |
+| D-U5 | After sign-out or an ended session the heading takes focus. Also fixed a StrictMode quirk that focused the heading on a cold dev load. | same |
+| D-U6 | Show/Hide password: constant accessible name "Show password" with `aria-pressed` (visible text "Show" is contained in the name). | same |
+| D-U7 | Transcript: `role="log"` on a `div`, the `ul` inside keeps list semantics. | same |
+
+Same fixes applied to the new screens (titles, reasons, 44 px targets, stretched links). Also fixed along the way: a stale `alive` ref in the Connect screen that stopped the first check polling under StrictMode, and the new `CLOCK_UNTRUSTED` auth error wording from T-066.
+
+## Checks run (real output)
+- `pnpm --filter @servrsit/web test`: **151 pass, 0 fail** (121 before). `typecheck` clean, `build` ok.
+- Browser (Playwright, own API :3005 and preview :5174, both closed afterwards): axe-core 4.14.1 (loaded from the Tester's tool folder, read only) with WCAG 2.0/2.1/2.2 A/AA and best-practice rules, run on 11 states (sign-in, sign-in with error, setup authenticator, Overview, plan, operation, operation with transcript open, findings, activity, connect, clock fixtures): **0 violations in all 11**. Titles verified per route; skip link, Tab order, disabled-reason text, toggle name, error `aria-describedby`, sign-out focus (H1), brand and breadcrumb heights (44), pending-step contrast 6.39 all checked in `docs/team/evidence/t072/browser-check.txt`. No horizontal overflow on any screen at 1280 and 390 px.
+- Connect flow end to end in the contract's order (create draft, scan, compare, confirm, access key, first check, activate) at both widths; Findings acknowledge → snooze → scheduler states; Activity search, filter, export, download, reload keeps "Recent exports".
+- Screenshots: `docs/team/evidence/t067/` (connect flow), `t071/` (findings, activity), `t072/` (skip link, browser check).
+
+## Gaps
+- **Not run (as in the Tester's list):** screen reader, real phone, forced-colors rendering (rules written from the CSS only), reduced-motion emulation, Firefox/Safari. The Tester's own suite (`tests/e2e/a11y`) was not run against this branch; please rerun it, which should turn the 14 `todo` items into guards.
+- Findings and Activity run on fixtures until Coder provides contracts and endpoints; `/findings` is not linked from the live Overview.
+- D-U10: inline links inside sentences keep their text-height targets (allowed by WCAG 2.5.8; not changed).
+- The Overview page title reads "Loading your servers" until the first fleet response arrives, then "Overview".

@@ -71,7 +71,7 @@ export function ConnectScreen({ client: injected }: { client?: ServersClient }) 
   const alive = useRef(true);
   const ids = useId();
 
-  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []); // re-armed on mount: StrictMode runs cleanup once in development
   useEffect(() => { store.set(DRAFT_KEY, serializeDraft(form)); }, [form]);
   useEffect(() => {
     if (shownStep.current !== step) titleRef.current?.focus();
