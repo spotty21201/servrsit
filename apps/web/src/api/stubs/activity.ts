@@ -15,6 +15,8 @@
  * says it redacted and never offers raw output.
  */
 
+import { gate } from "../../lib/fixtureState";
+
 export type ActivityType = "operation" | "finding" | "inspection";
 export type ActivityResult = "succeeded" | "partial" | "failed" | "unknown" | "cancelled" | "in-progress" | "info";
 
@@ -126,7 +128,7 @@ export function createFixtureActivityClient(now: () => Date = () => new Date()):
   let exports = load();
   let n = exports.length;
   return {
-    async list() { await wait(200); return { ok: true, data: records }; },
+    async list() { await wait(200); return gate<ActivityClientResult<readonly ActivityRecord[]>>(() => ({ ok: true, data: records }), () => ({ ok: false, error: "NETWORK" })); },
     async listExports() { await wait(100); return { ok: true, data: exports }; },
     async createExport(req, recs) {
       await wait(700);

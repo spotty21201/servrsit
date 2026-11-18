@@ -1,0 +1,58 @@
+/**
+ * Compact roster rows. Mobile anchoring: no 100vw, every grid track is
+ * minmax(0, …), every text child wraps (overflow-wrap: anywhere), no fixed or
+ * sticky positioning. 44 px targets for the name hit area and the action.
+ */
+.list { list-style: none; display: flex; flex-direction: column; min-width: 0; border-top: 2px solid var(--color-ink); }
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-half) var(--space-2);
+  min-width: 0;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-1-half);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-soft-line);
+  border-left: 6px solid var(--row-identity, var(--color-lilac));
+}
+.row[data-tone="uncertain"] { border-left-style: dashed; }
+.row[data-tone="no-data"] { border-left-style: dotted; }
+
+.who { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+.icon { flex: none; width: 32px; height: 32px; }
+.names { display: flex; flex-direction: column; min-width: 0; }
+.name { font-family: var(--font-pixel); font-size: 1rem; line-height: 1.25rem; color: var(--color-ink); overflow-wrap: anywhere; text-decoration: none; }
+.name:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+/* The whole row opens the server; the action link sits above it. */
+.name::after { content: ""; position: absolute; inset: 0; }
+.name:focus-visible { outline: none; background: var(--color-citron); text-decoration: underline; text-decoration-color: var(--color-focus); text-decoration-thickness: 3px; text-underline-offset: 3px; }
+.row:has(.name:focus-visible) { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.role { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-half) var(--space-1); font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); color: var(--color-muted-ink); overflow-wrap: anywhere; }
+.prod {
+  display: inline-flex; align-items: center; padding: 0 var(--space-1); border: 1px solid var(--color-ink); border-radius: var(--radius-small);
+  background: var(--color-citron); color: var(--color-ink); font-size: 0.75rem; line-height: 1.25rem; font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap;
+}
+.status { min-width: 0; }
+.detail { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.line, .when, .fail { font-size: var(--text-compact-size); line-height: var(--text-compact-line-height); overflow-wrap: anywhere; min-width: 0; }
+.when { color: var(--color-muted-ink); font-variant-numeric: tabular-nums; }
+.fail { color: var(--color-state-failed-fg); font-weight: var(--font-weight-semibold); }
+.hist { display: inline-block; margin-right: var(--space-1); padding: 0 var(--space-1); border-radius: var(--radius-small); background: var(--color-state-unknown-bg); color: var(--color-state-unknown-fg); font-size: 0.75rem; font-weight: var(--font-weight-semibold); }
+.action {
+  position: relative; z-index: 1; justify-self: start; display: inline-flex; align-items: center; justify-content: center; min-height: var(--touch-target-min); max-width: 100%;
+  padding: var(--space-half) var(--space-2); border: 2px solid var(--color-ink); border-radius: var(--radius-button); background: var(--color-tangerine); color: var(--color-ink);
+  font-size: var(--text-compact-size); font-weight: var(--font-weight-semibold); text-align: center; white-space: normal; text-decoration: none;
+}
+.action:hover { background: var(--color-citron); text-decoration: none; }
+
+@media (min-width: 900px) {
+  .row { grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.6fr) auto; align-items: center; }
+  .action { justify-self: end; }
+}
+
+@media (forced-colors: active) {
+  .row { border-left-color: CanvasText; }
+  .prod { background: Highlight; color: HighlightText; forced-color-adjust: none; }
+}

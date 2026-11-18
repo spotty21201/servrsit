@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFixtureFindingsClient, type FindingRecord, type FindingsClient, type FindingsSnapshot, type FixtureScheduler, type SnoozeFor } from "../api/stubs/findings";
-import { CareShell, ProductionLabel } from "../care/CareShell";
+import { CareShell, LoadFailure, ProductionLabel } from "../care/CareShell";
 import { useClock } from "../clock/ClockContext";
 import { DEFAULT_OWNER_TIME_ZONE } from "../lib/time";
 import { usePageTitle } from "../lib/pageTitle";
@@ -98,7 +98,8 @@ export function FindingsScreen({ client: injected }: { client?: FindingsClient }
       </header>
 
       {notice && <SchedulerNotice notice={notice} />}
-      {error && <div className={`${c.notice} ${c.noticeFailed}`} role="alert"><p className={c.noticeTitle}>Couldn&rsquo;t load findings</p><p>Nothing is shown until real data arrives.</p></div>}
+      {error && !snap && <LoadFailure title="Couldn't load findings" text="Nothing is shown until real data arrives. This does not mean there are no findings." onRetry={() => void load()} />}
+      {!snap && !error && <p className={c.p} role="status">Loading findings…</p>}
       {problem && <div className={`${c.notice} ${c.noticeFailed}`} role="alert"><p>{problem}</p></div>}
 
       {snap && (

@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { createFixtureActivityClient, type ActivityClient, type ActivityRecord, type ActivityResult, type ActivityType, type ExportFormat, type ExportResult } from "../api/stubs/activity";
-import { CareShell, ProductionLabel } from "../care/CareShell";
+import { CareShell, LoadFailure, ProductionLabel } from "../care/CareShell";
 import { useClock } from "../clock/ClockContext";
 import { usePageTitle } from "../lib/pageTitle";
 import { DEFAULT_OWNER_TIME_ZONE, formatClockWithAge, parseIso } from "../lib/time";
@@ -122,7 +122,8 @@ export function ActivityScreen({ client: injected }: { client?: ActivityClient }
         {!isDefault(filters) && <button type="button" className={c.secondary} onClick={() => setFilters(DEFAULT_FILTERS)}>Reset filters</button>}
       </form>
 
-      {error && <div className={`${c.notice} ${c.noticeFailed}`} role="alert"><p className={c.noticeTitle}>Couldn&rsquo;t load activity</p><p>Nothing is shown until real data arrives.</p></div>}
+      {error && !records && <LoadFailure title="Couldn't load activity" text="Nothing is shown until real data arrives. This does not mean nothing happened." onRetry={() => void load()} />}
+      {!records && !error && <p className={c.p} role="status">Loading activity…</p>}
 
       {records && (
         <section className={c.panel} aria-labelledby={`${ids}-list`}>

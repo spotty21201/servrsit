@@ -18,7 +18,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createFixtureBaselinesClient, type Baseline, type BaselineServer, type BaselinesClient, type Candidate, type ComparisonRow, type HistoryEvent } from "../api/stubs/baselines";
-import { CareShell, ProductionLabel } from "../care/CareShell";
+import { CareShell, LoadFailure, ProductionLabel } from "../care/CareShell";
 import { ReasonButton } from "../auth/AuthFrame";
 import { useClock } from "../clock/ClockContext";
 import { usePageTitle } from "../lib/pageTitle";
@@ -88,12 +88,18 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
   const [history, setHistory] = useState<readonly HistoryEvent[]>([]);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [load, setLoad] = useState<"loading" | "ready" | "error">("loading");
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const shown = useRef(0);
 
   usePageTitle(`Baselines: step ${step + 1} of 4, ${STEPS[step]}`);
   useEffect(() => { if (shown.current !== step) titleRef.current?.focus(); shown.current = step; }, [step]);
-  useEffect(() => { void client.listServers().then((r) => { if (r.ok) { setServers(r.data); setNow(new Date()); } else setProblem("Couldn't load servers. Nothing is shown until real data arrives."); }); }, [client]);
+  const loadServers = useMemo(() => async (): Promise<void> => {
+    setLoad("loading");
+    const r = await client.listServers();
+    if (r.ok) { setServers(r.data); setNow(new Date()); setLoad("ready"); } else setLoad("error");
+  }, [client]);
+  useEffect(() => { void loadServers(); }, [loadServers]);
 
   const reference = servers.find((x) => x.id === referenceId) ?? null;
   const target = servers.find((x) => x.id === targetId) ?? null;
@@ -161,17 +167,20 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
         <p className={c.small}>Step {step + 1} of 4: {STEPS[step]}. Comparing copies and deletes nothing. A setup only ever happens through a plan you approve.</p>
       </header>
 
-      <ol className={s.stepper} aria-label="Progress">
+      {load === "error" && <LoadFailure title="Couldn't load servers" text="Nothing is shown until real data arrives." onRetry={() => void loadServers()} />}
+      {load === "loading" && <p className={c.p} role="status">Loading servers…</p>}
+
+      {load === "ready" && <ol className={s.stepper} aria-label="Progress">
         {STEPS.map((label, i) => (
           <li key={label} data-state={i < step ? "done" : i === step ? "current" : "todo"} aria-current={i === step ? "step" : undefined}>
             <span className={s.stepNum}>{i < step ? `${i + 1} ✓` : i + 1}</span>{label}
           </li>
         ))}
-      </ol>
+      </ol>}
 
       {problem && <div className={`${c.notice} ${c.noticeFailed}`} role="alert"><p className={c.noticeTitle}>That didn&rsquo;t work</p><p>{problem}</p></div>}
 
-      <section className={c.panel} aria-labelledby={`${ids}-h`}>
+      {load === "ready" && <section className={c.panel} aria-labelledby={`${ids}-h`}>
         <h2 id={`${ids}-h`} className={c.h2}>{STEPS[step]}</h2>
 
         {step === 0 && (
@@ -279,7 +288,7 @@ export function BaselineScreen({ client: injected }: { client?: BaselinesClient 
             </div>
           </div>
         )}
-      </section>
+      </section>}
     </CareShell>
   );
 }

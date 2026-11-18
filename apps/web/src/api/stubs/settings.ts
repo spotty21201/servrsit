@@ -19,6 +19,7 @@
  * remote key is gone (`remoteKeyRemoved` is always false).
  */
 import type { DisconnectResponse } from "@servrsit/contracts";
+import { gate } from "../../lib/fixtureState";
 
 export interface ScheduleSettings {
   readonly intervalMinutes: 5 | 15 | 30 | 60;
@@ -98,7 +99,7 @@ export function createFixtureSettingsClient(now: () => Date = () => new Date()):
     "s-old": { queued: [], active: [] },
   };
   return {
-    async get() { await wait(); return { ok: true, data }; },
+    async get() { await wait(); return gate<SettingsResult<SettingsData>>(() => ({ ok: true, data }), () => ({ ok: false, error: "NETWORK" })); },
     async saveSchedule(s) {
       await wait();
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(s.dailyTime) || ![5, 15, 30, 60].includes(s.intervalMinutes)) return { ok: false, error: "INVALID" };

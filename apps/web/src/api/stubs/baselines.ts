@@ -22,6 +22,8 @@
  * real host's plan is blocked by writesEnabled=false like any other plan.
  */
 
+import { gate } from "../../lib/fixtureState";
+
 export type ConventionKind = "directory" | "package";
 
 export interface BaselineServer {
@@ -160,7 +162,7 @@ export function createFixtureBaselinesClient(now: () => Date = () => new Date())
   };
   const note = (b: string, t: string, text: string): void => { const k = `${b}|${t}`; hist.set(k, [{ at: now().toISOString(), text }, ...(hist.get(k) ?? [])]); };
   return {
-    async listServers() { await wait(); return { ok: true, data: servers }; },
+    async listServers() { await wait(); return gate<BaselinesResult<readonly BaselineServer[]>>(() => ({ ok: true, data: servers }), () => ({ ok: false, error: "NETWORK" })); },
     async listCandidates(referenceId) { await wait(); return servers.some((s) => s.id === referenceId) ? { ok: true, data: candidates } : { ok: false, error: "NOT_FOUND" }; },
     async saveBaseline(input) {
       await wait();

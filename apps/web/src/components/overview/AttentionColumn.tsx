@@ -14,6 +14,8 @@ interface AttentionColumnProps {
   findings: AttentionItemVM[];
   /** True while there is no fleet data (loading or API down): don't claim "nothing needs attention". */
   unavailable?: boolean;
+  /** No server is connected yet: say nothing was checked, not that nothing needs attention. */
+  noServers?: boolean;
 }
 
 function FindingIcon({ severity }: { severity: "attention" | "failed" }) {
@@ -34,7 +36,15 @@ function FindingIcon({ severity }: { severity: "attention" | "failed" }) {
   );
 }
 
-export function AttentionColumn({ findings, unavailable = false }: AttentionColumnProps) {
+export function AttentionColumn({ findings, unavailable = false, noServers = false }: AttentionColumnProps) {
+  if (noServers) {
+    return (
+      <section className={styles.column} aria-labelledby="attention-heading">
+        <h2 id="attention-heading" className={styles.heading}>Needs attention</h2>
+        <p className={styles.empty}>No server is connected, so nothing has been checked yet.</p>
+      </section>
+    );
+  }
   if (unavailable) {
     return (
       <section className={styles.column} aria-labelledby="attention-heading">

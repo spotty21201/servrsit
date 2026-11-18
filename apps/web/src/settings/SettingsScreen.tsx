@@ -19,7 +19,7 @@ import type { DisconnectResponse } from "@servrsit/contracts";
 import { copyText } from "../auth/copy";
 import { ReasonButton } from "../auth/AuthFrame";
 import { createFixtureSettingsClient, type AccessServer, type DisconnectPreview, type SettingsClient, type SettingsData } from "../api/stubs/settings";
-import { CareShell, ProductionLabel } from "../care/CareShell";
+import { CareShell, LoadFailure, ProductionLabel } from "../care/CareShell";
 import { useClock } from "../clock/ClockContext";
 import { SchedulerNotice } from "../findings/SchedulerNotice";
 import { schedulerNotice } from "../findings/findingsViewModel";
@@ -137,7 +137,8 @@ export function SettingsScreen({ client: injected }: { client?: SettingsClient }
         <p className={c.small}>Schedules, AI and data, and server access. Changes here use sample data for now and do not touch a real schedule or connection.</p>
       </header>
 
-      {error && <div className={`${c.notice} ${c.noticeFailed}`} role="alert"><p className={c.noticeTitle}>Couldn&rsquo;t load settings</p><p>Nothing is shown until real data arrives.</p></div>}
+      {error && !data && <LoadFailure title="Couldn't load settings" text="Nothing is shown until real data arrives. Your schedule and connections are unchanged." onRetry={() => void load()} />}
+      {!data && !error && <p className={c.p} role="status">Loading settings…</p>}
       {problem && <div className={`${c.notice} ${c.noticeFailed}`} role="alert"><p>{problem}</p></div>}
       <div role="status" aria-live="polite" className={st.saved}>{saved}</div>
 

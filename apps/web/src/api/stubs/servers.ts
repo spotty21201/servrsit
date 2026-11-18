@@ -29,6 +29,7 @@ import {
   type ServerRegistrationErrorCode,
 } from "@servrsit/contracts";
 import { csrfHeaders } from "../auth";
+import { gate } from "../../lib/fixtureState";
 
 export type ServersResult<T> =
   | { readonly ok: true; readonly data: T }
@@ -145,9 +146,7 @@ export function createFixtureServersClient(now: () => Date = () => new Date(), d
     };
   }
 
-  return {
-    async createDraft(req) {
-      await wait(delayMs);
+  function createDraftNow(req: ServerDraftRequest): ServersResult<ServerDraft> {
       const dup = req.address === FIXTURE_DUPLICATE.address;
       const id = `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`;
       const t = now();
@@ -159,6 +158,12 @@ export function createFixtureServersClient(now: () => Date = () => new Date(), d
           : { reachable: true, note: "The network path is open. This does not test signing in." },
         hostKey: null, hostKeyConfirmedAt: null, accessKey: null, createdAt: t.toISOString(), expiresAt: new Date(t.getTime() + 24 * 3600_000).toISOString(),
       }) };
+    }
+
+  return {
+    async createDraft(req) {
+      await wait(delayMs);
+      return gate<ServersResult<ServerDraft>>(() => createDraftNow(req), () => ({ ok: false, error: { error: "NETWORK" } }));
     },
     async getDraft(id) { await wait(delayMs / 2); const d = find(id); return d ? { ok: true, data: d } : fail("DRAFT_NOT_FOUND"); },
     async deleteDraft(id) { await wait(delayMs / 2); drafts.delete(id); runs.delete(id); return { ok: true, data: null }; },

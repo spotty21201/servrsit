@@ -62,6 +62,8 @@ export interface FindingsClient {
 
 // ── [FIXTURE] in-memory model ────────────────────────────────────────────��───
 
+import { gate } from "../../lib/fixtureState";
+
 export type FixtureScheduler = SchedulerStatus["status"];
 
 export function createFixtureFindingsClient(now: () => Date = () => new Date(), scheduler: () => FixtureScheduler = () => "running"): FindingsClient {
@@ -87,7 +89,7 @@ export function createFixtureFindingsClient(now: () => Date = () => new Date(), 
     }
   };
   return {
-    async list() { await wait(); return { ok: true, data: { findings: [...records.values()], scheduler: sched() } }; },
+    async list() { await wait(); return gate<FindingsResult<FindingsSnapshot>>(() => ({ ok: true, data: { findings: [...records.values()], scheduler: sched() } }), () => ({ ok: false, error: "NETWORK" })); },
     async acknowledge(id) {
       await wait();
       const r = records.get(id);

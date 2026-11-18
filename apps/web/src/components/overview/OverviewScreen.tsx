@@ -27,12 +27,18 @@
  *   ready, 0 servers empty state
  * The [FIXTURE DATA] banner shows only when at least one card is fixture.
  */
+import { useEffect, useMemo, useState } from "react";
 import { TopBanners } from "../../clock/TopBanners";
 import { ServerCard } from "../server-card/index.js";
 import { AttentionColumn } from "./AttentionColumn.js";
 import { RecentActivity } from "./RecentActivity.js";
 import { ChatBar } from "./ChatBar.js";
 import type { OverviewVM } from "./fleetViewModel.js";
+import { CompactServerList } from "./CompactServerList.js";
+import {
+  applyOrder, effectiveView, offersList, orderDiffers, orderIds, parsePrefs, PREFS_KEY, serializePrefs, SORT_LABEL,
+  type OverviewPrefs, type SortKey,
+} from "./listView.js";
 import { SchedulerNotice } from "../../findings/SchedulerNotice";
 import { SignOutButton } from "../../auth/SignOutButton";
 import { useSession } from "../../auth/session";
@@ -46,6 +52,24 @@ interface OverviewScreenProps {
 export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
   const hasData = vm.phase === "ready";
   const session = useSession();
+  const count = vm.servers.length;
+  const empty = hasData && count === 0;
+
+  // View and sort preference (saved); the order is fixed on entry and changes only on request (UX Spec §5.2).
+  const [prefs, setPrefs] = useState<OverviewPrefs>(() => {
+    try { return parsePrefs(globalThis.localStorage?.getItem(PREFS_KEY) ?? null); } catch { return parsePrefs(null); }
+  });
+  const [ids, setIds] = useState<string[]>([]);
+  useEffect(() => { if (count > 0 && ids.length === 0) setIds(orderIds(vm.servers, prefs.sort)); }, [count, ids.length, vm.servers, prefs.sort]);
+  const sorted = offersList(count);
+  const ordered = useMemo(() => (sorted ? applyOrder(vm.servers, ids, prefs.sort) : vm.servers), [sorted, vm.servers, ids, prefs.sort]);
+  const orderStale = sorted && ids.length > 0 && orderDiffers(vm.servers, ids, prefs.sort);
+  const view = effectiveView(prefs, count);
+  const savePrefs = (next: OverviewPrefs): void => {
+    setPrefs(next);
+    try { globalThis.localStorage?.setItem(PREFS_KEY, serializePrefs(next)); } catch { /* storage unavailable: the choice lasts for this visit */ }
+  };
+  const changeSort = (sort: SortKey): void => { savePrefs({ ...prefs, sort }); setIds(orderIds(vm.servers, sort)); };
   return (
     <div className={styles.appShell}>
       <TopBanners fixture={vm.anyFixture} />
@@ -129,7 +153,7 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
                   </>
                 )}
               </p>
-              <a href="/servers/new" className={styles.connectLink}>Connect a server</a>
+              {!empty && <a href="/servers/new" className={styles.connectLink}>Connect a server</a>}
             </header>
 
             {/* Data-state notices (inline, never a toast) */}
@@ -165,13 +189,44 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
               </div>
             )}
 
-            {hasData && vm.servers.length === 0 && (
-              <p className={styles.stateNote}>No servers are configured yet.</p>
+            {empty && (
+              <section className={styles.empty} aria-labelledby="empty-heading">
+                <h2 id="empty-heading" className={`${styles.emptyTitle} pixel-text`}>Let&rsquo;s meet your first server.</h2>
+                <p className={styles.emptyText}>Connect a supported Ubuntu server to check its condition and review care tasks.</p>
+                <ul className={styles.emptyList}>
+                  <li>Supported today: Ubuntu LTS servers.</li>
+                  <li>ServrSit needs SSH access to the server and a network path to it, for example over your private network.</li>
+                  <li>It only looks at first. It cannot change anything on the server yet.</li>
+                </ul>
+                <a href="/servers/new" className={styles.emptyAction}>Connect a server</a>
+              </section>
             )}
 
-            {vm.servers.length > 0 && (
+            {sorted && (
+              <div className={styles.viewBar}>
+                <div role="group" aria-label="Roster layout" className={styles.viewToggle}>
+                  <button type="button" aria-pressed={view === "cards"} onClick={() => savePrefs({ ...prefs, view: "cards" })}>Cards</button>
+                  <button type="button" aria-pressed={view === "list"} onClick={() => savePrefs({ ...prefs, view: "list" })}>Compact list</button>
+                </div>
+                <label className={styles.sortLabel}>
+                  <span>Sort by</span>
+                  <select value={prefs.sort} onChange={(e) => changeSort(e.target.value as SortKey)}>
+                    {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => <option key={k} value={k}>{SORT_LABEL[k]}</option>)}
+                  </select>
+                </label>
+                {orderStale && (
+                  <p className={styles.orderNote} role="status">
+                    Order is from when you opened this page; statuses have changed since.{" "}
+                    <button type="button" className={styles.linkButton} onClick={() => setIds(orderIds(vm.servers, prefs.sort))}>Update order</button>
+                  </p>
+                )}
+              </div>
+            )}
+
+            {count > 0 && view === "list" && <CompactServerList servers={ordered} />}
+            {count > 0 && view === "cards" && (
               <div className={styles.rosterGrid}>
-                {vm.servers.map((server) => (
+                {ordered.map((server) => (
                   <ServerCard key={server.id} server={server} />
                 ))}
               </div>
@@ -179,12 +234,12 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
           </section>
 
           <div className={styles.lowerGrid}>
-            <AttentionColumn findings={vm.attention} unavailable={!hasData} />
+            <AttentionColumn findings={vm.attention} unavailable={!hasData} noServers={empty} />
             {/* The fleet API has no operation history yet: honest empty list. */}
             <RecentActivity operations={[]} />
           </div>
 
-          <ChatBar servers={vm.servers.map((s) => ({ id: s.id, name: s.name }))} timeZone={vm.timeZone} />
+          {!empty && <ChatBar servers={vm.servers.map((s) => ({ id: s.id, name: s.name }))} timeZone={vm.timeZone} />}
         </div>
       </main>
     </div>
