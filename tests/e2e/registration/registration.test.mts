@@ -1,7 +1,6 @@
 /**
- * T-069 server registration acceptance scenarios. PENDING: the contract (packages/contracts/src/servers.ts) is
- * committed, the API is not. Every scenario is reported as skipped with the reason until a binding to the real
- * API exists (support/binding.mts, to be written when T-069 lands).
+ * T-069 server registration: static checks (unique ids, every contract endpoint exercised). The scenarios run
+ * against the implementation in registration-live.test.mts through support/binding.mts.
  *
  * Not yet self-validated: there is no spec-derived reference model for these scenarios yet (the care-loop and
  * login suites have one). Until there is, a pass would prove less than it does there.
@@ -12,11 +11,9 @@ import { part2 } from "./scenarios2.mts";
 
 const all = [...part1, ...part2];
 const ids = new Set<string>();
-for (const s of all) {
-  if (ids.has(s.id)) throw new Error(`duplicate scenario id ${s.id}`);
-  ids.add(s.id);
-  test(`${s.id} ${s.title} [${s.spec.join("; ")}]`, { skip: `PENDING T-069: the registration API is not implemented (contract only, 37805b6)${s.needs?.length ? `; also needs: ${s.needs.join(", ")}` : ""}` }, async () => {});
-}
+for (const s of all) { if (ids.has(s.id)) throw new Error(`duplicate scenario id ${s.id}`); ids.add(s.id); }
+// The scenarios themselves run in registration-live.test.mts (bound to T-069). This file keeps the static checks.
+test(`scenario ids are unique (${all.length} scenarios)`, () => {});
 test("inventory: every endpoint in the contract is exercised by at least one scenario", async () => {
   const fs = await import("node:fs");
   const src = ["./scenarios.mts", "./scenarios2.mts"].map((f) => fs.readFileSync(new URL(f, import.meta.url), "utf8")).join("\n");

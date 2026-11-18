@@ -24,6 +24,8 @@ import { DatabaseSync } from "node:sqlite";
 import { enrolOwner, setupTokenSink, type SignedInOwner } from "../../../apps/api/src/auth/testing.ts";
 import { FleetConfigSchema, loadFleetConfig } from "../../../apps/api/src/fleet/config.ts";
 import { buildServer } from "../../../apps/api/src/server.ts";
+import { productAcks } from "./binding.mts";
+import { ACK_RECOVERY, ACK_RISK } from "./support/contract.mts";
 import { SshWriteTarget, WritesDisabledError } from "../../../apps/worker/src/index.ts";
 import { PRODUCTION_ACK } from "../../../packages/domain/src/index.ts";
 import { SqliteCareStore } from "../../../packages/store/src/index.ts";
@@ -110,7 +112,7 @@ test("ZT-01: for every real host, approval is refused and creates no operation",
     const plan = (await post("/api/plans", { operation: "apply.packages.v1", serverId: h.id })).body;
     const r = await post(`/api/plans/${plan["id"]}/approvals`, {
       planVersion: plan["version"], planDigest: plan["digest"], idempotencyKey: `zt01-${h.name}-`.padEnd(24, "x"),
-      acknowledgements: h.production ? [PRODUCTION_ACK] : [],
+      acknowledgements: h.production ? productAcks([ACK_RECOVERY, ACK_RISK]) : [],
     }, withCsrf);
     assert.ok(r.status >= 400 && r.status < 500, `${h.name}: expected a 4xx refusal, got ${r.status}`);
     assert.ok(["PLAN_BLOCKED", "WRITES_DISABLED"].includes(String(r.body["error"])), `${h.name}: unexpected refusal ${JSON.stringify(r.body)}`);
@@ -125,7 +127,7 @@ test("ZT-01: a revised plan for a real host is still blocked, and a client canno
   const rev = await post(`/api/plans/${plan["id"]}/revisions`);
   assert.equal(rev.status, 201);
   assert.ok((rev.body["blockers"] as { code: string }[]).some((b: { code: string }) => b.code === "WRITES_DISABLED"));
-  const baseBody = { planVersion: rev.body["version"], planDigest: rev.body["digest"], idempotencyKey: "zt01-override-attempt-0001", acknowledgements: [PRODUCTION_ACK] };
+  const baseBody = { planVersion: rev.body["version"], planDigest: rev.body["digest"], idempotencyKey: "zt01-override-attempt-0001", acknowledgements: productAcks([ACK_RECOVERY, ACK_RISK]) };
   for (const extra of [{ writesEnabled: true }, { writes_enabled: true }, { force: true }, { override: { writesEnabled: true } }]) {
     const r = await post(`/api/plans/${plan["id"]}/approvals`, { ...baseBody, ...extra }, withCsrf);
     assert.ok(r.status >= 400 && r.status < 500, `override ${JSON.stringify(extra)}: ${r.status}`);
@@ -134,6 +136,16 @@ test("ZT-01: a revised plan for a real host is still blocked, and a client canno
   for (const headers of headerSets) {
     const r = await post(`/api/plans/${plan["id"]}/approvals`, baseBody, { ...withCsrf, ...headers });
     assert.ok(r.status >= 400 && r.status < 500, `header override ${JSON.stringify(headers)}: ${r.status}`);
+  }
+  assert.equal(COUNT_OPS(), 0);
+});
+
+test("ZT-01 (T-055): stop-request and reconcile on an id with no operation are refused and touch no server", async () => {
+  for (const id of ["00000000-0000-4000-8000-0000000000dd", "not-an-id", "../etc/passwd", "a".repeat(200)]) {
+    for (const route of ["stop-request", "reconcile"]) {
+      const r = await post(`/api/operations/${encodeURIComponent(id)}/${route}`, undefined, withCsrf);
+      assert.ok(r.status >= 400 && r.status < 500, `${route} on ${id.slice(0, 20)}: expected a 4xx refusal, got ${r.status}`);
+    }
   }
   assert.equal(COUNT_OPS(), 0);
 });
@@ -179,19 +191,22 @@ test("ZT-01: route inventory. Every mutating route is known and reviewed (a new 
       if (!["GET", "HEAD", "OPTIONS"].includes(method)) found.add(`${method} ${full}`);
     }
   }
-  const expected = [
-    "POST /api/assistant/messages",
-    // T-053: create or end the owner's session; they touch no server and no care record.
-    "POST /api/auth/login",
-    "POST /api/auth/logout",
-    "POST /api/auth/setup",
-    "POST /api/auth/setup/confirm",
-    "POST /api/auth/totp",
-    "POST /api/plans",
-    "POST /api/plans/:id/approvals",
-    "POST /api/plans/:id/revisions",
-  ];
-  assert.deepEqual([...found].sort(), expected, `mutating routes changed. Review each for the real-host gate.\n${text}`);
+  // Every mutating route must be in this REVIEWED set (a new, unreviewed one fails on purpose), and the core ones must exist.
+  const reviewed: Record<string, string> = {
+    "POST /api/assistant/messages": "chat; cannot approve (tests below)",
+    "POST /api/auth/login": "T-053 session; touches no server", "POST /api/auth/logout": "T-053", "POST /api/auth/setup": "T-053", "POST /api/auth/setup/confirm": "T-053", "POST /api/auth/totp": "T-053",
+    "POST /api/plans": "real hosts are WRITES_DISABLED (tests above)", "POST /api/plans/:id/approvals": "refused for real hosts (tests above)", "POST /api/plans/:id/revisions": "still blocked (tests above)",
+    "POST /api/operations/:id/reconcile": "T-055; acts only on an existing operation, none can exist for a real host", "POST /api/operations/:id/stop-request": "T-055; same",
+    // T-069 server registration. Reviewed: none can write to a server. Read-only contact a NEW draft may make on owner action: a TCP probe,
+    // a host-key scan (key exchange, no sign-in) and the fixed read-only collector with a key made for it. PATCH cannot set writesEnabled
+    // (test below and SR-44); disconnect contacts no server and never deletes an imported server's key (SR-50, SR-55).
+    "POST /api/servers/drafts": "T-069", "DELETE /api/servers/drafts/:id": "T-069", "POST /api/servers/drafts/:id/host-key": "T-069 read-only key scan",
+    "POST /api/servers/drafts/:id/host-key/confirm": "T-069", "POST /api/servers/drafts/:id/access-key": "T-069 local key generation", "POST /api/servers/drafts/:id/first-check": "T-069 read-only collector",
+    "POST /api/servers/drafts/:id/activate": "T-069 writes off", "PATCH /api/servers/:id": "T-069 name/role/production only", "POST /api/servers/:id/disconnect": "T-069 contacts no server",
+  };
+  const unreviewed = [...found].filter((r) => !(r in reviewed)).sort();
+  assert.deepEqual(unreviewed, [], `unreviewed mutating routes. Review each for the real-host gate, then add it with a reason.\n${text}`);
+  for (const core of ["POST /api/plans", "POST /api/plans/:id/approvals", "POST /api/auth/login"]) assert.ok(found.has(core), `core route missing: ${core}`);
 });
 
 test("ZT-01: the real SSH write target refuses every write and cannot reach anything", async () => {

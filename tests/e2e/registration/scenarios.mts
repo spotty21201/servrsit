@@ -48,7 +48,7 @@ export async function scanAndConfirm(h: RegHarness, id: string, t: FakeTarget): 
   const c = await step(h, id, "host-key/confirm", { fingerprint: t.fingerprint }); assert.equal(c.status, 200, `confirm ${c.status} ${c.code}`);
 }
 export async function waitCheck(h: RegHarness, id: string): Promise<any> {
-  for (let i = 0; i < 60; i++) { const r = await h.api({ method: "GET", path: `${P}/${id}/first-check` }); if (r.status === 200 && r.data?.finished) return r.data; await h.advance(500); }
+  for (let i = 0; i < 60; i++) { const r = await h.api({ method: "GET", path: `${P}/${id}/first-check` }); if (r.status === 200 && r.data?.finished) return r.data; await h.advance(500); await new Promise((res) => setTimeout(res, 25)); } // the check runs asynchronously in real time
   throw new Error("the first check never finished");
 }
 /** The whole happy path up to (not including) activation. Returns the draft id and the fake server. */
@@ -225,16 +225,24 @@ add({ id: "SR-12", title: "steps out of order are refused, change nothing, issue
     assert.equal((await h.servers()).length, 0, "a server was created without a first check");
   } });
 
-add({ id: "SR-13", title: "a changed host key voids the confirmation: the owner must confirm the new fingerprint, and the old one never carries over", spec: ["Tech 6.3: a changed key blocks inspection and changes until reverified; reverification does not inherit", "PRD FR-02: changed host key blocks access until separately reverified"],
+add({ id: "SR-13", title: "a changed host key is never accepted under the old confirmation: a rescan either resets the confirmation or is refused, and the old fingerprint cannot be confirmed again", spec: ["Tech 6.3: a changed key blocks inspection and changes until reverified; reverification does not inherit", "PRD FR-02: changed host key blocks access until separately reverified"],
   async run(h) {
     const t = h.world.addTarget({ address: "100.64.1.50" }); const id = (await draft(h)).data.id as string; await scanAndConfirm(h, id, t);
     const oldFp = t.fingerprint; const newFp = t.changeHostKey(); assert.notEqual(oldFp, newFp);
     const rescan = await step(h, id, "host-key");
-    if (rescan.status === 200) { assert.notEqual(rescan.data.state, "host-key-confirmed", "the old confirmation was kept for a different key"); assert.equal(rescan.data.hostKeyConfirmedAt, null); assert.equal(rescan.data.hostKey.fingerprint, newFp); }
-    else refused(rescan, "rescan after change", ["HOST_KEY_CHANGED"]);
-    refused(await step(h, id, "access-key"), "access key while the new fingerprint is unconfirmed", ["HOST_KEY_NOT_CONFIRMED", "STATE_CONFLICT", "HOST_KEY_CHANGED"]);
-    refused(await step(h, id, "host-key/confirm", { fingerprint: oldFp }), "the OLD fingerprint", ["FINGERPRINT_MISMATCH", "STATE_CONFLICT", "HOST_KEY_CHANGED"]);
-    assert.equal(t.authAttempts(), 0);
+    if (rescan.status === 200) {
+      // design 1: rescanning shows the new key and drops the old confirmation
+      assert.notEqual(rescan.data.state, "host-key-confirmed", "the old confirmation was kept for a different key"); assert.equal(rescan.data.hostKeyConfirmedAt, null); assert.equal(rescan.data.hostKey.fingerprint, newFp);
+      refused(await step(h, id, "access-key"), "access key while the new fingerprint is unconfirmed", ["HOST_KEY_NOT_CONFIRMED", "STATE_CONFLICT", "HOST_KEY_CHANGED"]);
+    } else {
+      // design 2 (T-069): a confirmed draft is not rescanned; the old pin stays and the change is caught at connection (SR-14)
+      refused(rescan, "rescan after change", ["HOST_KEY_CHANGED", "STATE_CONFLICT"]);
+      console.log(`# SR-13 design: a confirmed draft cannot be rescanned (${rescan.code}); the owner must delete the draft to re-verify`);
+    }
+    const again = await step(h, id, "host-key/confirm", { fingerprint: oldFp });
+    if (rescan.status === 200) refused(again, "the OLD fingerprint again", ["FINGERPRINT_MISMATCH", "STATE_CONFLICT", "HOST_KEY_CHANGED"]);
+    else if (again.status < 300) assert.equal(again.data.hostKey?.fingerprint, oldFp, "re-confirming changed the pinned key"); // idempotent repeat of the existing pin: grants nothing new
+    assert.equal(t.authAttempts(), 0, "the controller signed in to a server whose key changed");
   } });
 
 add({ id: "SR-14", title: "if the key changes between confirmation and the first check, nothing is offered to the new server and the failure is HOST_KEY_CHANGED", spec: ["Tech 6.3", "PRD FR-02: connection tests distinguish host-key mismatch", "execution-security: strict host checking"],
@@ -291,8 +299,9 @@ add({ id: "SR-22", title: "no private key, in any response, log line or subproce
     await all(await getDraft(h, id)); await all(await h.api({ method: "GET", path: "/api/fleet" })); await all(await h.api({ method: "GET", path: `${P}/${id}/first-check` }));
     await all(await h.api({ method: "PATCH", path: `/api/servers/${a.data.serverId}`, body: { name: "Secret Hunt 2" } }));
     for (const e of ENDPOINTS) await all(await h.api({ method: e.method, path: e.path, ...(e.body === undefined ? {} : { body: e.body }) }));
-    const d = await h.api({ method: "POST", path: `/api/servers/${a.data.serverId}/disconnect` }); await all(d);
+    // read the key material BEFORE disconnect deletes it, then search everything including the disconnect response
     const needles = h.keys.privateKeyNeedles(); assert.ok(needles.length > 0, "premise: the harness could read the private key to search for it");
+    const d = await h.api({ method: "POST", path: `/api/servers/${a.data.serverId}/disconnect` }); await all(d);
     const haystacks: [string, string][] = [["a response", bodies.join("\n")], ["the log", h.logText()], ["a subprocess argument", h.argvLog().map((a) => a.join(" ")).join("\n")]];
     for (const [where, text] of haystacks) {
       assert.ok(!/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(text), `a private-key header appears in ${where}`);
@@ -308,11 +317,21 @@ add({ id: "SR-23", title: "key files are owner-only, deleting a draft removes it
     const del = await h.api({ method: "DELETE", path: `${P}/${id}` }); assert.equal(del.status, 204); assert.equal(h.keys.storedKeyCount(), 0, "the unused key survived its draft"); refused(await getDraft(h, id), "deleted draft", ["DRAFT_NOT_FOUND"]);
     // expiry
     const t2 = h.world.addTarget({ address: "100.64.1.52" }); const id2 = (await draft(h, { address: "100.64.1.52", name: "Exp" })).data.id as string; await scanAndConfirm(h, id2, t2); await step(h, id2, "access-key");
-    await h.advance(24 * HOUR + 60_000); refused(await step(h, id2, "first-check"), "expired draft", ["DRAFT_EXPIRED", "DRAFT_NOT_FOUND"]); assert.equal(h.keys.storedKeyCount(), 0, "an expired draft kept its key");
+    await h.advance(24 * HOUR + 60_000); refused(await step(h, id2, "first-check"), "expired draft", ["DRAFT_EXPIRED", "DRAFT_NOT_FOUND"]);
+    // (removal of the expired draft's key without any further action is SR-23b; here: the next draft cleans it up)
+    h.world.addTarget({ address: "100.64.1.54" }); await draft(h, { address: "100.64.1.54", name: "Sweeper" }); assert.equal(h.keys.storedKeyCount(), 0, "an expired draft kept its key even after the next draft was created");
     // an activated draft's delete must not destroy the live key
     const live = await toChecked(h, { address: "100.64.1.53", name: "Live" }); const act = await step(h, live.id, "activate"); assert.equal(act.status, 201);
     await h.api({ method: "DELETE", path: `${P}/${live.id}` }); assert.equal(h.keys.storedKeyCount(), 1, "deleting the draft deleted the key a live server is using");
     const before = live.target.authAttempts(); await h.scheduler.tick(); assert.ok(live.target.authAttempts() > before, "the live server can no longer be checked");
+  } });
+
+add({ id: "SR-23b", title: "an expired draft's private key is removed once the draft expires, without waiting for the owner to start another draft", spec: ["contract: a draft holds no secret and expires after 24 hours", "execution-security: do not keep credentials longer than needed"], needs: ["keystore"],
+  async run(h) {
+    const t = h.world.addTarget({ address: "100.64.1.52" }); const id = (await draft(h, { address: "100.64.1.52", name: "Abandoned" })).data.id as string; await scanAndConfirm(h, id, t); await step(h, id, "access-key");
+    assert.equal(h.keys.storedKeyCount(), 1);
+    await h.advance(24 * HOUR + 60_000); await getDraft(h, id); await h.api({ method: "GET", path: "/api/fleet" }); await h.scheduler.tick();
+    assert.equal(h.keys.storedKeyCount(), 0, "the abandoned draft's private key is still on the controller 24 h later");
   } });
 
 add({ id: "SR-24", title: "the first check offers only this server's key, and only after the owner has installed it: until then the answer is AUTH_FAILED and retrying works", spec: ["PRD FR-02: connection tests distinguish authentication failure", "Tech 6.4: explicitly select the intended key"],

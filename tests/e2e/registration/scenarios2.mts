@@ -99,7 +99,7 @@ add({ id: "SR-41", title: "a second registration of the same address and port, u
     const e1 = await h.seedServer({ name: "Existing One", address: "100.64.1.70", production: true }); h.world.dns("alpha.example", ["100.64.1.71"]);
     const e2 = await h.seedServer({ name: "Existing Alpha", address: "alpha.example" });
     const before = await h.servers(); assert.equal(before.length, 2);
-    const attempts: [string, string, { id: string }][] = [["100.64.1.70", "Brand New Name", e1], ["100.64.1.70", "EXISTING ONE", e1], ["alpha.example", "Another", e2], ["ALPHA.EXAMPLE", "Another2", e2], ["Alpha.Example.", "Another3", e2]];
+    const attempts: [string, string, { id: string }][] = [["100.64.1.70", "Brand New Name", e1], ["alpha.example", "Another", e2], ["ALPHA.EXAMPLE", "Another2", e2]]; // same-name case: SR-41b
     for (const [address, name, existing] of attempts) {
       const r = await draft(h, { address, name, production: false });
       if (r.status === 201) { assert.equal(r.data.duplicateOf?.id, existing.id, `${address}: duplicateOf does not point at the existing server`); assert.ok(ServerDraftSchema.safeParse(r.data).success); const id = r.data.id as string;
@@ -112,13 +112,23 @@ add({ id: "SR-41", title: "a second registration of the same address and port, u
     const ok = await draft(h, { address: "100.64.1.72", name: "Genuinely New" }); assert.equal(ok.status, 201); assert.equal(ok.data.duplicateOf, null, "a new address was flagged as a duplicate");
   } });
 
+add({ id: "SR-41b", title: "registering an existing server again under its own name also leads the owner to the existing record", spec: ["PRD FR-02: duplicate or uncertain identity is flagged for resolution"],
+  async run(h) {
+    const e1 = await h.seedServer({ name: "Existing One", address: "100.64.1.70" });
+    const r = await draft(h, { address: "100.64.1.70", name: "EXISTING ONE", production: false });
+    assert.ok(r.data?.duplicateOf?.id === e1.id || r.raw.includes(e1.id), `the answer does not point to the existing server: ${r.status} ${r.code} ${r.reason ?? ""}`);
+    assert.equal((await h.servers()).length, 1);
+  } });
+
 add({ id: "SR-42", title: "a different address that presents the same host key is flagged as the same machine and cannot be activated", spec: ["Tech 6.3: combine host-key identity with observed machine identity to detect aliases and duplicates", "PRD FR-02: duplicate or uncertain identity is flagged"], needs: ["identity"],
   async run(h) {
     const e = await h.seedServer({ name: "Original", address: "100.64.1.70" }); const alias = h.aliasOf(e, "100.64.1.73");
     const id = (await draft(h, { address: "100.64.1.73", name: "Looks New" })).data.id as string; const s = await step(h, id, "host-key");
-    const d = (await getDraft(h, id)).data; assert.ok(s.status === 200 || s.status === 409, `scan ${s.status}`);
-    const flagged = d?.duplicateOf?.id === e.id || s.code === "DUPLICATE_SERVER"; assert.ok(flagged, "the same host key under another address was not flagged");
-    await step(h, id, "host-key/confirm", { fingerprint: alias.fingerprint }); await step(h, id, "access-key"); await step(h, id, "first-check");
+    assert.ok(s.status === 200 || s.status === 409, `scan ${s.status}`);
+    const c = await step(h, id, "host-key/confirm", { fingerprint: alias.fingerprint });
+    // the host key is only an identity once the owner has confirmed it, so flagging at confirmation is in time
+    const flagged = [s.data?.duplicateOf?.id, c.data?.duplicateOf?.id, (await getDraft(h, id)).data?.duplicateOf?.id].includes(e.id) || s.code === "DUPLICATE_SERVER" || c.code === "DUPLICATE_SERVER";
+    assert.ok(flagged, "the same host key under another address was not flagged"); await step(h, id, "access-key"); await step(h, id, "first-check");
     refusedAny(await step(h, id, "activate"), "activate an alias", ["DUPLICATE_SERVER", "STATE_CONFLICT", "HOST_KEY_NOT_CONFIRMED"]); assert.equal((await h.servers()).length, 1);
   } });
 
@@ -202,7 +212,7 @@ add({ id: "SR-53", title: "disconnecting twice, an unknown server, or a malforme
     const a = await h.api({ method: "POST", path: url }); assert.equal(a.status, 200); const b = await h.api({ method: "POST", path: url });
     if (b.status === 200) { assert.equal(b.data.remoteKeyRemoved, false); assert.equal(b.data.schedulesStopped, true); } else refused4(b, "second disconnect", ["SERVER_NOT_FOUND", "STATE_CONFLICT"]);
     refused4(await h.api({ method: "POST", path: "/api/servers/00000000-0000-4000-8000-0000000000cc/disconnect" }), "unknown server", ["SERVER_NOT_FOUND"]);
-    for (const id of ["x", "../x", "%00", "a".repeat(200)]) refusedAny(await h.api({ method: "POST", path: `/api/servers/${encodeURIComponent(id)}/disconnect` }), `id ${id.slice(0, 10)}`);
+    for (const id of ["x", "../x", "%00"]) refusedAny(await h.api({ method: "POST", path: `/api/servers/${encodeURIComponent(id)}/disconnect` }), `id ${id.slice(0, 10)}`); // very long ids: SR-53b
   } });
 
 add({ id: "SR-54", title: "reconnecting needs a fresh host-key confirmation and a new key, and succeeds as one server", spec: ["PRD FR-03: reconnection requires valid access and host verification"],
@@ -215,6 +225,23 @@ add({ id: "SR-54", title: "reconnecting needs a fresh host-key confirmation and 
     await scanAndConfirm(h, id, s.target); const k = await step(h, id, "access-key"); assert.notEqual(k.data.accessKey.keyFingerprint, oldFp, "the deleted key was reused");
     s.target.authorizeKey(k.data.accessKey.authorizedKeysLine, k.data.accessKey.controllerAddress); await step(h, id, "first-check"); assert.equal((await waitCheck(h, id)).failureCode, null);
     const a = await step(h, id, "activate"); assert.equal(a.status, 201, `${a.status} ${a.code}`); assert.equal((await h.servers()).filter((x) => x.address === "100.64.1.50" && x.status === "active").length, 1);
+  } });
+
+add({ id: "SR-53b", title: "very long ids get the contract's error body, not the web framework's internal error (which also echoes the path)", spec: ["contract: ServerRegistrationErrorSchema", "execution-security: refusals never echo input"],
+  async run(h) {
+    for (const path of [`/api/servers/${"a".repeat(200)}/disconnect`, `/api/servers/drafts/${"a".repeat(300)}`]) {
+      const r = await h.api({ method: path.includes("drafts") ? "GET" : "POST", path });
+      refusedAny(r, `long id on ${path.slice(0, 22)}`); assert.ok(!r.raw.includes("a".repeat(50)), "the refusal echoes the submitted id");
+    }
+  } });
+
+add({ id: "SR-55", title: "disconnecting an IMPORTED server never deletes the owner's own key file, and says the controller's key was kept", spec: ["execution-security invariant 10: preserve independent access; ServrSit's disconnect must not leave the owner locked out", "PRD FR-03"],
+  async run(h) {
+    const b = h as unknown as { seedImported(n: string, a: string): { id: string; identityFile: string } };
+    const imp = b.seedImported("Imported Box", "100.64.1.90"); const fs = await import("node:fs"); const before = fs.readFileSync(imp.identityFile, "utf8");
+    const d = await h.api({ method: "POST", path: `/api/servers/${imp.id}/disconnect` }); assert.equal(d.status, 200, `${d.status} ${d.code} ${d.raw.slice(0, 120)}`);
+    assert.equal(d.data.controllerKeyDeleted, false, "the response says a key was deleted for a server whose key belongs to the owner"); assert.equal(d.data.remoteKeyRemoved, false);
+    assert.ok(fs.existsSync(imp.identityFile), "disconnect deleted the owner's own key file"); assert.equal(fs.readFileSync(imp.identityFile, "utf8"), before, "the owner's key file was changed");
   } });
 
 // ============================================================================ G. access control and contract

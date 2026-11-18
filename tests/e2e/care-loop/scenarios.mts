@@ -633,6 +633,9 @@ const unknown: Scenario[] = [
       const sentBefore = await manifests(h, serverId);
       const r = await h.reconcile(opId);
       assert.equal(r.ok, true, `reconcile must work once the target is reachable (${r.status} ${r.code})`);
+      // Allow the worker its retry interval (T-058 backs off up to a minute), as CL-05a/b/c already do. No time is
+      // allowed for anything else: 2 minutes, then the state must have resolved.
+      await h.advance(2 * MIN);
       await h.settle();
       const after = await op(h, opId);
       assert.notEqual(after.state, "outcome_unknown", "evidence exists on the target, so the state must resolve");

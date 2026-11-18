@@ -35,6 +35,20 @@ import { buildServer } from "../../../apps/api/src/server.ts";
 type App = Awaited<ReturnType<typeof buildServer>>;
 import { Dispatcher, SimulatedTarget, TransportError, type WriteTarget } from "../../../apps/worker/src/index.ts";
 import { createSigner, PRODUCTION_ACK } from "../../../packages/domain/src/index.ts";
+import * as careContracts from "../../../packages/contracts/src/care.ts";
+
+/**
+ * T-057 replaced the one production acknowledgement with two named ones. Map each abstract acknowledgement to
+ * its own product token by NAME, so a partial set really is sent as a partial set. On code without T-057 the
+ * old single token is sent only when both are given (the previous mapping).
+ */
+const named = careContracts as unknown as { ACK_RECOVERY_ROUTE?: string; ACK_INTERRUPTION_RISK?: string };
+export function productAcks(acks: readonly string[]): string[] {
+  if (named.ACK_RECOVERY_ROUTE && named.ACK_INTERRUPTION_RISK) {
+    return [...(acks.includes(ACK_RECOVERY) ? [named.ACK_RECOVERY_ROUTE] : []), ...(acks.includes(ACK_RISK) ? [named.ACK_INTERRUPTION_RISK] : [])];
+  }
+  return acks.includes(ACK_RECOVERY) && acks.includes(ACK_RISK) ? [PRODUCTION_ACK] : [];
+}
 import { MemoryIntentStore, SqliteAuthStore, SqliteCareStore, type OperationEvent, type StoredOperation } from "../../../packages/store/src/index.ts";
 import {
   ACK_RECOVERY,
@@ -72,16 +86,18 @@ class Clock {
 class RecordingTarget implements WriteTarget {
   readonly kind = "simulated" as const;
   readonly serverId: string;
-  readonly hostKeyFingerprint = FINGERPRINT;
+  readonly hostKeyFingerprint: string;
   readonly log: Interaction[] = [];
   partitioned = false;
   armPartitionAfterSubmit = false;
   removalInPreview = false;
   private seq = 0;
-  constructor(readonly sim: SimulatedTarget, serverId: string) { this.serverId = serverId; }
+  constructor(readonly sim: SimulatedTarget, serverId: string) { this.serverId = serverId; this.hostKeyFingerprint = (sim as unknown as { hostKeyFingerprint: string }).hostKeyFingerprint; }
 
   private rec(kind: Interaction["kind"], opId?: string): void { this.log.push({ seq: ++this.seq, kind, opId }); }
 
+  /** T-056 added identity() to WriteTarget. Forwarded untouched; it is a read of the simulated machine's identity, not an interaction. */
+  identity() { const f = (this.sim as unknown as { identity?: () => unknown }).identity; return (f ? f.call(this.sim) : null) as ReturnType<WriteTarget["identity"]>; }
   async previewPackages() {
     if (this.partitioned) { this.rec("connect-failed"); throw new TransportError("inspect"); }
     this.rec("inspect");
@@ -162,6 +178,7 @@ export class InProcessHarness implements Harness {
   private readonly sink = setupTokenSink();
   private owner: SignedInOwner | null = null;
   private readonly servers = new Map<string, Entry>();
+  private readonly identities = new Map<string, { fp: string; machineId: string }>();
   private readonly targets = new Map<string, WriteTarget>();
   private app: App | null = null;
   private dirty = true;
@@ -229,13 +246,16 @@ export class InProcessHarness implements Harness {
 
   // ---- Harness: setup ----
   async addServer(o: { name: string; production?: boolean; writesEnabled?: boolean | undefined; aliasOf?: string }) {
-    if (o.aliasOf !== undefined) {
-      throw new UnsupportedByBinding("T-048 has no canonical-identity model: a second record for one machine would have its own server id and its own lock (FR-02 duplicate detection not built)");
-    }
+    // T-056: each simulated machine has its own host key and machine id. An alias (a second record for the same
+    // machine) presents the SAME pair, which is what the product must use to put both records under one lock.
     const id = `${SIM_PREFIX}${(++this.n).toString(16).padStart(12, "0")}`;
+    const original = o.aliasOf !== undefined ? this.servers.get(o.aliasOf) : undefined;
+    if (o.aliasOf !== undefined && original === undefined) throw new Error(`aliasOf: unknown server ${o.aliasOf}`);
+    const ident = original ? this.identities.get(o.aliasOf!)! : { fp: `${FINGERPRINT}-${id}`, machineId: `sim-machine-${id}` };
+    this.identities.set(id, ident);
     const runMs = { value: 1000 };
     const sim = new SimulatedTarget({
-      serverId: id, installationId: INSTALL, hostKeyFingerprint: FINGERPRINT,
+      serverId: id, installationId: INSTALL, hostKeyFingerprint: ident.fp, machineId: ident.machineId,
       trustedKeys: { [this.signer.keyId]: this.signer.publicKeyPem },
       installed: { "openssl:amd64": "3.0.13-0ubuntu3.4", "libssl3t64:amd64": "3.0.13-0ubuntu3.4" },
       upgrades: [
@@ -283,7 +303,7 @@ export class InProcessHarness implements Harness {
       planVersion: i.version,
       ...(i.digest === undefined ? {} : { planDigest: i.digest }),
       idempotencyKey: sha(i.idempotencyKey).slice(0, 32),
-      acknowledgements: acks.includes(ACK_RECOVERY) && acks.includes(ACK_RISK) ? [PRODUCTION_ACK] : [],
+      acknowledgements: productAcks(acks),
       ...(i.extra ?? {}),
     };
     const r = await this.http("POST", `/api/plans/${i.planId}/approvals`, body, headers, { session: i.session !== "none", csrf: false });
