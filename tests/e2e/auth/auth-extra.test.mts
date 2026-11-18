@@ -1,6 +1,6 @@
 /**
  * T-053 checks beyond the 27 scenarios: things only visible once the real flow exists.
- * Tests marked `todo` assert the behaviour I believe is required and FAIL today; they are
+ * Tests that were `todo` (D-A1, D-A3, D-A3b, D-A4) are now guards: T-066 fixed them. They used to fail; they are
  * reported as defects (see docs/team/test-report-ai-auth-001.md), not hidden.
  */
 import assert from "node:assert/strict";
@@ -94,13 +94,12 @@ test("X-03 lock durations: none below 5 failures, then escalating; correct login
   } finally { await h.close(); }
 });
 
-test("X-04 DoS: an anonymous caller with NO credentials can lock the owner out (5 wrong passwords), from several addresses", async () => {
+test("X-04 (T-066, inverted) six anonymous failures from six addresses no longer lock the owner out on a fresh address", async () => {
   const h = await enrolled({ wiring: "isolated" });
   try {
     for (let i = 0; i < 6; i++) await wrongPassword(h, `198.51.100.${i + 1}`);
-    const own = await h.login({ code: totp(h.totpSecret!, h.now()) });
-    console.log(`# X-04 owner login after 6 anonymous failures from 6 addresses: ${own.status} ${own.code}`);
-    assert.equal(own.status, 429);
+    const own = await h.login({ code: totp(h.totpSecret!, h.now()), client: "203.0.113.50" });
+    assert.equal(own.ok, true, `the owner was locked out by 6 anonymous failures: ${own.status} ${own.code}`);
   } finally { await h.close(); }
 });
 
@@ -121,7 +120,7 @@ test("X-14b restarting the API (new setup token on the same database) recovers a
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("X-05 DoS: the global auth rate limit (10 POSTs/min, before validation) lets an anonymous caller block the owner's login", { todo: "reported: D-A1" }, async () => {
+test("X-05 (guard, D-A1) garbage bodies from anyone can never use up the owner's login allowance", async () => {
   const h = await AuthBinding.create({ wiring: "full" });
   try {
     const r = await h.setup({ token: await h.setupToken() });
@@ -133,18 +132,19 @@ test("X-05 DoS: the global auth rate limit (10 POSTs/min, before validation) let
   } finally { await h.close(); }
 });
 
-test("X-05b the 11th auth POST in a minute is RATE_LIMITED with Retry-After, and the window then recovers", async () => {
+test("X-05b (T-066) the allowance is per source and counts only well-formed requests: 100 garbage POSTs cost nothing, and a source that really signs in too often gets RATE_LIMITED with Retry-After while another source is unaffected", async () => {
   const h = await AuthBinding.create({ wiring: "full" });
   try {
-    const codes: number[] = [];
-    for (let i = 0; i < 11; i++) codes.push((await garbage(h)).status);
-    assert.deepEqual(codes.slice(0, 10), Array(10).fill(400));
-    assert.equal(codes[10], 429);
-    const r = await garbage(h);
-    assert.equal(r.json["error"], "RATE_LIMITED");
-    assert.ok(Number(r.headers["retry-after"]) >= 1, "Retry-After missing");
-    await h.advance(61_000);
-    assert.equal((await garbage(h)).status, 400, "limiter did not recover after the window");
+    assert.equal((await h.setup({ token: await h.setupToken() })).ok, true);
+    for (let i = 0; i < 100; i++) assert.equal((await garbage(h)).status, 400, "a garbage body must be refused as invalid, not counted");
+    const codes = h.recoveryCodes.slice(0, 6); const A = "198.51.100.7";
+    for (const [i, rc] of codes.entries()) {
+      const l = await h.raw("POST", "/api/auth/login", { body: { username: USERNAME, password: PASSWORD }, headers: HDR, client: A });
+      if (i < 5) { assert.equal(l.status, 200, `sign-in ${i + 1} of 5 from one source: ${l.status}`); const t = await h.raw("POST", "/api/auth/totp", { body: { recoveryCode: rc }, cookies: { servrsit_mfa: l.set.find((c) => c.name === "servrsit_mfa")!.value }, headers: HDR, client: A }); assert.equal(t.status, 200); }
+      else { assert.equal(l.status, 429, `the 6th sign-in in a minute from one source: ${l.status}`); assert.equal(l.json["error"], "RATE_LIMITED"); assert.ok(Number(l.headers["retry-after"]) >= 1, "no Retry-After"); }
+    }
+    const other = await h.raw("POST", "/api/auth/login", { body: { username: USERNAME, password: PASSWORD }, headers: HDR, client: "203.0.113.9" }); assert.equal(other.status, 200, "another source was limited by the first one's traffic");
+    await h.advance(61_000); assert.equal((await h.raw("POST", "/api/auth/login", { body: { username: USERNAME, password: PASSWORD }, headers: HDR, client: A })).status, 200, "the limit did not recover after the window");
   } finally { await h.close(); }
 });
 
@@ -294,7 +294,7 @@ test("X-13 a too-short password is refused without using up the setup token", as
   } finally { await h.close(); }
 });
 
-test("X-14 an abandoned enrolment (closed the tab at the QR code) can be retried without restarting the API", { todo: "reported: D-A4" }, async () => {
+test("X-14 (guard, D-A4) an abandoned enrolment can be retried without restarting the API", async () => {
   const h = await AuthBinding.create({ wiring: "isolated" });
   try {
     const token = await h.setupToken();
@@ -335,7 +335,7 @@ test("X-16 CLOCK: enrolment itself cannot be confirmed with a correct phone whil
   } finally { await h.close(); }
 });
 
-test("X-17 CLOCK: after the server clock is corrected backwards by 7 h, the owner can still log in with a current code", { todo: "reported: D-A5" }, async () => {
+test("X-17 CLOCK: after the server clock is corrected backwards by 7 h, the owner can still log in with a current code", async () => {
   const h = await enrolled({ wiring: "isolated" });
   try {
     assert.equal((await h.login({ code: totp(h.totpSecret!, h.now()) })).ok, true, "premise: login while the clock is fast");
@@ -346,23 +346,10 @@ test("X-17 CLOCK: after the server clock is corrected backwards by 7 h, the owne
   } finally { await h.close(); }
 });
 
-test("X-17b CLOCK: how long the step-back lock-out lasts, and what gets the owner in (measured)", async () => {
-  const h = await enrolled({ wiring: "isolated" });
-  try {
-    await h.login({ code: totp(h.totpSecret!, h.now()) });
-    await h.advance(-SKEW); await h.advance(31_000);
-    assert.equal((await h.login({ code: totp(h.totpSecret!, h.now()) })).ok, false, "premise: stuck right after the step back");
-    const viaRecovery = await h.loginWithRecoveryCode(h.recoveryCodes[0]!);
-    console.log(`# X-17b recovery code while stuck: ${viaRecovery.status} ${viaRecovery.ok ? "ok" : viaRecovery.code}`);
-    assert.equal(viaRecovery.ok, true, "a recovery code must still work");
-    let minutes = 0;
-    while (minutes < 8 * 60) { await h.advance(MIN); minutes++; const r = await h.login({ code: totp(h.totpSecret!, h.now()) }); if (r.ok) break; }
-    console.log(`# X-17b TOTP logins stayed refused for about ${(minutes / 60).toFixed(1)} h after the clock was corrected`);
-    assert.ok(minutes < 8 * 60, "never recovered inside 8 h");
-  } finally { await h.close(); }
-});
+// X-17b retired (T-066): it recorded that TOTP stayed refused for about 7 h after a clock step back. That is fixed;
+// X-17 (a current code works straight after the step) is the guard. The recovery-code escape route is still checked in T66-09.
 
-test("X-18 CLOCK: a lock set while the clock was fast does not outlast the real lock after the clock is corrected", { todo: "reported: D-A5" }, async () => {
+test("X-18 CLOCK: a lock set while the clock was fast does not outlast the real lock after the clock is corrected", async () => {
   const h = await enrolled({ wiring: "isolated" });
   try {
     for (let i = 0; i < 6; i++) await wrongPassword(h);
@@ -373,7 +360,7 @@ test("X-18 CLOCK: a lock set while the clock was fast does not outlast the real 
   } finally { await h.close(); }
 });
 
-test("X-19 CLOCK: an idle session still ends 60 minutes after its last use even if the clock is corrected backwards", { todo: "reported: D-A5" }, async () => {
+test("X-19 CLOCK: an idle session still ends 60 minutes after its last use even if the clock is corrected backwards", async () => {
   const h = await enrolled({ wiring: "isolated" });
   try {
     const s = (await h.login({ code: totp(h.totpSecret!, h.now()) })).data!;

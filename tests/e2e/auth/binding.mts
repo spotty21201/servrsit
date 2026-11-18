@@ -51,6 +51,8 @@ export interface BindingOptions {
   readonly defaultTokenSink?: boolean;
   /** Use a database file instead of memory (to inspect what is stored). */
   readonly storePath?: string;
+  /** Isolated only: T-066 `clockTrusted` (false = ServrSit's own clock is untrusted; enrolment is refused). */
+  readonly clockTrusted?: () => boolean;
 }
 
 interface SetCookie { name: string; value: string; attrs: Record<string, string | true> }
@@ -122,7 +124,7 @@ export class AuthBinding implements AuthHarness {
     const cookie = apiRequire("@fastify/cookie");
     const f = Fastify({ logger: createLoggerOptions({ level: "info", secrets: [], stream: logStream }) });
     await f.register(cookie);
-    const auth = new OwnerAuth({ store: this.store, now: this.now, ...(sink === undefined ? {} : { onSetupToken: sink }) });
+    const auth = new OwnerAuth({ store: this.store, now: this.now, ...(sink === undefined ? {} : { onSetupToken: sink }), ...(this.opts.clockTrusted ? { clockTrusted: this.opts.clockTrusted } : {}) });
     await auth.init();
     installAuthGuard(f, { auth });
     await f.register(authRoutes, {

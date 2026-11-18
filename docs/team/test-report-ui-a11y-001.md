@@ -161,3 +161,11 @@ tests/e2e/a11y/structure.test.mts                23 checks (landmarks, names, ti
 tests/e2e/a11y/browser/browser-check.mjs         real-Chromium pass (manual run; not part of pnpm test)
 docs/team/evidence/a11y/*.json                   results
 ```
+
+---
+
+## Update after T-066 landed
+
+T-066 (`41676cc`) is merged and re-tested: the 401 sweep is **7/7**, the 37 login scenarios pass, and the five former `todo` tests are guards. Full results are in `test-report-ai-auth-001.md` §10.
+
+It adds one finding for this area: **D-U13 (Medium)**. The auth error contract gained `CLOCK_UNTRUSTED`, and the web app has no wording for it, so the web build fails to compile once T-065 and T-066 are merged (D-X1), and a bypassed build would show the owner the raw code. New guard: `ST-24` (`todo`). The a11y suite is now 120 tests: 105 pass, 15 `todo`, 0 fail.

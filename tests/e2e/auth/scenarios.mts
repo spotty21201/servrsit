@@ -181,12 +181,13 @@ export const scenarios: Scenario[] = [
     },
   },
   {
-    id: "AU-04b", title: "the lock is not bypassed by another address, another cookie, or time of a minute or two",
+    id: "AU-04b", title: "the lock is not bypassed by dropping the cookie, or by a few seconds passing",
     spec: ["T-053: lockout"],
     async run(h) {
       const secret = await enrol(h);
       for (let i = 0; i < 10; i++) await h.login({ code: wrongCode(secret, h, i) });
-      refused(await h.login({ code: code(secret, h), client: "203.0.113.77" }), "correct code from a new address");
+      // (T-066) The "from a new address" clause was removed: locks are per source by decision, so a different address is
+      // NOT locked by this one's failures. That behaviour, and the account-wide lock that backs it, are tested in auth-t066.test.mts.
       refused(await h.login({ code: code(secret, h), existingCookie: null }), "correct code with no cookie");
       // CORRECTED after the first run against T-053 (see test-report-ai-auth-001.md, "My own mistakes"):
       // the original asserted the lock still held 2 minutes in. No spec gives a lock duration; T-053 locks

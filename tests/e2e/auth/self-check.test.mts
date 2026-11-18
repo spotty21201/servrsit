@@ -29,7 +29,7 @@ test("every scenario passes on the correct reference model", async () => {
 
 const EXPECT: Record<Fault, string[]> = {
   noSingleUseSetup: ["AU-01a", "AU-01b"], setupRace: ["AU-01b"], weakSetupToken: ["AU-01d"],
-  noReplayProtection: ["AU-03a", "AU-03b"], noLockout: ["AU-04a", "AU-04b"], lockoutPerClient: ["AU-04b"],
+  noReplayProtection: ["AU-03a", "AU-03b"], noLockout: ["AU-04a", "AU-04b"], // lockoutPerClient retired (T-066): per-source locks are now the decided design, so it is no longer a fault.
   lockoutTooLate: ["AU-04a"], lockoutForever: ["AU-04c"], lockoutTooEager: ["AU-04d"], wideWindow: ["AU-02c"],
   verboseErrors: ["AU-02b"], arrayCodeAccepted: ["AU-04e"], nonOpaqueSession: ["AU-05a"], shortCookie: ["AU-05a"],
   sessionFixation: ["AU-05b"], noLogoutInvalidate: ["AU-05c"], noIdleExpiry: ["AU-05d"], idleTooShort: ["AU-05d"],

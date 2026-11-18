@@ -221,3 +221,15 @@ test("ST-23 source scan: no click handler on a non-interactive element, no posit
   }
   assert.deepEqual(bad, []);
 });
+
+// ------------------------------------------------------------------------------------------- contract drift guard
+test("ST-24 the sign-in and setup screens have their own words for EVERY auth error code in the contract, never the raw code", { todo: "reported: D-U13" }, async () => {
+  const { AuthErrorCodeSchema } = await import("../../../packages/contracts/src/auth.ts");
+  const { authError } = await import("../../../apps/web/src/auth/authText.ts");
+  const bad: string[] = [];
+  for (const code of AuthErrorCodeSchema.options as readonly string[]) for (const stepName of ["password", "setup-token", "totp", "recovery", "enrol-confirm"] as const) {
+    const v = authError({ kind: code as never }, stepName, new Date(), "Asia/Jakarta");
+    if (!v.text || v.text.includes(code) || /^[A-Z_]{6,}$/.test(v.text)) bad.push(`${code} @ ${stepName}: "${v.text}"`);
+  }
+  assert.deepEqual([...new Set(bad.map((b) => b.split(" @ ")[0]))], [], `the owner would be shown a raw error code:\n${bad.slice(0, 4).join("\n")}`);
+});

@@ -392,3 +392,78 @@ tests/e2e/care-loop/binding.mts, zt01-real-hosts.test.mts   Coder's patch, revie
 ```
 
 Run: `cd apps/api && pnpm exec tsx --test --test-reporter=spec ../../tests/e2e/auth/auth.test.mts` (and `auth-extra.test.mts`). The extra checks print their measured values on lines starting with `# X-`.
+
+
+---
+
+# 10. T-066 re-test: the five `todo` tests are guards, and the lockout design is checked
+
+**Code tested:** `feat/coder/owner-auth` `41676cc` (handoff `9673c1d`), merged into `feat/tester/auth-guards`. Product source unchanged by me. Times in this section are Merauke-clock stamped; counts and durations are not affected.
+
+## 10.1 Result: PASS. D-A1, D-A3, D-A3b and D-A4 are fixed. D-A2 is fixed for an anonymous caller, with one residual limit.
+
+| Suite | Result |
+|---|---|
+| `routes-401` (every registered `/api` route, no session) | **7/7 pass** |
+| 27 login scenarios (isolated 27 + `buildServer` 10) | **37/37 pass** |
+| Extra checks (`auth-extra`) | **21/21 pass, 0 `todo`.** X-05, X-14, X-17, X-18, X-19 are now guards. |
+| **New: T-066 guards (`auth-t066`)** | **12/12 pass** |
+| Tests of the tests | 29/29 (one retired mutant, see 10.3) |
+| Whole repo `pnpm test` | **527 pass, 0 fail** |
+
+| Former defect | Verdict | Held by |
+|---|---|---|
+| **D-A1** An anonymous caller exhausts the owner's login allowance | **Fixed.** 100 garbage POSTs cost nothing; the allowance is per source and counted only for well-formed requests; another source is unaffected. | X-05, X-05b |
+| **D-A2** An anonymous caller locks the owner out | **Fixed for anonymous callers.** 6 failures from 6 addresses no longer lock a fresh address. One failure at account-lock expiry no longer re-locks the account. Residual limit in 10.4. | X-04, T66-03, T66-04, T66-05 |
+| **D-A3 / D-A3b** Clock step back strands the owner | **Fixed.** After a 7 h step back a current TOTP code works, a lock set on the fast clock ends, an idle session ends, a ticket from before the step is dead, recovery codes work. | X-17, X-18, X-19, T66-09 |
+| **D-A4** Abandoned enrolment strands the owner | **Fixed.** The same setup token restarts enrolment. | X-14, X-14b |
+
+## 10.2 The guards can fail (checked, not assumed)
+
+- **Against the code just before T-066** (`41676cc^`, temporary worktree, removed): **8 of the 12 new T66 guards and 7 of the 21 extra checks fail**, each for the old behaviour. The four T66 tests that pass on both versions (T66-01, 02, 10, 12) guard the new mechanism or document a limit, so they cannot fail on the old code.
+- **Mutant of the new code** (temporary worktree, removed): changing `sourceKey` so any well-formed `servrsit_device` value is trusted makes **T66-01 and T66-02 fail**, and nothing else. So the forged-cookie guards are real.
+
+## 10.3 What I changed in my own tests, and why
+
+The handoff listed four of my tests as conflicting "on purpose". I checked each against the code and the ADR before agreeing.
+
+| Test | Decision | Reason |
+|---|---|---|
+| **AU-04b** (scenario) | Removed the "correct code from a new address is refused" clause. The rest stays. | T-066 decided locks are per source. That clause was my own assumption from the first round (see §9.5). Per-source and account locks are tested concretely in `auth-t066`. |
+| **X-04** | Inverted. | It recorded the defect. It now asserts the owner signs in from a fresh address after 6 anonymous failures from 6 addresses. |
+| **X-05b** | Rewritten. | Invalid bodies are no longer counted. It now asserts 100 garbage POSTs cost nothing, the 6th sign-in in a minute from one source gets `RATE_LIMITED` with `Retry-After`, another source is unaffected, and the limit recovers. |
+| **X-17b** | Retired. | Its premise (stuck for 7 h) is fixed. X-17 and T66-09 cover it. |
+| Mutant `lockoutPerClient` in the reference model | Retired. | Per-client locking is now the decided design, so it is no longer a fault. |
+
+**My own slips this round:** (1) T66-03 assumed the 5th failure returns 401; it returns the lock (429). (2) T66-06 reused a TOTP step the trusted sign-in had just consumed, so a correct replay refusal looked like a failed reset. I probed the product directly before deciding, and the product was right both times. (3) An edit dropped X-14b by accident; the test count (22 to 20) exposed it and I restored it.
+
+## 10.4 Findings
+
+| ID | Severity | Finding |
+|---|---|---|
+| **D-X1** | **High (integration)** | **The web app no longer compiles once T-066 and T-065 are merged.** T-066 added `CLOCK_UNTRUSTED` to the auth error contract (`packages/contracts/src/auth.ts:116`). The Designer's exhaustive switch (`apps/web/src/auth/authText.ts:73`) has no case, so `tsc` fails: `Type '"CLOCK_UNTRUSTED"' is not assignable to type 'never'`. `pnpm -r build` and `pnpm --filter @servrsit/web typecheck` fail. `pnpm test` still passes (527), because the web tests run through tsx, so **a gate that only runs `pnpm test` will miss it.** |
+| **D-U13** | Medium | **If the compile error were bypassed, the owner would be shown the raw text "CLOCK_UNTRUSTED".** This is the very case T-066 added for Merauke: enrolment refused because ServrSit's own clock is wrong. The handoff says "setup now says so plainly"; the web screen cannot. Guard: `ST-24` in the a11y suite (`todo`, checks every contract error code has its own wording). Owner: Designer. |
+| D-B1 | Low | **The handoff and ADR wording is wrong for per-source locks.** "One failure at expiry no longer extends a lock" is true for the **account** lock (T66-04 passes). For a **per-source** lock one failure right after it ends locks that source again (observed lengths 30, 60, 120, 240, 480, then 900 s). It affects only that address or device, so no denial of service, but the owner who mistypes once as a lock ends gets 60 s more. A trusted device has its own per-source lock (T66-07). |
+| D-B2 | Low (Medium if the API is reachable beyond the private network) | **Residual denial of service on an untrusted browser.** 21 failures from rotating addresses lock the account for 15 min, then 30 min, 1 h, 2 h, 4 h (measured: 900, 1800, 3600, 7200, 14400 s). An attacker who repeats about 21 requests per lock period keeps any **untrusted** browser out, and a trusted device is exempt and resets the lock. A new phone, cleared cookies, or the 90-day device expiry puts the owner in the affected group. This is a documented trade-off (ADR-017), not a surprise. There is no break-glass route in the product; deleting `auth.db` is the only reset. |
+| O-B3 | Observation | A rotating attacker with the password gets about **19 guesses** before the account lock (measured across 30 addresses in one IPv6 /64), then at most 21 per lock period. One address on its own gets about 4 guesses in an hour. |
+| O-B4 | Observation | The small-step-back limit holds: a 10-minute step back costs at most about that long on a lock (T66-10). |
+| O-A3 | Still open | Secure cookies on plain-HTTP Tailscale in production mode: not addressed and still needs a real-browser test. |
+
+## 10.5 Recommendations
+
+1. **Fix D-X1 before merging T-065 and T-066 into integration.** Add the `CLOCK_UNTRUSTED` case to `authText.ts` with plain wording ("ServrSit's own clock is wrong, so setup is paused. Fix the clock and try again."). That also closes D-U13. Add `typecheck` or `build` to whatever gate decides a merge is good.
+2. Correct the handoff/ADR sentence (D-B1), or change the per-source behaviour to match it.
+3. Decide on D-B2 with the Orchestrator: a local break-glass reset documented next to setup, or allowing sign-in from the enrolled Tailscale identity.
+4. Run a real-browser check of O-A3 before production mode.
+
+## 10.6 Files
+
+```
+tests/e2e/auth/auth-t066.test.mts       12 guards for T-066 (forged cookies, per-source and account lock, trusted device, clock steps, CLOCK_UNTRUSTED)
+tests/e2e/auth/auth-extra.test.mts      5 todo markers removed; X-04, X-05b rewritten; X-17b retired; X-14b kept
+tests/e2e/auth/scenarios.mts            AU-04b: one clause removed (commented)
+tests/e2e/auth/binding.mts              optional clockTrusted hook
+tests/e2e/auth/self-check.test.mts      one retired mutant
+tests/e2e/a11y/structure.test.mts       ST-24: every auth error code has real wording (todo, D-U13)
+```
+Run: `cd apps/api && pnpm exec tsx --test --test-reporter=spec ../../tests/e2e/auth/<file>.test.mts`. Rebuild first after any merge: `pnpm -r --filter '!@servrsit/web' build` (the web build is broken by D-X1).
