@@ -27,7 +27,7 @@
  *   ready, 0 servers empty state
  * The [FIXTURE DATA] banner shows only when at least one card is fixture.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { TopBanners } from "../../clock/TopBanners";
 import { ServerCard } from "../server-card/index.js";
 import { AttentionColumn } from "./AttentionColumn.js";
@@ -54,6 +54,22 @@ interface OverviewScreenProps {
 export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
   const hasData = vm.phase === "ready";
   const session = useSession();
+  // Publish the sticky top navigation's height (below 1200px it sticks under the banners) so keyboard focus
+  // scrolls clear of it: html { scroll-padding-top } in tokens.css reads --nav-h (WCAG 2.4.11, D-U16).
+  const navRef = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const apply = (): void => {
+      const sticky = getComputedStyle(el).position === "sticky";
+      document.documentElement.style.setProperty("--nav-h", sticky ? `${el.offsetHeight}px` : "0px");
+    };
+    apply();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(apply);
+    ro?.observe(el);
+    window.addEventListener("resize", apply);
+    return () => { ro?.disconnect(); window.removeEventListener("resize", apply); document.documentElement.style.removeProperty("--nav-h"); };
+  }, []);
   const count = vm.servers.length;
   const empty = hasData && count === 0;
 
@@ -76,7 +92,7 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
     <div className={styles.appShell}>
       <TopBanners fixture={vm.anyFixture} />
 
-      <nav className={styles.nav} aria-label="Main navigation">
+      <nav ref={navRef} className={styles.nav} aria-label="Main navigation">
         <div className={styles.wordmark}>
           <span className="sr-only">ServrSit</span>
           {/* The 88 px rail only has room for a compact mark; the full wordmark shows in the top bar below 1200 px and on every other page. */}

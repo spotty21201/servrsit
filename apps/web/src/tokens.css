@@ -70,6 +70,8 @@
 }
 
 html {
+  /* Keyboard focus scrolls clear of the sticky banners and the sticky top navigation (WCAG 2.4.11, D-U16). */
+  scroll-padding-top: calc(var(--banner-h, 0px) + var(--nav-h, 0px) + var(--space-1));
   /* Height of the fixture banner; the sticky/fixed nav sits below it. */
   --banner-h: 2.25rem; /* 36px */
   /* 1rem = 16px; never override browser font-size preference */
