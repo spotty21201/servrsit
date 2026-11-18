@@ -2,5 +2,8 @@
   "name": "@servrsit/target-helper",
   "private": true,
   "version": "0.0.0",
-  "description": "ServrSit target-side restricted gateway, operation adapter, signed manifests, and remote ledger (Python)"
+  "description": "ServrSit target-side restricted gateway, operation adapter, signed manifests, and remote ledger (Python)",
+  "scripts": {
+    "test": "cd tests && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=..:. python3 -m unittest -v 2>&1"
+  }
 }

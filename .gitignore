@@ -40,3 +40,6 @@ cdk.out/
 # agent git worktrees
 .worktrees/
 apps/web/public/review-001/
+
+# Python
+__pycache__/
