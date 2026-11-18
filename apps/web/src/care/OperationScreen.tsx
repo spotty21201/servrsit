@@ -19,9 +19,11 @@
  */
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchFleet } from "../api/fleet";
+import { useClock } from "../clock/ClockContext";
 import { createCareClient, type CareClient, type OperationView, type PlanView } from "../api/stubs/care";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
 import { planPath } from "../lib/router";
+import { usePageTitle } from "../lib/pageTitle";
 import { StatusBadge } from "../components/StatusBadge/index.js";
 import { CareShell, LoadFailure, ProductionLabel, SimulatedLabel } from "./CareShell";
 import { createFixtureClient, fixturePlanFor, isFixtureId } from "./fixtures";
@@ -74,7 +76,7 @@ function Steps({ steps }: { steps: readonly StepVM[] }) {
 
 /** Dark, read-only event log. Follows new lines only while the reader is at the end. */
 function Transcript({ lines, zoneNote }: { lines: readonly TranscriptLine[]; zoneNote: string }) {
-  const ref = useRef<HTMLUListElement | null>(null);
+  const ref = useRef<HTMLDivElement | null>(null);
   const following = useRef(true);
   const [away, setAway] = useState(false);
 
@@ -94,12 +96,15 @@ function Transcript({ lines, zoneNote }: { lines: readonly TranscriptLine[]; zon
   return (
     <div className={styles.transcriptWrap}>
       <p className={styles.small}>Event log, read-only, times in {zoneNote}. Remote command output is not captured yet, so this shows ServrSit&rsquo;s own recorded events.</p>
-      <ul ref={ref} className={styles.transcript} role="log" aria-live="off" aria-label="Operation event log, read-only" tabIndex={0} onScroll={onScroll}>
-        {lines.map((l) => (
-          <li key={l.seq}><span className={styles.tTime}>{l.time}</span><span>{l.text}</span></li>
-        ))}
-        {lines.length === 0 && <li><span className={styles.tTime}>--:--:--</span><span>No events recorded yet.</span></li>}
-      </ul>
+      {/* The log role sits on a div; the list inside keeps its own list semantics (D-U7). */}
+      <div ref={ref} className={styles.transcript} role="log" aria-live="off" aria-label="Operation event log, read-only" tabIndex={0} onScroll={onScroll}>
+        <ul className={styles.transcriptList}>
+          {lines.map((l) => (
+            <li key={l.seq}><span className={styles.tTime}>{l.time}</span><span>{l.text}</span></li>
+          ))}
+          {lines.length === 0 && <li><span className={styles.tTime}>--:--:--</span><span>No events recorded yet.</span></li>}
+        </ul>
+      </div>
       {away && (
         <button type="button" className={`${styles.secondary} ${styles.jump}`} onClick={() => {
           const el = ref.current;
@@ -121,6 +126,7 @@ export function OperationScreen({ operationId, client: injected }: { operationId
   const [now, setNow] = useState(() => new Date());
   const planTried = useRef<string | null>(null);
   const stopHelpId = useId();
+  const clockView = useClock().view;
 
   useEffect(() => {
     if (fixture) return;
@@ -166,13 +172,14 @@ export function OperationScreen({ operationId, client: injected }: { operationId
     void client.getPlan(planId).then((r) => { if (r.ok) setPlan(r.data); });
   }, [client, planId]);
 
-  const vm = view ? toOperationVM(view, plan, now, tz) : null;
+  const vm = view ? toOperationVM(view, plan, now, tz, clockView?.agesUncertain ?? false) : null;
+  usePageTitle(vm ? `${vm.title}: ${vm.stateLabel}` : error ? "Operation not available" : "Loading the operation", vm !== null || error !== null);
 
   return (
     <CareShell fixture={fixture} section="Operation">
       {error === "missing" && <LoadFailure title="Operation not found" text="There is no operation with this id." />}
       {error === "failed" && !view && <LoadFailure title="Couldn't load the operation" text="The ServrSit API did not return a usable record. This does not tell you whether the operation ran." onRetry={() => void load()} />}
-      {!view && !error && <p className={styles.p} role="status">Loading the operation…</p>}
+      {!view && !error && <><h1 className={styles.title}>Operation</h1><p className={styles.p} role="status">Loading the operation…</p></>}
 
       {vm && (
         <>
