@@ -1,0 +1,28 @@
+/**
+ * Clock banner. Critical = failed pair, attention = attention pair; icon and
+ * text always, never colour alone. Sticky with the fixture banner as one
+ * block; text wraps, nothing is clipped or fixed to the viewport width.
+ */
+.stack { position: static; width: 100%; min-width: 0; }
+@media (min-width: 768px) { .stack { position: sticky; top: 0; z-index: 100; } }
+
+.banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1-half);
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-1) max(var(--space-2), env(safe-area-inset-right)) var(--space-1) max(var(--space-2), env(safe-area-inset-left));
+  border-bottom: 2px solid currentColor;
+  font-size: var(--text-compact-size);
+  line-height: var(--text-compact-line-height);
+}
+.critical { color: var(--color-state-failed-fg); background-color: var(--color-state-failed-bg); }
+.attention { color: var(--color-state-attention-fg); background-color: var(--color-state-attention-bg); }
+.icon { padding-top: 1px; }
+.body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.body p { color: var(--color-ink); overflow-wrap: anywhere; }
+.body .title { color: inherit; font-weight: var(--font-weight-semibold); }
+.text { font-weight: var(--font-weight-semibold); }
+.reason { color: var(--color-muted-ink) !important; font-size: 0.8125rem; }

@@ -14,6 +14,7 @@
 import type { Finding, FleetServer, FleetStatus } from "@servrsit/contracts";
 import type { FleetState } from "../../api/fleetState";
 import { formatClock, formatClockWithAge, formatRelative, parseIso, resolveTimeZone } from "../../lib/time";
+import { schedulerFromFleet, schedulerNotice, type SchedulerNoticeVM } from "../../findings/findingsViewModel";
 
 // ── View-model types ────────────────────────────────────────────────────────
 
@@ -78,6 +79,8 @@ export interface OverviewVM {
   /** Owner time zone (IANA) used for every time on the screen. */
   timeZone: string;
   receivedText: string | null;
+  /** "Check delayed" when the next check is overdue; null when checking looks normal or unknown. */
+  scheduler: SchedulerNoticeVM | null;
   nextCheckText: string | null;
   refreshing: boolean;
   /** Latest refresh failure (shown with or without data). */
@@ -159,7 +162,7 @@ function primaryLine(s: FleetServer): string {
  */
 const IDENTITY_ORDER: IdentityColor[] = ["tangerine", "lilac", "citron", "bubblegum"];
 
-function toCard(s: FleetServer, index: number, now: Date, tz: string): ServerCardVM {
+function toCard(s: FleetServer, index: number, now: Date, tz: string, u: boolean): ServerCardVM {
   const p = effectiveStatus(s);
   const observed = parse(s.observedAt);
   const freshUntil = parse(s.freshUntil);
@@ -172,7 +175,7 @@ function toCard(s: FleetServer, index: number, now: Date, tz: string): ServerCar
     const why = attempt.failure?.message ?? "No reason given";
     latestFailure = {
       at: attempt.at,
-      text: `Latest check failed ${formatRelative(attemptAt, now, tz)}${times}: ${why}`,
+      text: `Latest check failed ${formatRelative(attemptAt, now, tz, u)}${times}: ${why}`,
     };
   }
 
@@ -199,13 +202,18 @@ function toCard(s: FleetServer, index: number, now: Date, tz: string): ServerCar
     primaryLine: primaryLine(s),
     historical: observed !== null && s.status !== "fresh" && s.status !== "partial",
     observedAt: s.observedAt,
-    observedText: observed ? `Observed ${formatRelative(observed, now, tz)}` : "Never observed",
+    observedText: observed ? `Observed ${formatRelative(observed, now, tz, u)}` : "Never observed",
     freshUntil: s.freshUntil,
     freshUntilText,
     latestFailure,
     actionLabel: p.action.label,
     actionHref: `/servers/${encodeURIComponent(s.id)}${p.action.path}`,
   };
+}
+
+/** The card view model for one server; the Server detail header reuses it so both screens agree. */
+export function toServerCard(s: FleetServer, index: number, now: Date, tz: string, agesUncertain = false): ServerCardVM {
+  return toCard(s, index, now, tz, agesUncertain);
 }
 
 /** Status-derived attention rows (things the owner must act on or know). */
@@ -219,7 +227,7 @@ const ATTENTION_STATUSES: ReadonlySet<FleetStatus> = new Set<FleetStatus>([
   "misconfigured",
 ]);
 
-function toAttention(s: FleetServer, now: Date, tz: string): AttentionItemVM[] {
+function toAttention(s: FleetServer, now: Date, tz: string, u: boolean): AttentionItemVM[] {
   const items: AttentionItemVM[] = [];
   const p = STATUS[s.status];
   const refIso = s.latestAttempt?.at ?? s.observedAt ?? "";
@@ -234,7 +242,7 @@ function toAttention(s: FleetServer, now: Date, tz: string): AttentionItemVM[] {
       title: p.label,
       detail: s.statusReason,
       firstObservedAt: refIso,
-      firstObservedRelative: ref ? formatRelative(ref, now, tz) : "",
+      firstObservedRelative: ref ? formatRelative(ref, now, tz, u) : "",
     });
   }
 
@@ -250,7 +258,7 @@ function toAttention(s: FleetServer, now: Date, tz: string): AttentionItemVM[] {
       title: f.summary,
       detail: s.status === "fresh" || s.status === "partial" ? `Rule ${f.rule}` : `Rule ${f.rule} · from an older observation`,
       firstObservedAt: s.observedAt ?? "",
-      firstObservedRelative: observed ? formatRelative(observed, now, tz) : "",
+      firstObservedRelative: observed ? formatRelative(observed, now, tz, u) : "",
     });
   }
   return items;
@@ -258,13 +266,15 @@ function toAttention(s: FleetServer, now: Date, tz: string): AttentionItemVM[] {
 
 // ── Entry point ─────────────────────────────────────────────────────────────
 
-export function toOverviewVM(state: FleetState, now: Date): OverviewVM {
+/** `agesUncertain`: ServrSit's own clock is untrusted, so relative ages carry "≈". */
+export function toOverviewVM(state: FleetState, now: Date, agesUncertain = false): OverviewVM {
+  const u = agesUncertain;
   const data = state.data;
   const tz = resolveTimeZone(data?.ownerTimeZone);
-  const servers = data ? data.servers.map((s, i) => toCard(s, i, now, tz)) : [];
+  const servers = data ? data.servers.map((s, i) => toCard(s, i, now, tz, u)) : [];
   const attention = data
     ? data.servers
-        .flatMap((s) => toAttention(s, now, tz))
+        .flatMap((s) => toAttention(s, now, tz, u))
         .sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "failed" ? -1 : 1))
     : [];
 
@@ -285,7 +295,8 @@ export function toOverviewVM(state: FleetState, now: Date): OverviewVM {
     anyFixture: counts.fixture > 0,
     counts,
     timeZone: tz,
-    receivedText: received ? formatClockWithAge(received, now, tz) : null,
+    scheduler: schedulerNotice(schedulerFromFleet(data, now), now, tz, u),
+    receivedText: received ? formatClockWithAge(received, now, tz, u) : null,
     nextCheckText: nextCheck ? formatClock(nextCheck, now, tz) : null,
     refreshing: state.refreshing,
     error: state.error ? { message: state.error.message } : null,

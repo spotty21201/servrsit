@@ -20,9 +20,11 @@
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { fetchFleet } from "../api/fleet";
+import { useClock } from "../clock/ClockContext";
 import { createCareClient, type CareClient, type PlanView } from "../api/stubs/care";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
 import { operationPath } from "../lib/router";
+import { usePageTitle } from "../lib/pageTitle";
 import { StatusBadge } from "../components/StatusBadge/index.js";
 import { IDLE, newIdempotencyKey, PHASE_LABEL, submitApproval, type ApprovalPhase } from "./approval";
 import { CareShell, LoadFailure, LockGlyph, ProductionLabel, SimulatedLabel } from "./CareShell";
@@ -49,6 +51,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
   const fixture = isFixtureId(planId);
   const client = useMemo(() => injected ?? (fixture ? createFixtureClient() : createCareClient()), [injected, fixture]);
   const tz = useOwnerZone(fixture);
+  const clockView = useClock().view;
 
   const [plan, setPlan] = useState<PlanView | null>(null);
   const [loadError, setLoadError] = useState<"missing" | "failed" | null>(null);
@@ -75,7 +78,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
     return () => globalThis.clearInterval(t);
   }, []);
 
-  const vm: PlanVM | null = plan ? toPlanVM(plan, now, tz, notice) : null;
+  const vm: PlanVM | null = plan ? toPlanVM(plan, now, tz, notice, clockView?.approvalsPaused ?? false) : null;
   const busy = phase.phase === "submitting" || phase.phase === "checking" || phase.phase === "accepted";
   const allAcked = vm ? vm.acknowledgements.every((_, i) => acks[i] === true) : false;
 
@@ -121,13 +124,14 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
     if (end.phase === "rejected") { setNotice(end.notice); setPhase(IDLE); }
   }
 
+  usePageTitle(vm ? `Plan review: ${vm.title}${vm.disposition.canApprove ? "" : ` (${vm.disposition.title})`}` : loadError ? "Plan not available" : "Loading the plan", vm !== null || loadError !== null);
   const sectionId = (s: string): string => `${ids}-${s}`;
 
   return (
     <CareShell fixture={fixture} section="Plan review">
       {loadError === "missing" && <LoadFailure title="Plan not found" text="There is no plan with this id. Nothing was started." />}
       {loadError === "failed" && <LoadFailure title="Couldn't load the plan" text="The ServrSit API did not return a usable plan. Nothing was started." onRetry={() => void load()} />}
-      {!plan && !loadError && <p className={styles.p} role="status">Loading the plan…</p>}
+      {!plan && !loadError && <><h1 className={styles.title}>Plan review</h1><p className={styles.p} role="status">Loading the plan…</p></>}
 
       {vm && plan && (
         <>
@@ -166,10 +170,29 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
               <section className={styles.panel} aria-labelledby={sectionId("scope")}>
                 <h2 id={sectionId("scope")} className={styles.h2}>Scope</h2>
                 <p className={styles.p}>{vm.scopeSummary}</p>
+                {vm.directories.length > 0 && (
+                  <>
+                    <p className={styles.rowLabel}>Directories to create</p>
+                    <ul className={styles.pkgGrid} aria-label="Directories to create">
+                      {vm.directories.map((d) => <li key={d.path}>{d.path}</li>)}
+                    </ul>
+                  </>
+                )}
                 {vm.packages.length > 0 && (
-                  <ul className={styles.pkgGrid} aria-label="Packages in this plan">
-                    {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}</li>)}
-                  </ul>
+                  <>
+                    {vm.directories.length > 0 && <p className={styles.rowLabel}>Packages to install</p>}
+                    <ul className={styles.pkgGrid} aria-label="Packages in this plan">
+                      {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}</li>)}
+                    </ul>
+                  </>
+                )}
+                {vm.leftAlone.length > 0 && (
+                  <>
+                    <p className={styles.rowLabel}>Left alone</p>
+                    <ul className={`${styles.list} ${styles.bullets}`} aria-label="Left alone">
+                      {vm.leftAlone.map((x) => <li key={x.label}><span className={styles.mono}>{x.label}</span>: {x.reason}</li>)}
+                    </ul>
+                  </>
                 )}
                 <ul className={`${styles.list} ${styles.bullets}`} aria-label="Not included">
                   {vm.exclusions.map((e) => <li key={e}>{e}</li>)}
@@ -204,7 +227,8 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
                   <summary>Technical details</summary>
                   <ul className={styles.diffList} aria-label="Package versions">
                     {vm.packages.map((p) => <li key={`${p.name}:${p.arch}`}>{p.name}:{p.arch} {p.from} → {p.to}</li>)}
-                    {vm.packages.length === 0 && <li>No package versions: nothing was prepared.</li>}
+                    {vm.directories.map((d) => <li key={`d-${d.path}`}>create {d.path} owner {d.owner} mode {d.mode}</li>)}
+                    {vm.packages.length === 0 && vm.directories.length === 0 && <li>No versions or directories: nothing was prepared.</li>}
                   </ul>
                   <p className={styles.small}>Operation: apply.packages.v1 · Plan ID <span className={styles.mono}>{vm.id}</span> · Digest <span className={styles.mono}>{vm.digestShort}…</span></p>
                 </details>
@@ -263,7 +287,8 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
                       type="button"
                       className={styles.primary}
                       onClick={() => void approve()}
-                      disabled={busy || phase.phase === "unconfirmed" || !allAcked}
+                      disabled={busy}
+                      aria-disabled={phase.phase === "unconfirmed" || !allAcked ? true : undefined}
                       aria-describedby={`${ids}-help`}
                     >
                       {vm.approveLabel}

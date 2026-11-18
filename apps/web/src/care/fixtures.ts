@@ -13,6 +13,8 @@
  *                                     with the same key replays the operation
  *   fixture-plan-changed              approve -> PLAN_CHANGED; refresh -> version 2
  */
+import { gate } from "../lib/fixtureState";
+import { STRESS } from "../fixtures/stressFleet";
 import type {
   ApprovalBody, CareClient, CareResult, OperationEventView, OperationStateName, OperationView, PlanView,
 } from "../api/stubs/care";
@@ -54,7 +56,34 @@ export function fixturePlans(now: Date): Record<string, PlanView> {
     blockers: [{ code: "WRITES_DISABLED", message: "Changes are disabled for this server until disposable-server tests pass and live work is authorized." }],
     target: { serverId: "00000000-0000-4000-8000-000000000001", name: "Fixture Timika", kind: "ssh", simulated: false },
   });
+  const PREPARE = {
+    baselineName: "Web server baseline", baselineVersion: 1, referenceName: "Fixture Web-1",
+    directories: [{ path: "/srv/app", owner: "deploy:deploy", mode: "0755" }, { path: "/var/backups/app", owner: "root:root", mode: "0750" }],
+    leftAlone: [{ label: "/opt/tools", reason: "It exists and is owned by another user, so it is not changed." }],
+  } as const;
+  const PREP_PKGS = [{ name: "nginx", arch: "amd64", from: "(not installed)", to: "1.24.0-2ubuntu7.1" }, { name: "logrotate", arch: "amd64", from: "(not installed)", to: "3.21.0-2build1" }];
+  const prepare = mk("fixture-plan-prepare", "Fixture Dev-2", false, {
+    prepare: PREPARE, scope: { packages: PREP_PKGS, includesServiceRestart: false, includesReboot: false },
+    verification: { expectInstalled: Object.fromEntries(PREP_PKGS.map((p) => [`${p.name}:${p.arch}`, p.to])) },
+  });
+  const prepareBlocked = mk("fixture-plan-prepare-blocked", "Fixture Web-2", true, {
+    prepare: PREPARE, scope: { packages: [], includesServiceRestart: false, includesReboot: false },
+    preconditions: { previewDigest: "none" }, verification: { expectInstalled: {} }, approvable: false,
+    blockers: [{ code: "WRITES_DISABLED", message: "Changes are disabled for this server until disposable-server tests pass and live work is authorized." }],
+    target: { serverId: "00000000-0000-4000-8000-000000000002", name: "Fixture Web-2", kind: "ssh", simulated: false },
+  });
+  const LONG_PKGS = [
+    { name: STRESS.LONG_PKG, arch: "amd64", from: STRESS.LONG_VERSION, to: `${STRESS.LONG_VERSION}.1` },
+    { name: "libssl3t64", arch: "amd64", from: "3.0.13-0ubuntu3.4+really.long.build.metadata.0123456789abcdef", to: "3.0.13-0ubuntu3.5+really.long.build.metadata.0123456789abcdef" },
+  ];
+  const long = mk("fixture-plan-long", STRESS.LONG_NAME, true, {
+    scope: { packages: LONG_PKGS, includesServiceRestart: false, includesReboot: false },
+    verification: { expectInstalled: Object.fromEntries(LONG_PKGS.map((p) => [`${p.name}:${p.arch}`, p.to])) },
+  });
   return {
+    "fixture-plan-long": long,
+    "fixture-plan-prepare": prepare,
+    "fixture-plan-prepare-blocked": prepareBlocked,
     "fixture-plan-ready": mk("fixture-plan-ready", "Fixture Nabire", false),
     "fixture-plan-production": mk("fixture-plan-production", "Fixture Timika", true),
     "fixture-plan-lost": mk("fixture-plan-lost", "Fixture Merauke", false),
@@ -133,9 +162,11 @@ export function createFixtureClient(now: () => Date = () => new Date()): CareCli
   const nf: CareResult<never> = { ok: false, kind: "http", status: 404, code: "NOT_FOUND" };
   return {
     async getPlan(id) {
-      if (id === "fixture-plan-changed" && changedServed) return { ok: true, data: changedPlanV2(t0) };
-      const p = plans[id];
-      return p ? { ok: true, data: p } : nf;
+      return gate<CareResult<PlanView>>(() => {
+        if (id === "fixture-plan-changed" && changedServed) return { ok: true, data: changedPlanV2(t0) };
+        const p = plans[id];
+        return p ? { ok: true, data: p } : nf;
+      }, () => ({ ok: false, kind: "network" }));
     },
     async createPlan() { return nf; },
     async revisePlan(id) {
@@ -153,14 +184,13 @@ export function createFixtureClient(now: () => Date = () => new Date()): CareCli
       return { ok: true, data: { operationId: "fixture-op-queued", state: "queued", replayed: replay } };
     },
     async getOperation(id) {
-      const o = operations[id];
-      return o ? { ok: true, data: o } : nf;
+      return gate<CareResult<OperationView>>(() => { const o = operations[id]; return o ? { ok: true, data: o } : nf; }, () => ({ ok: false, kind: "network" }));
     },
   };
 }
 
 export const FIXTURE_INDEX: ReadonlyArray<{ group: string; ids: readonly string[] }> = [
-  { group: "Plans", ids: ["fixture-plan-ready", "fixture-plan-production", "fixture-plan-lost", "fixture-plan-changed", "fixture-plan-expired", "fixture-plan-busy", "fixture-plan-writes-off"] },
+  { group: "Plans", ids: ["fixture-plan-ready", "fixture-plan-production", "fixture-plan-lost", "fixture-plan-changed", "fixture-plan-expired", "fixture-plan-busy", "fixture-plan-writes-off", "fixture-plan-prepare", "fixture-plan-prepare-blocked", "fixture-plan-long"] },
   { group: "Operations", ids: ["fixture-op-queued", "fixture-op-running", "fixture-op-running-stop", "fixture-op-verifying", "fixture-op-succeeded", "fixture-op-succeeded-reboot", "fixture-op-partial", "fixture-op-failed", "fixture-op-cancelled", "fixture-op-unknown"] },
 ];
 
