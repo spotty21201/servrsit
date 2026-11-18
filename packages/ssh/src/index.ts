@@ -1,5 +1,9 @@
 export {
   CHECK_NAMES,
+  CLOCK_SKEW_TOLERANCE_SECONDS,
+  clockSkewed,
+  describeClockSkew,
+  isUbuntuArchiveOrigin,
   InspectionObservationSchema,
   LIMITS,
   OBSERVATION_SCHEMA_VERSION,
@@ -8,6 +12,8 @@ export {
 } from "./schema.js";
 export type {
   CheckName,
+  Clock,
+  PendingOutsideUbuntu,
   FailedUnit,
   Field,
   FilesystemEntry,

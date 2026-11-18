@@ -13,6 +13,7 @@
  * with the same rules as live mode.
  */
 
+import { NOT_CHECKED_CLOCK } from "../clock/controller-clock.js";
 import { ok, unavailable, type InspectionObservation } from "@servrsit/ssh";
 import type { FleetConfig } from "./config.js";
 import { evaluateFindings } from "./findings.js";
@@ -73,6 +74,7 @@ function syntheticObservation(o: ObservationShape): InspectionObservation {
         ],
         skippedLineCount: 0,
       }),
+      clock: ok({ targetEpochSeconds: Math.floor(o.at.getTime() / 1000), skewSeconds: 0, uncertaintySeconds: 1 }),
     },
     services: {
       collector: "inspect.services.v1",
@@ -82,8 +84,10 @@ function syntheticObservation(o: ObservationShape): InspectionObservation {
       collector: "inspect.packages.v1",
       pendingCount: ok(o.pending),
       heldBackCount: ok(0),
+      pendingOutsideUbuntu: ok({ count: 0, packages: [] }),
       metadataUpdatedAt: ok(new Date(o.at.getTime() - 6 * 60 * MIN).toISOString()),
       rebootRequired: ok(false),
+      metadataClock: "in-sync",
     },
   };
 }
@@ -168,6 +172,7 @@ export function buildFixtureFleet(config: FleetConfig, now: Date): FleetResponse
     healthIntervalMinutes: config.healthIntervalMinutes,
     ownerTimeZone: config.ownerTimeZone,
     nextCheckAt: null,
+    controlPlane: { clock: { ...NOT_CHECKED_CLOCK, reason: "[FIXTURE DATA] Fixture mode does not check ServrSit's own clock." }, findings: [] },
     servers: [fresh, partial, unreachable, noData],
   };
 }

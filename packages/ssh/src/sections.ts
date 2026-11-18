@@ -10,6 +10,8 @@ export interface CollectorSection {
 }
 
 export const COLLECTOR_SECTIONS: readonly CollectorSection[] = [
+  // First, so it runs as close as possible to the start of the collection (T-061).
+  { name: "clock", command: "date +%s" },
   { name: "hostname", command: "uname -n" },
   { name: "os", command: "cat /etc/os-release" },
   { name: "arch", command: "uname -m" },

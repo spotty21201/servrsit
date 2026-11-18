@@ -60,6 +60,62 @@ export const InodeEntrySchema = z.object({
   usedPercent: z.number().int().min(0).max(100),
 });
 
+/** Larger skew than this (beyond the measurement uncertainty) is a time-sync finding (T-061, Tech Spec §8.2). */
+export const CLOCK_SKEW_TOLERANCE_SECONDS = 120;
+
+export const ClockSchema = z.object({
+  targetEpochSeconds: z.number().int().nonnegative(),
+  skewSeconds: z.number().int(),
+  uncertaintySeconds: z.number().int().nonnegative(),
+});
+export type Clock = z.infer<typeof ClockSchema>;
+
+/** True when the skew is beyond tolerance even at the most favourable end of the uncertainty. */
+export function clockSkewed(clock: Clock): boolean {
+  return Math.abs(clock.skewSeconds) - clock.uncertaintySeconds > CLOCK_SKEW_TOLERANCE_SECONDS;
+}
+
+/** "about 7 h behind ServrSit's clock", "about 10 min ahead of ServrSit's clock": plain text for findings and summaries. */
+export function describeClockSkew(clock: Pick<Clock, "skewSeconds">): string {
+  const abs = Math.abs(clock.skewSeconds);
+  const span =
+    abs >= 3600
+      ? `${Math.round(abs / 3600)} h`
+      : abs >= 60
+        ? `${Math.round(abs / 60)} min`
+        : `${abs} s`;
+  return `about ${span} ${clock.skewSeconds < 0 ? "behind" : "ahead of"} ServrSit's clock`;
+}
+
+// ---------------------------------------------------------------------------
+// Package origins (T-062, Tech Spec §10.2 step 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ubuntu's own archive, as `apt-get -s` prints it: "Ubuntu:24.04/noble",
+ * "Ubuntu:24.04/noble-updates" or "Ubuntu:24.04/noble-security", possibly
+ * several joined by ", ". Backports, proposed, PPAs, ESM and every other
+ * repository are outside it.
+ */
+const UBUNTU_ARCHIVE = /^Ubuntu:\d{2}\.\d{2}\/[a-z]+(?:-(?:updates|security))?$/;
+
+export function isUbuntuArchiveOrigin(origin: string): boolean {
+  const parts = origin.split(", ");
+  return parts.length > 0 && parts.every((p) => UBUNTU_ARCHIVE.test(p));
+}
+
+export const MAX_LISTED_OUTSIDE_UBUNTU = 50;
+/** Shown in place of a package name or origin that failed validation. */
+export const UNRECOGNISED_NAME = "(unrecognised)";
+
+export const PendingOutsideUbuntuSchema = z.object({
+  /** A well-formed Debian package name, or "(unrecognised)". */
+  name: z.string().max(100),
+  /** The origin label apt printed (for example "Docker CE:noble"), or "(unrecognised)". */
+  origin: z.string().max(64),
+});
+export type PendingOutsideUbuntu = z.infer<typeof PendingOutsideUbuntuSchema>;
+
 export const FailedUnitSchema = z.object({
   unit: z.string().max(256),
   /** True only when `unit` is a well-formed systemd unit name. */
@@ -112,6 +168,13 @@ export const InspectionObservationSchema = z.object({
         skippedLineCount: z.number().int().nonnegative(),
       }),
     ),
+    /**
+     * T-061: the target's clock against ServrSit's, read once per collection
+     * (`date +%s`, read-only). Positive skew means the target is ahead.
+     * `uncertaintySeconds` covers the collection window and the one-second
+     * resolution: the true skew is within skew +- uncertainty.
+     */
+    clock: fieldSchema(ClockSchema),
   }),
   services: z.object({
     collector: z.literal("inspect.services.v1"),
@@ -127,8 +190,30 @@ export const InspectionObservationSchema = z.object({
     /** From a read-only simulation against the existing APT state. No refresh. */
     pendingCount: fieldSchema(z.number().int().nonnegative()),
     heldBackCount: fieldSchema(z.number().int().nonnegative()),
-    /** When APT metadata was last refreshed on the target (not by us). */
+    /**
+     * T-062: the pending updates that do NOT come from Ubuntu's own archive
+     * (for example Docker's repository). They are listed separately and are
+     * excluded from update plans by default. Included in pendingCount.
+     */
+    pendingOutsideUbuntu: fieldSchema(
+      z.object({
+        count: z.number().int().nonnegative(),
+        packages: z.array(PendingOutsideUbuntuSchema).max(MAX_LISTED_OUTSIDE_UBUNTU),
+      }),
+    ),
+    /**
+     * When APT metadata was last refreshed on the target (not by us), in
+     * ServrSit's time. The target writes this stamp with its own clock, so it is
+     * corrected for a measured skew beyond the tolerance (T-061).
+     */
     metadataUpdatedAt: fieldSchema(z.string().datetime()),
+    /**
+     * How metadataUpdatedAt relates to the target's clock:
+     *  - "in-sync": the clock was measured within tolerance; the stamp is used as is.
+     *  - "corrected": the clock was off by more than the tolerance; the stamp was shifted by the measured skew.
+     *  - "unverified": the clock could not be read, so the stamp may be wrong by any amount.
+     */
+    metadataClock: z.enum(["in-sync", "corrected", "unverified"]),
     rebootRequired: fieldSchema(z.boolean()),
   }),
 });
@@ -151,6 +236,7 @@ export const CHECK_NAMES = [
   "memory",
   "filesystems",
   "inodes",
+  "clock",
   "failedUnits",
   "pendingPackages",
   "heldBackPackages",

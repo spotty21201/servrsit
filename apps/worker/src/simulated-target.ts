@@ -65,6 +65,9 @@ interface LedgerEntry {
   exitCode: number | null;
 }
 
+/** [SIMULATED] Origin given to fixture upgrades that do not name one. */
+export const SIMULATED_DEFAULT_ORIGIN = "Ubuntu:24.04/noble-updates";
+
 export class SimulatedTarget implements WriteTarget {
   readonly kind = "simulated" as const;
   readonly serverId: string;
@@ -127,7 +130,8 @@ export class SimulatedTarget implements WriteTarget {
   async previewPackages(): Promise<TransactionPreview | null> {
     this.settle();
     return {
-      upgrades: [...this.upgrades],
+      // [SIMULATED] A fixture upgrade without an origin is labelled as Ubuntu's archive (T-062).
+      upgrades: this.upgrades.map((u) => ({ ...u, origin: u.origin ?? SIMULATED_DEFAULT_ORIGIN })),
       removals: [],
       downgrades: [],
       held: [],

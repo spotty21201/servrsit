@@ -70,3 +70,12 @@ test("coverage lists each unavailable check with its reason", () => {
   assert.equal(partial.passed, partial.total - 1);
   assert.deepEqual(partial.unavailable, [{ check: "memory", reason: "missing from meminfo: MemAvailable" }]);
 });
+
+test("T-061: the clock is one of the counted checks; when it cannot be read it is listed as unavailable", () => {
+  const ok = coverageOf(makeObservation());
+  assert.equal(ok.total, 16);
+  assert.equal(ok.passed, 16);
+  const missing = coverageOf(makeObservation({ clockSkewSeconds: null }));
+  assert.equal(missing.passed, 15);
+  assert.deepEqual(missing.unavailable, [{ check: "clock", reason: "target time not in expected format" }]);
+});

@@ -16,6 +16,7 @@ import { FleetConfigSchema, loadFleetConfig } from "../fleet/config.js";
 import { enrolOwner, setupTokenSink } from "../auth/testing.js";
 import { FleetService } from "../fleet/service.js";
 import { makeObservation } from "../fleet/observation.fixtures.js";
+import type { ControllerClock } from "@servrsit/contracts";
 
 const SIM = "00000000-0000-4000-8000-0000005e0a01";
 const NABIRE = "22222222-2222-4222-a222-222222222222";
@@ -27,7 +28,7 @@ class Clock {
   advance(ms: number) { this.t += ms; }
 }
 
-async function start(opts: { production?: boolean } = {}) {
+async function start(opts: { production?: boolean; clock?: { value: ControllerClock } } = {}) {
   const clock = new Clock();
   const config = await loadFleetConfig();
   const signer = createSigner("key-1");
@@ -40,7 +41,10 @@ async function start(opts: { production?: boolean } = {}) {
   });
   const store = new SqliteCareStore({ path: join(mkdtempSync(join(tmpdir(), "servrsit-care-")), "care.db") });
   const sink = setupTokenSink();
-  const fleet = new FleetService({ config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }) });
+  const fleet = new FleetService({
+    config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }),
+    ...(opts.clock === undefined ? {} : { controllerClock: () => opts.clock!.value }),
+  });
   const app = await buildServer({
     config, fleetService: fleet, startChecks: false, logger: false,
     auth: { onSetupToken: sink.onSetupToken },
@@ -254,5 +258,44 @@ test("unknown plans and operations are 404, with no detail", async () => {
     assert.equal((await h.post("/api/plans", { operation: "apply.packages.v1", serverId: "99999999-9999-4999-a999-999999999999" })).statusCode, 404);
     const r = await h.post("/api/plans/nope/approvals", { planVersion: 1, planDigest: `sha256:${"0".repeat(64)}`, idempotencyKey: "idem-key-0000000005", acknowledgements: [] }, h.goodHeaders);
     assert.equal(r.statusCode, 404);
+  } finally { await h.app.close(); }
+});
+
+test("T-062 via the API: a simulated server's Docker updates are listed as excluded and not planned", async () => {
+  const h = await start();
+  try {
+    h.sim.addUpgrade({ name: "docker-ce", arch: "amd64", from: "5:29.9.3-1~ubuntu.24.04~noble", to: "5:29.10.0-1~ubuntu.24.04~noble", origin: "Docker CE:noble" });
+    const p = (await h.plan()) as unknown as { scope: { packages: Array<{ name: string }>; excludedPackages: Array<{ name: string; origin: string; reason: string }> }; approvable: boolean };
+    assert.deepEqual(p.scope.packages.map((c) => c.name), ["openssl"], "the simulated Ubuntu update is planned");
+    assert.deepEqual(p.scope.excludedPackages, [{ name: "docker-ce", arch: "amd64", from: "5:29.9.3-1~ubuntu.24.04~noble", to: "5:29.10.0-1~ubuntu.24.04~noble", origin: "Docker CE:noble", reason: "outside-ubuntu-archive" }]);
+    assert.equal(p.approvable, true);
+  } finally { await h.app.close(); }
+});
+
+// ---- T-063: ServrSit's own clock ----------------------------------------------------
+
+const CLOCK = (status: "trusted" | "untrusted"): ControllerClock => ({
+  status, checkedAt: "2026-11-17T10:00:00.000Z", ntpSynchronized: status === "trusted",
+  offsetSeconds: status === "trusted" ? 0 : 25200, uncertaintySeconds: 2, basis: "https-date", sources: [], reason: "test",
+});
+
+test("T-063 via the API: an untrusted controller clock blocks planning, and approval is re-checked against it", async () => {
+  const clock = { value: CLOCK("untrusted") };
+  const h = await start({ clock });
+  try {
+    const blocked = await h.plan();
+    assert.deepEqual(blocked.blockers.map((b) => b.code), ["CONTROLLER_CLOCK_UNTRUSTED"]);
+    assert.equal(blocked.approvable, false);
+
+    clock.value = CLOCK("trusted");
+    const p = await h.plan();
+    assert.equal(p.approvable, true);
+    clock.value = CLOCK("untrusted"); // goes wrong between planning and approval
+    const r = await h.approve(p);
+    assert.deepEqual([r.statusCode, r.json()], [409, { error: "PLAN_BLOCKED", blockers: ["CONTROLLER_CLOCK_UNTRUSTED"] }]);
+    assert.equal(h.store.unresolvedFor(SIM), null, "nothing was approved");
+
+    clock.value = CLOCK("trusted");
+    assert.equal((await h.approve(p)).statusCode, 201);
   } finally { await h.app.close(); }
 });

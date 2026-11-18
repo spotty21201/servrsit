@@ -25,7 +25,7 @@ import {
 import { checkFacts, type FactMismatch } from "./fact-check.js";
 import { buildAiInput, type AiServerInput, type ExplainableServer } from "./input.js";
 import { TIME_AND_PACKAGE_RULES, timeContextFor } from "./prompt.js";
-import { timesAreQuoted, type TimeContext } from "./time.js";
+import { controllerClockWarning, timesAreQuoted, type TimeContext } from "./time.js";
 
 export const MAX_ASSISTANT_SERVERS = 20;
 export const MAX_ANSWER_CHARS = 1500;
@@ -211,7 +211,9 @@ function finalizeAnswer(raw: string): { ok: true; text: string } | { ok: false; 
 /** Deterministic summary of the scoped servers. Used whenever the model is not used. */
 export function deterministicOverview(servers: readonly ExplainableServer[], ctx: TimeContext): string {
   if (servers.length === 0) return "There are no servers in this scope.";
-  const text = servers.map((s) => deterministicExplanation(s, ctx)).join("\n\n");
+  const warning = controllerClockWarning(ctx);
+  const body = servers.map((s) => deterministicExplanation(s, ctx, false)).join("\n\n");
+  const text = warning === null ? body : `${warning}\n\n${body}`;
   return text.length > MAX_DETERMINISTIC_CHARS ? `${text.slice(0, MAX_DETERMINISTIC_CHARS)}…` : text;
 }
 

@@ -41,6 +41,7 @@ export function observation(overrides: { failedUnits?: Array<{ unit: string; nam
         skippedLineCount: 0,
       }),
       inodes: unavailable("no parsable inode rows"),
+      clock: ok({ targetEpochSeconds: 1794902400, skewSeconds: 0, uncertaintySeconds: 1 }),
     },
     services: {
       collector: "inspect.services.v1",
@@ -53,8 +54,10 @@ export function observation(overrides: { failedUnits?: Array<{ unit: string; nam
       collector: "inspect.packages.v1",
       pendingCount: ok(2),
       heldBackCount: ok(0),
+      pendingOutsideUbuntu: ok({ count: 0, packages: [] }),
       metadataUpdatedAt: ok("2026-11-16T02:00:00.000Z"),
       rebootRequired: ok(false),
+      metadataClock: "in-sync",
     },
   };
 }

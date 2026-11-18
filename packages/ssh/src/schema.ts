@@ -13,6 +13,13 @@ import { OBSERVATION_LIMITS, type Field } from "@servrsit/contracts";
 
 export {
   CHECK_NAMES,
+  CLOCK_SKEW_TOLERANCE_SECONDS,
+  ClockSchema,
+  clockSkewed,
+  describeClockSkew,
+  isUbuntuArchiveOrigin,
+  MAX_LISTED_OUTSIDE_UBUNTU,
+  UNRECOGNISED_NAME,
   FailedUnitSchema,
   FilesystemEntrySchema,
   InodeEntrySchema,
@@ -22,6 +29,8 @@ export {
 } from "@servrsit/contracts";
 export type {
   CheckName,
+  Clock,
+  PendingOutsideUbuntu,
   FailedUnit,
   Field,
   FilesystemEntry,

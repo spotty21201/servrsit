@@ -10,13 +10,19 @@
  *   reverifies the key out of band. No confirmation window applies.
  * - CPU and memory produce no finding: the spec requires a documented
  *   sampling method and sustained-sample rule first.
+ * - Target clock skew beyond 2 minutes (after the measurement's uncertainty)
+ *   is a time-sync warning on the first observation (T-061, Tech Spec §8.2):
+ *   one reading is a measurement, not a sample, and every target-written time
+ *   is affected from that moment.
  * - Unavailable checks are not findings (and never resolve one).
  *
  * Names that came from a server are only echoed into text when they pass the
  * well-formedness check. Findings are built from our own templates.
  */
 
-import { isSafeMountPath, isSafeUnitName, type InspectionObservation } from "@servrsit/ssh";
+import { CLOCK_SKEW_TOLERANCE_SECONDS, clockSkewed, isSafeMountPath, isSafeUnitName, type Clock, type InspectionObservation } from "@servrsit/ssh";
+import type { ControllerClock } from "@servrsit/contracts";
+import { describeSpan } from "../clock/controller-clock.js";
 import type { Finding } from "./schema.js";
 
 const WARNING = 85;
@@ -88,7 +94,42 @@ function usageFindings(
   return out;
 }
 
+/** "docker-ce, docker-ce-cli from Docker CE:noble", at most 5 names. */
+function outsideList(v: { count: number; packages: ReadonlyArray<{ name: string; origin: string }> }): string {
+  const byOrigin = new Map<string, string[]>();
+  for (const p of v.packages.slice(0, 5)) byOrigin.set(p.origin, [...(byOrigin.get(p.origin) ?? []), p.name]);
+  const text = [...byOrigin.entries()].map(([origin, names]) => `${names.join(", ")} from ${origin}`).join("; ");
+  return v.count > 5 ? `${text}; and ${v.count - 5} more` : text;
+}
+
+/**
+ * T-061 / T-063: a target's clock finding. The target's skew is measured
+ * against ServrSit's clock, so it is only blamed on the target when
+ * ServrSit's own offset is known (and subtracted) or ServrSit's clock is
+ * trusted. Otherwise the finding says it is unclear which clock is wrong.
+ */
+function clockFinding(c: Clock, controller: ControllerClock | null): Finding | null {
+  const converted = "Times the server writes itself, such as when it last refreshed package lists, are converted to ServrSit's clock.";
+  const finding = (summary: string): Finding => ({ id: "clock-skew", rule: "time.skew.v1", severity: "warning", summary });
+  if (controller !== null && controller.offsetSeconds !== null && controller.uncertaintySeconds !== null) {
+    // Target minus real time = (target minus ServrSit) + (ServrSit minus real time).
+    const real = c.skewSeconds + controller.offsetSeconds;
+    if (Math.abs(real) - (c.uncertaintySeconds + controller.uncertaintySeconds) <= CLOCK_SKEW_TOLERANCE_SECONDS) return null;
+    return finding(`This server's clock is about ${describeSpan(real)} ${real < 0 ? "behind" : "ahead of"} real time. ${converted} Check time synchronisation on the server.`);
+  }
+  if (!clockSkewed(c)) return null;
+  const span = describeSpan(c.skewSeconds);
+  if (controller !== null && controller.status === "trusted") {
+    return finding(`This server's clock is about ${span} ${c.skewSeconds < 0 ? "behind" : "ahead of"} ServrSit's clock, which is verified. ${converted} Check time synchronisation on the server.`);
+  }
+  return finding(
+    `This server's clock reads about ${span} ${c.skewSeconds < 0 ? "earlier" : "later"} than ServrSit's. ServrSit's own clock is not verified, so either clock could be the wrong one. ${converted}`,
+  );
+}
+
 export interface FindingsInput {
+  /** T-063: ServrSit's own clock. Absent means not checked. */
+  readonly controllerClock?: ControllerClock | null | undefined;
   readonly current: InspectionObservation | null;
   readonly previous: InspectionObservation | null;
   readonly consecutiveFailures: number;
@@ -118,6 +159,10 @@ export function evaluateFindings(input: FindingsInput): Finding[] {
   }
 
   if (current !== null) {
+    if (current.host.clock.status === "ok") {
+      const f = clockFinding(current.host.clock.value, input.controllerClock ?? null);
+      if (f !== null) findings.push(f);
+    }
     findings.push(...usageFindings("disk", filesystemUsage(current), filesystemUsage(previous)));
     findings.push(...usageFindings("inode", inodeUsage(current), inodeUsage(previous)));
 
@@ -145,9 +190,15 @@ export function evaluateFindings(input: FindingsInput): Finding[] {
 
     if (current.packages.pendingCount.status === "ok" && current.packages.pendingCount.value > 0) {
       const n = current.packages.pendingCount.value;
+      const outside = current.packages.pendingOutsideUbuntu;
+      // T-062: name what comes from outside Ubuntu's archive; names were validated by the parser.
+      const outsideText =
+        outside.status === "ok" && outside.value.count > 0
+          ? ` ${outside.value.count} of them come from outside Ubuntu's archive (${outsideList(outside.value)}) and are left out of update plans.`
+          : "";
       findings.push({
         id: "updates-pending", rule: "packages.pending.v1", severity: "advisory",
-        summary: `${n} package update${n === 1 ? "" : "s"} pending, from the host's existing package information (not refreshed by ServrSit).`,
+        summary: `${n} package update${n === 1 ? "" : "s"} pending, from the host's existing package information (not refreshed by ServrSit).${outsideText}`,
       });
     }
 

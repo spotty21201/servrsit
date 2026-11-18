@@ -20,6 +20,7 @@ import {
   AssistantResponseSchema,
   type AssistantEvidence,
   type AssistantResponse,
+  type ControllerClock,
   type FleetServer,
 } from "@servrsit/contracts";
 import type { AiUnavailableReason, AssistantReply, AssistantResponder } from "@servrsit/ai";
@@ -41,6 +42,8 @@ export interface AssistantRouteOptions {
   readonly now?: (() => Date) | undefined;
   /** The prepared owner-context layer (T-050), or null for none. Read per request. */
   readonly ownerContext?: (() => string | null) | undefined;
+  /** T-063: ServrSit's own clock; when untrusted, every time in the answer is marked uncertain. */
+  readonly controllerClock?: (() => ControllerClock) | undefined;
 }
 
 export const SECRET_NOTICE =
@@ -88,6 +91,8 @@ function evidenceFor(servers: readonly FleetServer[]): AssistantEvidence[] {
   return out;
 }
 
+const clockForAi = (c: ControllerClock) => ({ status: c.status, offsetSeconds: c.offsetSeconds });
+
 const invalid = (reply: FastifyReply) => reply.code(400).send({ error: "INVALID_INPUT" });
 
 export async function assistantRoutes(fastify: FastifyInstance, options: AssistantRouteOptions): Promise<void> {
@@ -128,7 +133,11 @@ export async function assistantRoutes(fastify: FastifyInstance, options: Assista
       const result = await options.assistant.respond(
         message,
         scoped,
-        { timeZone: options.timeZone, now: (options.now ?? (() => new Date()))() },
+        {
+          timeZone: options.timeZone,
+          now: (options.now ?? (() => new Date()))(),
+          ...(options.controllerClock === undefined ? {} : { controllerClock: clockForAi(options.controllerClock()) }),
+        },
         options.ownerContext?.() ?? null,
       );
       const usedObservations = result.kind === "question";
