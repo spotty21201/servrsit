@@ -28,13 +28,17 @@ import {
   ServerUpdateResponseSchema,
   type ServerRegistrationErrorCode,
 } from "@servrsit/contracts";
-import type { CsrfGuard } from "../csrf.js";
 import type { Outcome, ServerRegistry } from "../servers/registry.js";
+
+/** Checks CSRF token and Origin for one request (CsrfGuard on the current API). */
+export interface RequestCsrfCheck {
+  check(headers: Readonly<Record<string, string | string[] | undefined>>): boolean;
+}
 
 export interface ServerRouteOptions {
   readonly registry: ServerRegistry;
   /** null: a global auth guard already checks session, CSRF and Origin. */
-  readonly csrf: CsrfGuard | null;
+  readonly csrf: RequestCsrfCheck | null;
   readonly owner: (request: FastifyRequest) => string;
 }
 
