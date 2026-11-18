@@ -7,7 +7,9 @@
  * because no pixel text uses bold; .pixel-text sets font-synthesis: none.
  * See apps/web/public/fonts/silkscreen/README.md.
  *
- * Geist / Bricolage are not present; system sans/mono fallbacks render.
+ * Geist Sans and Geist Mono (SIL OFL 1.1), v1.9.2 from vercel/geist-font, in
+ * apps/web/public/fonts/geist/ (see README.md there): weights 400, 500, 600.
+ * Bricolage is not used; system fallbacks render if a font fails to load.
  */
 @font-face {
   font-family: "Silkscreen";
@@ -15,5 +17,53 @@
   font-weight: 400;
   font-style: normal;
   /* swap: show the fallback immediately, never invisible text */
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist/Geist-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist/Geist-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist/Geist-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist/GeistMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist/GeistMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist/GeistMono-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
   font-display: swap;
 }

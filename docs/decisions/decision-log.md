@@ -231,6 +231,16 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 
 **Resolved:** applies to both assistant and UI copy.
 
+## ADR-016 — Founder authorization for unattended development run
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-15 |
+| **Status** | [FOUNDER DECISION] |
+
+**Authorized:** Orchestrator continues pending tasks 2–8 without further check-ins: design, code, tests, merges into `integration/live-v1`, read-only inspection of the four servers.
+**Not covered (still require founder):** any write on a real server (updates, restarts, reboots, files, helper install), any spending (AWS, domains), changes to keys/authorized_keys, Tailscale changes, exposing anything beyond the tailnet, and product-scope changes. Decisions made during the run are logged here and summarised for the founder.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |

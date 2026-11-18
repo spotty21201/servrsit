@@ -26,6 +26,7 @@ import {
   type AssistantResponse,
   type AssistantScope,
 } from "../../api/assistantClient.js";
+import { formatClockWithAge, parseIso } from "../../lib/time";
 import styles from "./ChatBar.module.css";
 
 const MAX_MESSAGE_LENGTH = 2000;
@@ -38,6 +39,8 @@ interface ChatServer {
 interface ChatBarProps {
   /** Servers available as a scope. */
   servers: ChatServer[];
+  /** Owner time zone (IANA) for evidence times. */
+  timeZone: string;
 }
 
 type Answered = { seq: number; response: AssistantResponse; scope: AssistantScope; question: string };
@@ -62,18 +65,12 @@ function isAbort(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";
 }
 
-function formatObserved(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function formatObserved(iso: string, tz: string): string {
+  const d = parseIso(iso);
+  return d ? formatClockWithAge(d, new Date(), tz) : iso;
 }
 
-export function ChatBar({ servers }: ChatBarProps) {
+export function ChatBar({ servers, timeZone }: ChatBarProps) {
   const ids = useId();
   const inputId = `${ids}-input`;
   const labelId = `${ids}-label`;
@@ -166,7 +163,7 @@ export function ChatBar({ servers }: ChatBarProps) {
                 {r.evidence.map((ev, i) => (
                   <span key={`${ev.serverId}-${ev.observedAt}`} className={styles.evidenceItem}>
                     {nameFor(ev.serverId)} · observed{" "}
-                    <time dateTime={ev.observedAt}>{formatObserved(ev.observedAt)}</time>
+                    <time dateTime={ev.observedAt}>{formatObserved(ev.observedAt, timeZone)}</time>
                     {i < r.evidence.length - 1 ? ", " : ""}
                   </span>
                 ))}

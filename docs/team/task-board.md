@@ -478,3 +478,16 @@ Last updated: 2026-11-15 | Milestone: M0 — Establish the project
 | T-039 | Coder | Kiro AI adapter (`packages/ai`): no-tools agent, sanitized input, prompt-injection fixtures, failure fallback | T-038 | todo |
 | T-040 | Designer | Merauke card (Dev host) + per-card data-source badge (FIXTURE/LIVE) | T-018 | todo |
 | T-041 | Orchestrator | Founder fingerprint verification, then add pinned known_hosts entries | founder | blocked on founder |
+
+## Care-loop gaps from test-report-care-loop-001 (Orchestrator decisions, ADR-016 run)
+
+| ID | Owner | Task | Decision basis | Status |
+|---|---|---|---|---|
+| T-054 | Coder | F2: approval endpoint re-checks target state/preconditions before recording approval (typed PLAN_CHANGED) | Tech Spec 9.2 | todo |
+| T-055 | Coder | F3/F6: `POST /api/operations/:id/stop-request` (flag only, safe boundary, never kill) and `POST /api/operations/:id/reconcile` (read remote ledger, never start a mutation) | Tech Spec 13, FR-16/17 | todo |
+| T-056 | Coder | F5: canonical server identity (host key + observed machine identity); duplicate/alias detection blocks write enablement; lock on canonical identity | Tech Spec 6.3, 9.4, FR-02 | todo |
+| T-057 | Coder | O1: production approval requires the two specific acknowledgements (recovery route, interruption risk) | UX Spec 10.2 | todo |
+| T-058 | Coder | O2/O3: typed ROUTE_UNAVAILABLE on planning; worker-loop backoff | Tech Spec 13 | todo |
+| T-059 | Coder | F4: restart.service.v1, reboot.host.v1, prepare.directories.v1 (build only, simulated target, writes gated) | FR-13, FR-15 | todo |
+| T-061 | Coder | Clock-skew check: record controller time vs target time at collection; skew > 2 min raises a time-sync finding; ages derived from target timestamps are corrected or marked uncertain; skew beyond tolerance will block writes (Tech Spec 8.2). Found live: Sentani clock ~7 h slow (reports UTC 14:27 when real UTC is 21:27). | Tech Spec 8.2 | todo |
+| T-062 | Coder | Third-party package origins: pending updates from non-Ubuntu origins (e.g. Sentani docker-ce*) are listed separately and excluded from Stage A update plans by default (Tech Spec 10.2 step 2) | Tech Spec 10.2 | todo |
