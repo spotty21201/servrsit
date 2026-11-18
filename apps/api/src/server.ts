@@ -7,11 +7,11 @@
 
 import Fastify from "fastify";
 import fastifyCookie from "@fastify/cookie";
-import fastifySession from "@fastify/session";
 import fastifyCors from "@fastify/cors";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 
-import { authStub } from "./auth/stub.js";
+import { OwnerAuth } from "./auth/owner-auth.js";
+import authRoutes, { installAuthGuard } from "./auth/routes.js";
 import healthPlugin from "./routes/health.js";
 import fleetPlugin from "./routes/fleet.js";
 import { FleetService } from "./fleet/service.js";
@@ -19,9 +19,9 @@ import { knownHostsPath, loadFleetConfig, type FleetConfig } from "./fleet/confi
 import { createAssistant, createScrubber, resolveAiConfig, type AssistantResponder } from "@servrsit/ai";
 import assistantRoutes from "./routes/assistant.js";
 import careRoutes, { type CareServer } from "./routes/care.js";
-import { CsrfGuard } from "./csrf.js";
+import { DEFAULT_ALLOWED_ORIGINS } from "./csrf.js";
 import { DEFAULT_OWNER_CONTEXT_PATH, OwnerContextFile } from "./owner-context-file.js";
-import { SqliteCareStore, type CareStore } from "@servrsit/store";
+import { SqliteAuthStore, SqliteCareStore, type CareStore } from "@servrsit/store";
 import { SshWriteTarget, type WriteTarget } from "@servrsit/worker";
 import { buildFixtureFleet } from "./fleet/fixture.js";
 import { ControllerClockMonitor, NOT_CHECKED_CLOCK } from "./clock/controller-clock.js";
@@ -55,6 +55,8 @@ export interface BuildServerOptions {
    * null disables it (tests).
    */
   readonly ownerContextPath?: string | null | undefined;
+  /** Owner auth (T-053). Always enforced; these only choose where records live and, for tests, the clock. */
+  readonly auth?: AuthOptions | undefined;
   /**
    * T-063: ServrSit's own clock check. Default: a monitor that runs with the
    * background checks (live mode, startChecks not false); otherwise none, and
@@ -62,6 +64,19 @@ export interface BuildServerOptions {
    */
   readonly controllerClock?: ControllerClockMonitor | null | undefined;
 }
+
+export interface AuthOptions {
+  /** Default: an in-memory store (nothing survives a restart). The entry point passes the .data file. */
+  readonly store?: SqliteAuthStore | undefined;
+  /** Milliseconds since the epoch. For tests. */
+  readonly now?: (() => number) | undefined;
+  /** Receives the first-run setup token. Default: printed to stderr (not the structured log). */
+  readonly onSetupToken?: ((setupToken: string) => void) | undefined;
+  readonly allowedOrigins?: readonly string[] | undefined;
+}
+
+/** Where the entry point keeps owner auth records (gitignored). */
+export const DEFAULT_AUTH_DB_PATH = new URL("../.data/auth.db", import.meta.url).pathname;
 
 /** A simulated server, injectable only in code (tests and local demos), never via config or API. */
 export interface SimulatedCareServer {
@@ -72,7 +87,6 @@ export interface SimulatedCareServer {
 export interface CareOptions {
   readonly store?: CareStore | undefined;
   readonly simulated?: readonly SimulatedCareServer[] | undefined;
-  readonly csrf?: CsrfGuard | undefined;
   readonly now?: (() => Date) | undefined;
 }
 
@@ -149,56 +163,24 @@ export async function buildServer(options: BuildServerOptions = {}) {
   }
 
   // ---------------------------------------------------------------------------
-  // Cookie and session
-  //
-  // Session secret must be provided via SESSION_SECRET environment variable.
-  // In development a generated fallback is used so the server starts without
-  // configuration, but it logs a warning.
-  //
-  // Technical Spec §5: "Secure, HttpOnly, SameSite cookies. Store a hash of
-  // the session identifier."
+  // Owner auth (T-053, ADR-017). The guard runs on every request before routing
+  // completes: every /api route except /api/auth/{setup,login,totp,session,logout}
+  // needs a session, and every state-changing one also needs Origin + CSRF.
   // ---------------------------------------------------------------------------
-  const sessionSecret = process.env["SESSION_SECRET"];
-  if (!sessionSecret && !isDev) {
-    throw new Error(
-      "SESSION_SECRET environment variable is required in production"
-    );
-  }
-
-  const effectiveSecret =
-    sessionSecret ??
-    "dev-only-insecure-secret-32-chars-min!!";
-
-  if (!sessionSecret && isDev) {
-    // Log at warn so it appears even at reduced log levels
-    process.stderr.write(
-      "[WARN] SESSION_SECRET not set — using insecure dev default. " +
-        "Set SESSION_SECRET before any real data or external access.\n"
-    );
-  }
-
   await fastify.register(fastifyCookie);
-
-  await fastify.register(fastifySession, {
-    secret: effectiveSecret,
-    cookieName: "servrsit_session",
-    cookie: {
-      secure: !isDev, // true in production (HTTPS required)
-      httpOnly: true,
-      sameSite: "strict",
-      maxAge: 60 * 60 * 1000, // 60 minutes; matches Technical Spec §5 inactivity expiry
-      path: "/",
-    },
-    saveUninitialized: false,
+  // T-066 D-A3: enrolment is refused while ServrSit's own clock is untrusted. The clock source is
+  // wired below, after the fleet service exists, so it is read through this late-bound function.
+  let clockStatus: () => string = () => "not-checked";
+  const auth = new OwnerAuth({
+    clockTrusted: () => clockStatus() !== "untrusted",
+    store: options.auth?.store ?? new SqliteAuthStore({ path: ":memory:" }),
+    now: options.auth?.now,
+    onSetupToken: options.auth?.onSetupToken,
   });
-
-  // ---------------------------------------------------------------------------
-  // Auth hook
-  //
-  // Replace authStub with Cognito PKCE token validation before any real data
-  // or external access. See apps/api/src/auth/stub.ts.
-  // ---------------------------------------------------------------------------
-  fastify.addHook("preHandler", authStub);
+  await auth.init();
+  const allowedOrigins = options.auth?.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS;
+  installAuthGuard(fastify, { auth, allowedOrigins });
+  await fastify.register(authRoutes, { auth, allowedOrigins, secureCookies: !isDev, now: options.auth?.now });
 
   // ---------------------------------------------------------------------------
   // Routes
@@ -220,6 +202,7 @@ export async function buildServer(options: BuildServerOptions = {}) {
       ...(clockMonitor === null ? {} : { controllerClock: () => clockMonitor.current() }),
     });
   const controllerClock = () => (mode === "fixture" ? NOT_CHECKED_CLOCK : service.controlPlane().clock);
+  clockStatus = () => controllerClock().status;
   await fastify.register(fleetPlugin, { mode, service, config });
   await fastify.register(assistantRoutes, {
     assistant: options.assistant ?? createAssistant(resolveAiConfig({ AI_PROVIDER: "none" })),
@@ -235,9 +218,11 @@ export async function buildServer(options: BuildServerOptions = {}) {
     store: careStore,
     servers: care.servers,
     targets: care.targets,
-    csrf: options.care?.csrf ?? new CsrfGuard(),
-    // AUTH STUB (D3): a fixed owner until Cognito sessions (T-023).
-    owner: () => "owner-dev-stub",
+    owner: (request) => {
+      // The guard has already refused any request without a session; reaching here without one is a bug.
+      if (request.authSession === null) throw new Error("care route reached without a session");
+      return request.authSession.info.username;
+    },
     now: options.care?.now,
     controllerClock,
   });

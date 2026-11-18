@@ -11,7 +11,8 @@ import { createAssistant } from "@servrsit/ai";
 import { loadAiRuntime } from "./ai-runtime.js";
 import { createAsyncLogStream } from "./log-stream.js";
 import { resolvePort } from "./port.js";
-import { buildServer } from "./server.js";
+import { SqliteAuthStore } from "@servrsit/store";
+import { buildServer, DEFAULT_AUTH_DB_PATH } from "./server.js";
 import { createShutdownHandler } from "./shutdown.js";
 
 const PORT = resolvePort();
@@ -23,6 +24,8 @@ async function start(): Promise<void> {
     redactSecrets: ai.redactSecrets,
     assistant: createAssistant(ai.config),
     logStream: createAsyncLogStream({ fd: 1 }),
+    // T-053: owner auth records persist in apps/api/.data (gitignored, created 0600).
+    auth: { store: new SqliteAuthStore({ path: process.env["SERVRSIT_AUTH_DB"] ?? DEFAULT_AUTH_DB_PATH }) },
   });
   for (const note of ai.notes) fastify.log[note.level](note.message);
 

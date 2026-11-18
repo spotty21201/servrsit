@@ -13,7 +13,7 @@ import { MemoryIntentStore, SqliteCareStore } from "@servrsit/store";
 import { Dispatcher, SimulatedTarget, type WriteTarget } from "@servrsit/worker";
 import { buildServer } from "../server.js";
 import { FleetConfigSchema, loadFleetConfig } from "../fleet/config.js";
-import { CsrfGuard } from "../csrf.js";
+import { enrolOwner, setupTokenSink } from "../auth/testing.js";
 import { FleetService } from "../fleet/service.js";
 import { makeObservation } from "../fleet/observation.fixtures.js";
 import type { ControllerClock } from "@servrsit/contracts";
@@ -40,15 +40,16 @@ async function start(opts: { production?: boolean; clock?: { value: ControllerCl
     now: clock.now, runMs: 1000,
   });
   const store = new SqliteCareStore({ path: join(mkdtempSync(join(tmpdir(), "servrsit-care-")), "care.db") });
-  const csrf = new CsrfGuard();
+  const sink = setupTokenSink();
   const fleet = new FleetService({
     config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }),
     ...(opts.clock === undefined ? {} : { controllerClock: () => opts.clock!.value }),
   });
   const app = await buildServer({
     config, fleetService: fleet, startChecks: false, logger: false,
+    auth: { onSetupToken: sink.onSetupToken },
     care: {
-      store, csrf, now: clock.now,
+      store, now: clock.now,
       simulated: [{ server: { id: SIM, name: "Sim One", production: opts.production ?? false, kind: "simulated", writesEnabled: true }, target: sim }],
     },
   });
@@ -56,16 +57,20 @@ async function start(opts: { production?: boolean; clock?: { value: ControllerCl
     store, intents: new MemoryIntentStore(), targets: new Map<string, WriteTarget>([[SIM, sim]]),
     writesEnabled: (id) => id === SIM, signer, installationId: "inst", workerId: "w1", now: clock.now,
   });
-  const post = (url: string, body: unknown, headers: Record<string, string> = {}) =>
-    app.inject({ method: "POST", url, headers: { "content-type": "application/json", ...headers }, payload: JSON.stringify(body) });
+  // T-053: every request here is made by a signed-in owner, through the real setup flow.
+  const owner = await enrolOwner(app, sink.token());
+  const csrf = { token: owner.csrfToken };
   const goodHeaders = { "x-csrf-token": csrf.token, origin: ORIGIN };
+  const post = (url: string, body: unknown, headers: Record<string, string> = goodHeaders) =>
+    app.inject({ method: "POST", url, headers: { "content-type": "application/json", cookie: owner.cookie, ...headers }, payload: JSON.stringify(body) });
+  const get = (url: string) => app.inject({ method: "GET", url, headers: { cookie: owner.cookie } });
   const plan = async (serverId = SIM) => (await post("/api/plans", { operation: "apply.packages.v1", serverId })).json() as {
     id: string; version: number; digest: string; blockers: Array<{ code: string }>; approvable: boolean;
     requiredAcknowledgements: string[]; target: { kind: string; simulated: boolean };
   };
   const approve = (p: { id: string; version: number; digest: string }, over: Record<string, unknown> = {}, headers: Record<string, string> = goodHeaders) =>
     post(`/api/plans/${p.id}/approvals`, { planVersion: p.version, planDigest: p.digest, idempotencyKey: "idem-key-0000000001", acknowledgements: [], ...over }, headers);
-  return { app, clock, store, sim, csrf, dispatcher, post, plan, approve, goodHeaders };
+  return { app, clock, store, sim, csrf, dispatcher, post, get, plan, approve, goodHeaders, owner };
 }
 
 // ---- the hard gate for real servers ------------------------------------------
@@ -104,7 +109,7 @@ test("no API can set writesEnabled: no such routes, and request bodies cannot ca
   const h = await start();
   try {
     for (const [method, url] of [["PATCH", `/api/servers/${NABIRE}`], ["PUT", `/api/servers/${NABIRE}`], ["POST", `/api/servers/${NABIRE}/writes`], ["PATCH", "/api/config"]] as const) {
-      const r = await h.app.inject({ method, url, headers: { "content-type": "application/json", ...h.goodHeaders }, payload: JSON.stringify({ writesEnabled: true }) });
+      const r = await h.app.inject({ method, url, headers: { "content-type": "application/json", cookie: h.owner.cookie, ...h.goodHeaders }, payload: JSON.stringify({ writesEnabled: true }) });
       assert.equal(r.statusCode, 404, `${method} ${url}`);
     }
     assert.equal((await h.post("/api/plans", { operation: "apply.packages.v1", serverId: NABIRE, writesEnabled: true })).statusCode, 400);
@@ -139,7 +144,7 @@ test("simulated: plan -> approve -> dispatch -> verified success, every step lab
     const { operationId, state } = r.json() as { operationId: string; state: string };
     assert.equal(state, "queued");
     for (let i = 0; i < 6; i++) { await h.dispatcher.runOnce(); h.clock.advance(1500); }
-    const view = (await h.app.inject({ method: "GET", url: `/api/operations/${operationId}` })).json() as {
+    const view = (await h.get(`/api/operations/${operationId}`)).json() as {
       operation: { state: string; simulated: boolean; targetKind: string }; events: Array<{ type: string; seq: number }>;
     };
     assert.equal(view.operation.state, "succeeded");
@@ -181,7 +186,7 @@ test("CSRF: a missing or wrong token, a foreign origin and a cross-site request 
       assert.deepEqual([r.statusCode, r.json()], [403, { error: "CSRF_INVALID" }], label);
     }
     assert.equal(h.store.unresolvedFor(SIM), null, "nothing was approved");
-    const token = (await h.app.inject({ method: "GET", url: "/api/csrf" })).json() as { token: string; header: string };
+    const token = (await h.get("/api/csrf")).json() as { token: string; header: string };
     assert.equal(token.token, h.csrf.token);
     assert.equal(token.header, "x-csrf-token");
     assert.equal((await h.approve(p)).statusCode, 201);
@@ -263,8 +268,8 @@ test("invariant 1: chat assent ('yes', 'do it', 'approve the plan') never approv
 test("unknown plans and operations are 404, with no detail", async () => {
   const h = await start();
   try {
-    assert.equal((await h.app.inject({ method: "GET", url: "/api/plans/nope" })).statusCode, 404);
-    assert.equal((await h.app.inject({ method: "GET", url: "/api/operations/nope" })).statusCode, 404);
+    assert.equal((await h.get("/api/plans/nope")).statusCode, 404);
+    assert.equal((await h.get("/api/operations/nope")).statusCode, 404);
     assert.equal((await h.post("/api/plans", { operation: "apply.packages.v1", serverId: "99999999-9999-4999-a999-999999999999" })).statusCode, 404);
     const r = await h.post("/api/plans/nope/approvals", { planVersion: 1, planDigest: `sha256:${"0".repeat(64)}`, idempotencyKey: "idem-key-0000000005", acknowledgements: [] }, h.goodHeaders);
     assert.equal(r.statusCode, 404);
@@ -290,8 +295,10 @@ const CLOCK = (status: "trusted" | "untrusted"): ControllerClock => ({
 });
 
 test("T-063 via the API: an untrusted controller clock blocks planning, and approval is re-checked against it", async () => {
-  const clock = { value: CLOCK("untrusted") };
+  // Enrol while the clock is trusted (T-066 refuses enrolment on an untrusted clock), then it goes wrong.
+  const clock = { value: CLOCK("trusted") };
   const h = await start({ clock });
+  clock.value = CLOCK("untrusted");
   try {
     const blocked = await h.plan();
     assert.deepEqual(blocked.blockers.map((b) => b.code), ["CONTROLLER_CLOCK_UNTRUSTED"]);
@@ -365,7 +372,7 @@ test("T-055: stop while running only records the request; the work finishes and 
     assert.equal(r.events.filter((e) => e.type === "stop_requested").length, 1);
     await h.post(`/api/operations/${operationId}/stop-request`, {}, h.goodHeaders);
     for (let i = 0; i < 6; i++) { await h.dispatcher.runOnce(); h.clock.advance(1500); }
-    const view = (await h.app.inject({ method: "GET", url: `/api/operations/${operationId}` })).json() as { operation: { state: string }; events: Array<{ type: string }> };
+    const view = (await h.get(`/api/operations/${operationId}`)).json() as { operation: { state: string }; events: Array<{ type: string }> };
     assert.equal(view.operation.state, "succeeded", "a stop request is not a kill");
     assert.equal(view.events.filter((e) => e.type === "stop_requested").length, 1, "the second request added nothing");
   } finally { await h.app.close(); }
@@ -381,7 +388,7 @@ test("T-055: reconcile follows the ledger and never sends anything; real servers
     await h.dispatcher.runOnce();
     h.clock.advance(1500);
     for (let i = 0; i < 4; i++) await h.post(`/api/operations/${operationId}/reconcile`, {}, h.goodHeaders);
-    const done = (await h.app.inject({ method: "GET", url: `/api/operations/${operationId}` })).json() as { operation: { state: string } };
+    const done = (await h.get(`/api/operations/${operationId}`)).json() as { operation: { state: string } };
     assert.equal(done.operation.state, "succeeded", "reconcile can follow the ledger to verification");
     assert.equal((await h.post("/api/operations/nope/reconcile", {}, h.goodHeaders)).statusCode, 404);
     const noCsrf = await h.post(`/api/operations/${operationId}/reconcile`, {}, { origin: "http://100.104.220.8:5173" });
@@ -408,19 +415,21 @@ async function twoRecords(kind: "alias" | "ambiguous") {
   // An alias is a second record of the SAME machine: it reaches the same simulated target.
   const simB = kind === "alias" ? simA : mkSim(B, "machine-2");
   const store = new SqliteCareStore({ path: join(mkdtempSync(join(tmpdir(), "servrsit-care-")), "care.db") });
-  const csrf = new CsrfGuard();
+  const sink = setupTokenSink();
   const fleet = new FleetService({ config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }) });
   const app = await buildServer({
     config, fleetService: fleet, startChecks: false, logger: false,
+    auth: { onSetupToken: sink.onSetupToken },
     care: {
-      store, csrf, now: clock.now,
+      store, now: clock.now,
       simulated: [
         { server: { id: A, name: "Sim A", production: false, kind: "simulated", writesEnabled: true }, target: simA },
         { server: { id: B, name: "Sim B alias", production: false, kind: "simulated", writesEnabled: true }, target: simB },
       ],
     },
   });
-  const headers = { "content-type": "application/json", "x-csrf-token": csrf.token, origin: ORIGIN };
+  const owner = await enrolOwner(app, sink.token());
+  const headers = { "content-type": "application/json", cookie: owner.cookie, "x-csrf-token": owner.csrfToken, origin: ORIGIN };
   const plan = async (serverId: string) => (await app.inject({ method: "POST", url: "/api/plans", headers, payload: JSON.stringify({ operation: "apply.packages.v1", serverId }) })).json() as {
     id: string; version: number; digest: string; blockers: Array<{ code: string }>;
   };
@@ -490,12 +499,13 @@ async function actionHarness(opts: { faults?: Record<string, unknown> } = {}) {
   });
   Object.assign(sim.faults, opts.faults ?? {});
   const store = new SqliteCareStore({ path: join(mkdtempSync(join(tmpdir(), "servrsit-care-")), "care.db") });
-  const csrf = new CsrfGuard();
+  const sink = setupTokenSink();
   const fleet = new FleetService({ config, knownHostsFile: "/x/known_hosts", pinChecker: async () => "pinned", collector: async () => ({ ok: true, observation: makeObservation() }) });
   const app = await buildServer({
     config, fleetService: fleet, startChecks: false, logger: false,
+    auth: { onSetupToken: sink.onSetupToken },
     care: {
-      store, csrf, now: clock.now,
+      store, now: clock.now,
       simulated: [{ server: { id: SIM, name: "Sim One", production: false, kind: "simulated", writesEnabled: true, selectedServices: ["nginx.service"], user: "spotty" }, target: sim }],
     },
   });
@@ -503,7 +513,8 @@ async function actionHarness(opts: { faults?: Record<string, unknown> } = {}) {
     store, intents: new MemoryIntentStore(), targets: new Map<string, WriteTarget>([[SIM, sim]]),
     writesEnabled: (id) => id === SIM, signer, installationId: "inst", workerId: "w1", now: clock.now,
   });
-  const headers = { "content-type": "application/json", "x-csrf-token": csrf.token, origin: ORIGIN };
+  const owner = await enrolOwner(app, sink.token());
+  const headers = { "content-type": "application/json", cookie: owner.cookie, "x-csrf-token": owner.csrfToken, origin: ORIGIN };
   const plan = async (body: Record<string, unknown>) =>
     (await app.inject({ method: "POST", url: "/api/plans", headers, payload: JSON.stringify({ serverId: SIM, ...body }) })).json() as {
       id: string; version: number; digest: string; blockers: Array<{ code: string }>; scope: Record<string, unknown>; approvable: boolean;
@@ -513,7 +524,7 @@ async function actionHarness(opts: { faults?: Record<string, unknown> } = {}) {
     assert.equal(r.statusCode, 201, r.body);
     const { operationId } = r.json() as { operationId: string };
     for (let i = 0; i < 12; i++) { await dispatcher.runOnce(); clock.advance(2500); }
-    return (await app.inject({ method: "GET", url: `/api/operations/${operationId}` })).json() as { operation: { state: string }; events: Array<{ type: string; payload: Record<string, unknown> }> };
+    return (await app.inject({ method: "GET", url: `/api/operations/${operationId}`, headers: { cookie: owner.cookie } })).json() as { operation: { state: string }; events: Array<{ type: string; payload: Record<string, unknown> }> };
   };
   return { app, sim, plan, run };
 }

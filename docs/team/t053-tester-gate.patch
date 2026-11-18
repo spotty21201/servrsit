@@ -1,0 +1,144 @@
+diff --git tests/e2e/care-loop/binding.mts projects/servrsit-coder/tests/e2e/care-loop/binding.mts
+index ae9b864..edfc9ec 100644
+--- tests/e2e/care-loop/binding.mts
++++ projects/servrsit-coder/tests/e2e/care-loop/binding.mts
+@@ -28,13 +28,14 @@ import { mkdtempSync, rmSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import { DatabaseSync } from "node:sqlite";
+-import { CSRF_HEADER, CsrfGuard } from "../../../apps/api/src/csrf.ts";
++import { CSRF_HEADER } from "../../../apps/api/src/csrf.ts";
++import { enrolOwner, setupTokenSink, type SignedInOwner } from "../../../apps/api/src/auth/testing.ts";
+ import { buildServer } from "../../../apps/api/src/server.ts";
+ 
+ type App = Awaited<ReturnType<typeof buildServer>>;
+ import { Dispatcher, SimulatedTarget, TransportError, type WriteTarget } from "../../../apps/worker/src/index.ts";
+ import { createSigner, PRODUCTION_ACK } from "../../../packages/domain/src/index.ts";
+-import { MemoryIntentStore, SqliteCareStore, type OperationEvent, type StoredOperation } from "../../../packages/store/src/index.ts";
++import { MemoryIntentStore, SqliteAuthStore, SqliteCareStore, type OperationEvent, type StoredOperation } from "../../../packages/store/src/index.ts";
+ import {
+   ACK_RECOVERY,
+   ACK_RISK,
+@@ -156,7 +157,10 @@ export class InProcessHarness implements Harness {
+   private readonly readDb = new DatabaseSync(this.dbPath, { readOnly: true });
+   private readonly intents = new MemoryIntentStore();
+   private readonly signer = createSigner("key-1");
+-  private readonly csrf = new CsrfGuard();
++  // T-053: one owner for the whole run. The auth store outlives app rebuilds, so the session does too.
++  private readonly authStore = new SqliteAuthStore({ path: ":memory:" });
++  private readonly sink = setupTokenSink();
++  private owner: SignedInOwner | null = null;
+   private readonly servers = new Map<string, Entry>();
+   private readonly targets = new Map<string, WriteTarget>();
+   private app: App | null = null;
+@@ -188,20 +192,24 @@ export class InProcessHarness implements Harness {
+       logger: false,
+       startChecks: false,
+       now: this.clock.now,
++      auth: { store: this.authStore, onSetupToken: this.sink.onSetupToken },
+       care: {
+         store: this.store,
+-        csrf: this.csrf,
+         now: this.clock.now,
+         simulated: [...this.servers.values()].map((e) => ({ server: e.care as never, target: e.rec })),
+       },
+     });
+     this.dirty = false;
++    if (this.owner === null) this.owner = await enrolOwner(this.app, this.sink.token());
+     return this.app;
+   }
+ 
+-  private async http(method: "GET" | "POST", url: string, body?: unknown, headers: Record<string, string> = {}) {
++  /** `auth.session` false sends no session cookie; `auth.csrf` false leaves the CSRF header to the caller. */
++  private async http(method: "GET" | "POST", url: string, body?: unknown, headers: Record<string, string> = {}, auth: { session: boolean; csrf: boolean } = { session: true, csrf: true }) {
+     const app = await this.appInstance();
+-    const res = await app.inject({ method, url, payload: body === undefined ? undefined : (body as object), headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...headers } });
++    const owner = this.owner!;
++    const authHeaders = !auth.session ? {} : method === "GET" || !auth.csrf ? { cookie: owner.cookie, origin: "http://127.0.0.1:5173" } : owner.headers(true);
++    const res = await app.inject({ method, url, payload: body === undefined ? undefined : (body as object), headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...authHeaders, ...headers } });
+     let json: unknown = null;
+     try { json = res.body.length ? JSON.parse(res.body) : null; } catch { json = null; }
+     return { status: res.statusCode, body: asBody(json) };
+@@ -266,8 +274,9 @@ export class InProcessHarness implements Harness {
+   }
+ 
+   async approve(i: ApproveInput): Promise<Res<{ operationId: string }>> {
++    await this.appInstance();
+     const headers: Record<string, string> = { ...(i.extraHeaders ?? {}) };
+-    const token = this.csrf.token;
++    const token = this.owner!.csrfToken;
+     if (i.csrf !== "omit") headers[CSRF_HEADER] = i.csrf === "wrong" ? token.slice(0, -1) + (token.endsWith("0") ? "1" : "0") : token;
+     const acks = i.acknowledgements ?? [];
+     const body: Record<string, unknown> = {
+@@ -277,7 +286,7 @@ export class InProcessHarness implements Harness {
+       acknowledgements: acks.includes(ACK_RECOVERY) && acks.includes(ACK_RISK) ? [PRODUCTION_ACK] : [],
+       ...(i.extra ?? {}),
+     };
+-    const r = await this.http("POST", `/api/plans/${i.planId}/approvals`, body, headers);
++    const r = await this.http("POST", `/api/plans/${i.planId}/approvals`, body, headers, { session: i.session !== "none", csrf: false });
+     return r.status < 300 ? this.toRes(r.status, r.body, { operationId: String(r.body["operationId"]) }) : this.toRes(r.status, r.body);
+   }
+ 
+diff --git tests/e2e/care-loop/zt01-real-hosts.test.mts projects/servrsit-coder/tests/e2e/care-loop/zt01-real-hosts.test.mts
+index 236d4c6..879b93b 100644
+--- tests/e2e/care-loop/zt01-real-hosts.test.mts
++++ projects/servrsit-coder/tests/e2e/care-loop/zt01-real-hosts.test.mts
+@@ -21,7 +21,7 @@ import { syncBuiltinESMExports } from "node:module";
+ import test, { after, before } from "node:test";
+ import tls from "node:tls";
+ import { DatabaseSync } from "node:sqlite";
+-import { CSRF_HEADER, CsrfGuard } from "../../../apps/api/src/csrf.ts";
++import { enrolOwner, setupTokenSink, type SignedInOwner } from "../../../apps/api/src/auth/testing.ts";
+ import { FleetConfigSchema, loadFleetConfig } from "../../../apps/api/src/fleet/config.ts";
+ import { buildServer } from "../../../apps/api/src/server.ts";
+ import { SshWriteTarget, WritesDisabledError } from "../../../apps/worker/src/index.ts";
+@@ -50,7 +50,10 @@ function guard<T extends object>(obj: T, names: string[], label: string): void {
+   }
+ }
+ 
+-const csrf = new CsrfGuard();
++// T-053: every request is made by a signed-in owner, enrolled through the real setup flow.
++const sink = setupTokenSink();
++let owner: SignedInOwner;
++let withCsrf: Record<string, string> = {};
+ const store = new SqliteCareStore({ path: dbPath });
+ type App = Awaited<ReturnType<typeof buildServer>>;
+ let app: App;
+@@ -63,7 +66,9 @@ const opsFor = (id: string): number => (readDb.prepare("SELECT count(*) AS n FRO
+ before(async () => {
+   const cfg = await loadFleetConfig();
+   hosts = cfg.hosts.map((h) => ({ id: h.id, name: h.name, production: h.production }));
+-  app = await buildServer({ logger: false, startChecks: false, care: { store, csrf } });
++  app = await buildServer({ logger: false, startChecks: false, auth: { onSetupToken: sink.onSetupToken }, care: { store } });
++  owner = await enrolOwner(app, sink.token());
++  withCsrf = owner.headers(true);
+   readDb = new DatabaseSync(dbPath, { readOnly: true });
+   guard(childProcess, ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"], "child_process");
+   guard(net, ["connect", "createConnection"], "net");
+@@ -79,12 +84,11 @@ after(async () => {
+ });
+ 
+ async function post(url: string, body?: unknown, headers: Record<string, string> = {}) {
+-  const res = await app.inject({ method: "POST", url, payload: body as object | undefined, headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...headers } });
++  const res = await app.inject({ method: "POST", url, payload: body as object | undefined, headers: { ...(body === undefined ? {} : { "content-type": "application/json" }), ...owner.headers(true), ...headers } });
+   let json: Record<string, any> = {};
+   try { json = res.body ? JSON.parse(res.body) : {}; } catch { json = {}; }
+   return { status: res.statusCode, body: json };
+ }
+-const withCsrf = { [CSRF_HEADER]: csrf.token };
+ 
+ test("the shipped config covers the four real hosts and none can be written to", () => {
+   assert.deepEqual(hosts.map((h) => h.name).sort(), ["Merauke", "Nabire", "Sentani", "Timika"]);
+@@ -177,6 +181,12 @@ test("ZT-01: route inventory. Every mutating route is known and reviewed (a new
+   }
+   const expected = [
+     "POST /api/assistant/messages",
++    // T-053: create or end the owner's session; they touch no server and no care record.
++    "POST /api/auth/login",
++    "POST /api/auth/logout",
++    "POST /api/auth/setup",
++    "POST /api/auth/setup/confirm",
++    "POST /api/auth/totp",
+     "POST /api/plans",
+     "POST /api/plans/:id/approvals",
+     "POST /api/plans/:id/revisions",
