@@ -1789,3 +1789,69 @@ Next: T-082 (care client), then merge `feat/designer/t080` again.
 - **Fastify warning fixed:** `maxParamLength` (T-081) now goes through `routerOptions`, which removes the FSTDEP022 deprecation warning.
 
 **For the Designer:** move the Plan review and operation screens from `stubs/care.ts` to `../care` (same names). `PlanView.verification` is now a loose record (it still has `expectInstalled`), and the old `prepare` field is gone. For a setup plan, use `detail.directories`, `detail.existing` and `detail.requested`.
+
+## T-083: target helper, BUILD ONLY (branch `feat/coder/target-helper`, from `integration/next`)
+
+**Not installed anywhere.** Nothing was copied to, installed on or run on Sentani, Nabire, Timika or Merauke. No sudo was used. No container was used: none is available without sudo, so the tests run directly with `python3 -m unittest` against fake paths.
+
+**What it is** (`target-helper/`, Python 3.12, standard library plus Ubuntu's `python3-cryptography` and `python3-apt`; nothing from pip):
+
+| File | What |
+|---|---|
+| `servrsit_helper/canonical.py` | Canonical JSON, byte-identical to `canonicalJson()` / `digestOf()`. It refuses floats and non-ASCII keys rather than guessing. |
+| `signature.py` | Root-owned `trust.json` with public keys by key id. Verifies Ed25519 or RSA-PSS/SHA-256 (ADR-020). Refuses an unknown key id or algorithm, and a trust file that is a symlink, not owned by root, or writable by group or others. |
+| `schema.py` | Fixed request and manifest schemas: exact keys and types, bounded sizes, allowlisted operation ids. Units, packages, versions, accounts, modes and paths follow the same rules as `packages/domain/src/actions.ts`. |
+| `ledger.py` | One record per operation in a root-only directory. The claim is atomic (`O_CREAT\|O_EXCL` under `flock`). The same id with the same digest returns the existing record; another digest gets `DIGEST_MISMATCH`; a second unresolved mutation gets `TARGET_BUSY`. Finished records are final. Writes go to a temp file, fsync, then rename, then the directory is fsynced. `O_NOFOLLOW` throughout. |
+| `paths.py` | Directory creation walks each component by file descriptor (`O_NOFOLLOW\|O_DIRECTORY`), creates only the last component, and sets owner and mode with `fchown`/`fchmod`. An existing path is left as it is. |
+| `adapters.py` | One adapter per operation. Each verifies its result independently, so an exit code of 0 is never success on its own. Precondition digests use the same rules as the simulated target. `RealSystem` is the only code that touches the machine: fixed argument vectors, no shell, `python3-apt`, and `systemd-run --unit=servrsit-op-<id>` for the runner. |
+| `helper.py` | `submit` checks, in order: signature, schema, installation and host-key binding, allowed unit, ledger replay (before expiry, so a replay after expiry still returns the existing operation), clock skew and expiry, precondition, then claim and start of the runner. `query.operation.v1` reads the ledger, and settles a reboot once it sees a new boot id. |
+| `runner.py` | Started only through systemd-run, so it outlives the SSH session (invariant 6). It rechecks the precondition, never acts twice, and records the verified outcome. |
+| `gateway.py` | The forced SSH command. It ignores `SSH_ORIGINAL_COMMAND`, reads one bounded request, checks it, and calls exactly `/usr/bin/sudo -n -- /usr/lib/servrsit/bin/servrsit-helper` with the same bytes. It never shows the helper's own output on failure. |
+| `packaging/sudoers.in` | `<account> ALL=(root) NOPASSWD: /usr/lib/servrsit/bin/servrsit-helper ""` (no arguments), plus `env_reset, !setenv`. |
+| `packaging/bootstrap.sh` | Reviewable, run by the owner as root. In order: Ubuntu 24.04 and dependency check, SHA-256 check, files, account (only with `--create-account`), one forced-command key line, then sudoers via `visudo -c -f` before install and `visudo -c` after (the rule is removed again if that fails). `--dry-run` changes nothing. |
+| `packaging/uninstall.sh` | Removes the sudoers rule and ServrSit's one key line, and verifies both are gone. Removes `/usr/lib/servrsit` and `/etc/servrsit`. Keeps the ledger unless `--remove-ledger`. |
+| `packaging/build.sh` | Reproducible tarball plus `.sha256`. |
+| `README.md` | Disclosure for the owner and the Designer: files, owners, modes, dependencies and removal. |
+
+**Signing key:** ADR-020 in `docs/decisions/decision-log.md`. Local Ed25519 until KMS. The helper also accepts RSA-PSS/SHA-256, so moving to KMS is a trust-file change.
+
+**Checks (real output):**
+
+```
+$ cd target-helper/tests && PYTHONPATH=..:. python3 -m unittest
+Ran 51 tests in 1.075s
+OK
+
+$ PATH=<dir of logging stubs for sudo, systemctl, systemd-run, apt, apt-get, useradd, userdel, install, ssh, scp>:$PATH python3 -m unittest
+OK
+guarded calls: (none)
+
+$ pnpm -r --workspace-concurrency=1 run test     exit 0 (target-helper 51, api 242, web 209, ai 156, ssh 61, store 28, domain 22, worker 19, infra 9)
+typecheck: all 9 TS packages exit 0
+$ visudo -c -f <rendered sudoers.in>   parsed OK      (a broken copy: syntax error, rc=1)
+```
+
+**What the tests cover:**
+
+- **Cross-language vectors:** canonical text, digest, Ed25519 and RSA-PSS signatures made by Node, all checked in Python.
+- **Signatures:** invalid, tampered, under the wrong key id, unknown key, garbage base64.
+- **Replay** (including after expiry), digest mismatch, misbinding, expiry, clock skew, unsupported schema or operation, precondition change, busy target.
+- **Injection strings** in units, paths and packages, extra `command` fields, oversized and deeply nested requests, path traversal in the operation id.
+- **A trust file writable by others** is refused.
+- **Runner:** never acts twice; exit 0 alone is not success; the precondition is rechecked; reboot is settled by a new boot id; finished records are final.
+- **Symlinks:** at the parent, at the final path, and a parent swapped for a symlink mid-walk (simulated race). None of them is followed, and nothing is created outside the root.
+- **Ledger:** 12 racing processes for one id give exactly one acceptance; racing different digests give one acceptance and 5 mismatches; symlinked records and open directories are refused; a crash leftover does not block updates.
+- **Gateway:** ignores the SSH command; invalid requests never reach sudo.
+- **Sources:** no shell, `eval`, `exec`, `pickle` or dynamic import; only standard-library modules, `cryptography` and `apt` are imported.
+- **Scripts:** syntax, nothing fetched, reproducible build. Bootstrap's dry run puts the checksum check before any install and `visudo -c -f` before the sudoers install. A wrong checksum aborts before anything is installed; bad inputs and other Ubuntu releases are refused. Uninstall's dry run keeps the ledger and the account.
+
+**A defect the tests found and I fixed:** bootstrap checked each option with `grep -E`, which matches line by line. A value with a line break (for example a second key line) could pass. Every option value must now be a single line, and the same check is in uninstall.
+
+**Limits:**
+
+- **Not proven by these tests: APT, systemd and reboot behaviour.** No test runs `RealSystem`'s mutating methods, as root, or on Ubuntu with real packages. That needs the disposable-target gate (T-012).
+- **`plan.packages.v1` (the package preview) is not built.** The helper's package precondition digest is `digest_of({"installed": {name:arch: version}})`, and the controller's preview must use the same function when it lands.
+- **The controller side does not exist yet.** There is no persistent signing key and no SSH write target that speaks this protocol; `SshWriteTarget` still refuses every write.
+- **pytest is not installed on Merauke,** and pip from the internet is not allowed. The tests are unittest-based and pytest can collect them (`tests/conftest.py`).
+
+**For the Orchestrator:** review ADR-020 and D-HELPER-01. Bootstrap installs persistent files on managed servers, so it needs the founder's acceptance before T-012.
