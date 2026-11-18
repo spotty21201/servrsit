@@ -138,6 +138,16 @@ test("ZT-01: a revised plan for a real host is still blocked, and a client canno
   assert.equal(COUNT_OPS(), 0);
 });
 
+test("ZT-01 (T-055): stop-request and reconcile on an id with no operation are refused and touch no server", async () => {
+  for (const id of ["00000000-0000-4000-8000-0000000000dd", "not-an-id", "../etc/passwd", "a".repeat(200)]) {
+    for (const route of ["stop-request", "reconcile"]) {
+      const r = await post(`/api/operations/${encodeURIComponent(id)}/${route}`, undefined, withCsrf);
+      assert.ok(r.status >= 400 && r.status < 500, `${route} on ${id.slice(0, 20)}: expected a 4xx refusal, got ${r.status}`);
+    }
+  }
+  assert.equal(COUNT_OPS(), 0);
+});
+
 test("ZT-01: chat assent ('yes', 'do it', 'approve the plan') creates no operation for any real host", async () => {
   for (const h of hosts) {
     for (const message of ["yes", "do it", "approve the plan", "go ahead and update the packages now"]) {
@@ -187,6 +197,9 @@ test("ZT-01: route inventory. Every mutating route is known and reviewed (a new 
     "POST /api/auth/setup",
     "POST /api/auth/setup/confirm",
     "POST /api/auth/totp",
+    // T-055: flag a stop, and read the remote ledger. Reviewed: both act only on an existing operation, and no operation can exist for a real host (the tests above), so on a real host they can only answer 404.
+    "POST /api/operations/:id/reconcile",
+    "POST /api/operations/:id/stop-request",
     "POST /api/plans",
     "POST /api/plans/:id/approvals",
     "POST /api/plans/:id/revisions",

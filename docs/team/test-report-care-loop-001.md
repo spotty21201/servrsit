@@ -201,3 +201,46 @@ docs/team/test-report-care-loop-001.md      this report (replaces the earlier "p
 ```
 
 No production source was modified. Raw `/api/fleet` captures from real hosts are not committed.
+
+
+---
+
+# Addendum: binding to T-054, T-055 and T-056
+
+**Code tested:** `feat/coder/care-gaps` at `0195036` (T-054, T-055) and `5a86ed8` (T-056), each trial-merged with `feat/coder/owner-auth` `41676cc` in a throwaway worktree, since care-gaps is not yet built on T-053 (see I-1). T-057, T-058 and T-059 have not landed. The worktrees are removed and no product file in any branch was changed.
+
+## Result
+
+| Run | care-loop (42) | zt01-real-hosts | static-config | self-check |
+|---|---|---|---|---|
+| Before (owner-auth only) | 36 pass, 5 fail, 1 not run | 12/12 | 3/3 | 28/28 |
+| + T-054, T-055 | **40 pass, 1 fail, 1 not run** | **13/13** (with the reviewed inventory change) | 3/3 | 28/28 |
+| + T-056 | **41 pass, 1 fail, 0 not run** | **13/13** | 3/3 | 28/28 |
+
+The remaining failure is **CL-09a** (restart, reboot and directory preparation are not built), which is T-059.
+
+| Earlier finding | Status | Evidence |
+|---|---|---|
+| **F2** approval does not re-check the target (CL-04c) | **Fixed by T-054** | CL-04c passes. Mutant M1 (re-check removed) fails CL-04c. Mutant M3 (re-check also applied to replays) fails CL-03f, so the replay exception is guarded too. |
+| **F3/F6** no stop or reconcile route (CL-07a/b/c, CL-06e) | **Fixed by T-055** | All four pass through the real routes. The binding's reconcile fallback is no longer used. |
+| **F5** no canonical identity (CL-03e not run) | **Fixed by T-056** | CL-03e runs and passes. Mutant M4 (lock on server id only) fails CL-03e. |
+| F4 missing change kinds (CL-09a) | Open, T-059 | |
+
+## Changes to my files
+
+- **`zt01-real-hosts`**: the reviewed route inventory gains `POST /api/operations/:id/stop-request` and `/reconcile`. I reviewed both: each acts only on an existing operation, and no operation can exist for a real host, so on a real host both can only answer 404. New test: both routes on unknown and malformed ids are 4xx and touch no server. It fails on any branch without T-055, which is what the inventory is for.
+- **`binding.mts`**: two changes, both because the `WriteTarget` interface changed in T-056, not to make anything pass:
+  1. It forwards the new `identity()` method. Without it, every plan request was a 500 (`identity is not a function`). I first suspected my merge; T-056 alone gave the same 500 while Coder's own 23 care tests passed, which pointed to my wrapper.
+  2. Each simulated server gets its own host key and machine id; an alias shares the original's. All my servers used to share one fake fingerprint with different machine ids, and T-056 rightly treated that as an ambiguous identity and blocked them. CL-03e now uses this to make a real alias.
+
+## Gaps in my coverage (honest)
+
+- **Mutant M2 survives**: a stop request that cancels an operation whose send was already attempted. My harness cannot hold an operation at "sent, acknowledgement lost, still queued": both ways I tried ran it to `succeeded` before the stop arrived. I removed the scenario (CL-07d) rather than keep one that tests nothing. Coder's own store test covers the `attempted` check; mine does not.
+- **Mutant M5 survives**: approving a server whose identity is ambiguous. No scenario creates an ambiguous identity at approval time. Indirect evidence that T-056 blocks ambiguity at planning: my old binding's shared fingerprint made every plan blocked. Next step: a scenario with the same host key and a different machine id.
+
+## Integration findings
+
+| ID | Severity | Finding |
+|---|---|---|
+| **I-1** | **High (integration)** | **`feat/coder/care-gaps` is not built on T-053.** Merging it with `owner-auth` conflicts in `apps/api/src/routes/care.ts`: T-055 adds `o.csrf.check(...)` to both new routes, but T-053 removed `CsrfGuard`; the global guard now does CSRF. After the obvious resolution (drop the two lines, since the guard already covers every state-changing `/api` route), the API builds, the 401 sweep is 7/7 and CSRF on the new routes is enforced by the guard. But Coder's own `care.test.ts` still constructs `CsrfGuard`, so **`apps/api` does not typecheck** after the merge. Coder should rebase care-gaps on owner-auth. |
+| I-2 | Low | The shared handoff file `docs/team/handoff-coder-live.md` conflicts on every merge because each branch appends to the same place. One file per task would avoid it. |
