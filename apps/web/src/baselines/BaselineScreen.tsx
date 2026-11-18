@@ -51,7 +51,7 @@ function Row({ r, busy, onMark, onUnmark }: { r: ComparisonRow; busy: boolean; o
       <p className={b.line}><span className={b.k}>This server</span> {r.found ?? "—"}</p>
       <p className={b.line}>{r.reason}{r.intentional && <> {r.intentional.reason ? `Reason: ${r.intentional.reason}.` : "No reason was given."}</>}</p>
       {canMarkIntentional(r.status) && !open && (
-        <button type="button" className={c.secondary} onClick={() => setOpen(true)} aria-label={`Mark ${r.label} intentional`}>Mark intentional</button>
+        <button type="button" className={c.secondary} onClick={() => setOpen(true)} aria-label={`Mark intentional: ${r.label}`}>Mark intentional</button>
       )}
       {open && (
         <div className={b.mark} role="group" aria-label={`Mark ${r.label} intentional`}>
@@ -64,7 +64,7 @@ function Row({ r, busy, onMark, onUnmark }: { r: ComparisonRow; busy: boolean; o
           </div>
         </div>
       )}
-      {r.status === "different-by-design" && <button type="button" className={c.secondary} disabled={busy} onClick={onUnmark} aria-label={`Remove the intentional mark from ${r.label}`}>Remove the mark</button>}
+      {r.status === "different-by-design" && <button type="button" className={c.secondary} disabled={busy} onClick={onUnmark} aria-label={`Remove the mark: ${r.label}`}>Remove the mark</button>}
     </li>
   );
 }
