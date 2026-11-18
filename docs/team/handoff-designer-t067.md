@@ -193,3 +193,7 @@ Next: T-078 (baselines), T-079 (settings).
 **Not verified / for Coder**
 - Approval and operation polling on a real operation: no real host accepts writes, so only the plan side ran on the real API. Approval, stop and reconcile are covered by `api/care.test.ts` and the fixture client.
 - Reconcile is shown as "checked again" whenever the API answers; the record shows what changed. If `reconcile` can answer with the same unknown state, the screen says so.
+
+## Addendum 9: D-U17 (test-report-ui-a11y-003)
+
+The card grid sat flush under the view bar (bar bottom 232.9 px, card top 232.9 px), so a hovered card's 2 px lift put its top edge inside the bar's box. The roster grid now has 8 px of top padding (`OverviewScreen.module.css`, `.rosterGrid`). Measured at 1280 px in Chromium: card top 240.9 at rest and 238.9 hovered, 6 px clear of the bar; focus does not move the card. I could not reproduce the report's 14 px lift (only the 2 px hover lift exists); the overlap the report describes is the same one, and it is gone. Typecheck, 215 tests and build pass. Evidence: `docs/team/evidence/a11y-fixes/d-u17-after-1280.png`.

@@ -281,6 +281,9 @@
   /* room for the 6–8px identity shadow so it is never clipped */
   padding-right: var(--space-1);
   padding-bottom: var(--space-1);
+  /* D-U17: a hovered card lifts 2px; keep that clear of the view bar above it so the
+     top edge of the card is never part of the bar's box */
+  padding-top: var(--space-1);
 }
 
 /* ── Needs attention + Recent activity (compact, under the cards) ────────── */
