@@ -17,5 +17,6 @@ export function StressOverview() {
   usePageTitle(`Overview stress fixture (${n} servers${long ? ", long names" : ""})`);
   const now = useMemo(() => new Date(), []);
   const vm = useMemo(() => toOverviewVM({ ...initialFleetState, phase: "ready", data: stressFleet(n, long, now), receivedAt: now.toISOString() }, now), [n, long, now]);
-  return <OverviewScreen vm={vm} onRetry={() => undefined} />;
+  // The page is always fixture data, even with zero servers, so the banner is always shown.
+  return <OverviewScreen vm={{ ...vm, anyFixture: true }} onRetry={() => undefined} />;
 }
