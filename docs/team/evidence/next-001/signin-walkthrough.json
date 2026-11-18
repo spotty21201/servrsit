@@ -1,0 +1,71 @@
+{
+ "at": "2026-11-18T08:47:04.634Z",
+ "api": "own instance, fixture mode, random loopback port",
+ "steps": [
+  {
+   "step": "signin-first-load",
+   "ok": true,
+   "note": "title \"Sign in · ServrSit\"",
+   "axe": [],
+   "focus": "body"
+  },
+  {
+   "step": "setup-authenticator",
+   "ok": true,
+   "note": "key shown as text (32 chars), QR 1",
+   "axe": [],
+   "focus": "h1#auth-title"
+  },
+  {
+   "step": "setup-recovery-codes",
+   "ok": true,
+   "note": "10 codes; Continue unavailable before ticking: true",
+   "axe": [],
+   "focus": "h1#auth-title"
+  },
+  {
+   "step": "signed-in-after-setup",
+   "ok": true,
+   "note": "pressing Continue before ticking kept the codes page: true; now on \"Your servers\"",
+   "axe": [],
+   "focus": "body"
+  },
+  {
+   "step": "signed-out",
+   "ok": true,
+   "note": "signed-out notice shown",
+   "axe": [],
+   "focus": "h1#auth-title"
+  },
+  {
+   "step": "signed-in-with-totp",
+   "ok": true,
+   "note": "own RFC 6238 code accepted: true",
+   "axe": [],
+   "focus": "body"
+  },
+  {
+   "step": "signed-in-with-recovery-code",
+   "ok": true,
+   "note": "recovery code accepted: true",
+   "axe": [],
+   "focus": "body"
+  },
+  {
+   "step": "recovery-code-reuse-refused",
+   "ok": true,
+   "note": "alert: \"That recovery code didn't work. Each code works once. Check it and try again.\"",
+   "axe": [],
+   "focus": "body"
+  },
+  {
+   "step": "wrong-password-refused",
+   "ok": true,
+   "note": "alert: \"That username and password don't match. Check both and try again.\"",
+   "axe": [],
+   "focus": "body"
+  }
+ ],
+ "consoleErrors": [],
+ "secretsInEvidence": false
+}

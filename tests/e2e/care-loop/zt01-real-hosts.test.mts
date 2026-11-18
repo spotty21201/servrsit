@@ -207,6 +207,14 @@ test("ZT-01: route inventory. Every mutating route is known and reviewed (a new 
     // resume starts the EXISTING read-only checks of the configured servers (no write path exists behind any of them).
     "POST /api/findings/:id/acknowledge": "T-076 record only", "POST /api/findings/:id/snooze": "T-076 record only",
     "POST /api/scheduler/pause": "T-076 stops read-only checks", "POST /api/scheduler/resume": "T-076 resumes read-only checks",
+    // T-077: exports read only ServrSit's own records.
+    "POST /api/exports": "T-077 own records only",
+    // T-078: compare (and GET candidates) run the reviewed READ-ONLY inventory script over SSH on the chosen server (INV-01/02 review it);
+    // exceptions are records; a setup plan is only a plan, and for real servers it is blocked WRITES_DISABLED. Not called here against real hosts.
+    "POST /api/baselines": "T-078 record", "POST /api/baselines/:id/compare": "T-078 read-only inventory", "PUT /api/baselines/:id/exceptions": "T-078 record",
+    "DELETE /api/baselines/:id/exceptions/:targetId/:conventionId": "T-078 record", "POST /api/baselines/:id/setup-plan": "T-078 plan only (WRITES_DISABLED for real hosts)",
+    // T-079: schedule and AI settings; pause/resume act on the existing read-only checks; AI cannot be enabled without a configured provider.
+    "PUT /api/settings/schedule": "T-079 record", "POST /api/settings/schedule/pause": "T-079 read-only checks", "PUT /api/settings/ai": "T-079 setting",
   };
   const unreviewed = [...found].filter((r) => !(r in reviewed)).sort();
   assert.deepEqual(unreviewed, [], `unreviewed mutating routes. Review each for the real-host gate, then add it with a reason.\n${text}`);
