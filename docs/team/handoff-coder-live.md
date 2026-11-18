@@ -1638,3 +1638,37 @@ Tester @1c9d5a7 (temporary copy): auth 37/37, auth-t066 12/12, auth-extra 21/21,
 - **ZT-01 review.** Of the new routes, only `setup-plan` produces something that could later change a server, and it goes through the existing plan and approval path, so the hard gate still applies. Compare and candidates contact a server read-only.
 
 Next: T-079.
+
+## T-079: settings API (branch `feat/coder/settings`, from `integration/next`)
+
+**Contract** (`packages/contracts/src/settings.ts`):
+
+- `GET /api/settings`
+- `PUT /api/settings/schedule {intervalMinutes 5|15|30|60, dailyTime, timeZone}`
+- `POST /api/settings/schedule/pause {paused}`
+- `PUT /api/settings/ai {enabled}`
+- `GET /api/servers/:id/disconnect-preview`
+
+**Behaviour:**
+
+- **Schedule.** Saving takes effect at once: `FleetService.setIntervalMinutes` restarts the timer without an extra pass, and `setOwnerTimeZone` changes the zone used by the fleet and the assistant. The schedule is stored with history and survives a restart. A saved schedule takes priority over `hosts.json`.
+- **`dailyTime` is stored but not used yet** (`dailyTimeInEffect: false`). Every check runs at the interval, because there is no separate daily deep check.
+- **Pause** is the same persisted pause as `/api/scheduler/pause` and `/api/scheduler/resume`, through the shared `pauseScheduler` and `resumeScheduler` helpers.
+- **AI on/off.**
+  - Turning AI off switches the assistant to answers built only from the checks at the next message. A test confirms the model is called while AI is on and not called after it is turned off.
+  - AI cannot be turned on unless a provider is configured (409 `NOT_ALLOWED`).
+  - The response describes the provider, the host it reaches, and what is sent. It never includes the key: the entry point passes `describeAi(ai.config)`.
+- **Disconnect preview** lists queued or active work on the server. Disconnect itself is still refused while work is unresolved (T-069).
+- **Retention** (30, 90 and 7 days) is shown and cannot be edited.
+
+**Web:** `apps/web/src/api/settings.ts` has the stub's six methods. Errors are the contract's codes; the stub's `INVALID` is now `INVALID_INPUT`.
+
+**Checks:**
+
+```
+pnpm -r test exit 0: api 238, ai 156, web 98, ssh 56, store 27, domain 22, worker 19, infra 9; typecheck all 9 exit 0
+Tester @1c9d5a7: auth 37/37, auth-t066 12/12, auth-extra 21/21, routes-401 7/7, care-loop 41/42 (CL-09a, known),
+  zt01 13/13 with the reviewed list (adds PUT /api/settings/schedule, POST /api/settings/schedule/pause, PUT /api/settings/ai)
+```
+
+Next: T-081.

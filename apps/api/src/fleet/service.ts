@@ -121,8 +121,35 @@ export class FleetService {
     for (const id of this.states.keys()) if (!ids.has(id)) this.states.delete(id);
   }
 
+  /** T-079: the owner's interval, when set; otherwise the configured one. */
+  private intervalMinutes: number | null = null;
+  /** T-079: the owner's time zone, when set; otherwise the configured one. */
+  private timeZone: string | null = null;
+
+  setOwnerTimeZone(zone: string): void {
+    this.timeZone = zone;
+  }
+
+  ownerTimeZone(): string {
+    return this.timeZone ?? this.options.config.ownerTimeZone;
+  }
+
   private get intervalMs(): number {
-    return this.options.config.healthIntervalMinutes * 60_000;
+    return (this.intervalMinutes ?? this.options.config.healthIntervalMinutes) * 60_000;
+  }
+
+  /**
+   * T-079: change the check interval. A running timer restarts on the new
+   * interval without an extra pass; nothing is replayed.
+   */
+  setIntervalMinutes(minutes: number): void {
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) throw new Error("interval must be 1..1440 minutes");
+    this.intervalMinutes = minutes;
+    if (this.timer !== null) {
+      clearInterval(this.timer);
+      this.timer = setInterval(() => void this.refreshAll(), this.intervalMs);
+      this.timer.unref();
+    }
   }
 
   /** Every check runs through this chain, so no two collections overlap. */
@@ -299,8 +326,8 @@ export class FleetService {
     return {
       mode: "live",
       generatedAt: now.toISOString(),
-      healthIntervalMinutes: this.options.config.healthIntervalMinutes,
-      ownerTimeZone: this.options.config.ownerTimeZone,
+      healthIntervalMinutes: this.intervalMs / 60_000,
+      ownerTimeZone: this.ownerTimeZone(),
       nextCheckAt: next,
       controlPlane,
       servers,

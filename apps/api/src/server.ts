@@ -23,7 +23,7 @@ import {
   type FleetHost,
   type HostConfig,
 } from "./fleet/config.js";
-import { createAssistant, createScrubber, resolveAiConfig, type AssistantResponder } from "@servrsit/ai";
+import { createAssistant, createScrubber, resolveAiConfig, type AiConfig, type AssistantResponder } from "@servrsit/ai";
 import assistantRoutes from "./routes/assistant.js";
 import careRoutes, { type CareServer } from "./routes/care.js";
 import { DEFAULT_ALLOWED_ORIGINS } from "./csrf.js";
@@ -32,6 +32,7 @@ import findingRoutes, { PAUSE_KEY, type PausedSetting } from "./routes/findings.
 import { FindingTracker } from "./findings/tracker.js";
 import activityRoutes from "./routes/activity.js";
 import baselineRoutes from "./routes/baselines.js";
+import settingsRoutes, { aiEnabled, SCHEDULE_KEY, storedSchedule, type AiDescription } from "./routes/settings.js";
 import { BaselineService, type BaselineServerInfo } from "./baselines/service.js";
 import { collectInventoryLocal, collectInventoryViaSsh, TargetRejectedError, type Inventory, type InventoryDirectory } from "@servrsit/ssh";
 import { userInfo } from "node:os";
@@ -85,6 +86,8 @@ export interface BuildServerOptions {
   readonly controllerClock?: ControllerClockMonitor | null | undefined;
   /** T-069 server registry wiring. Defaults: in-memory registry, real OpenSSH tools. */
   readonly servers?: ServerRegistryWiring | undefined;
+  /** T-079: what the configured AI provider is, in plain words (no key). Default: none. */
+  readonly aiDescription?: AiDescription | undefined;
   /** T-076 findings and scheduler. Defaults: in-memory stores (the entry point passes files). */
   readonly findings?: FindingsWiring | undefined;
 }
@@ -136,6 +139,20 @@ export interface CareOptions {
   readonly store?: CareStore | undefined;
   readonly simulated?: readonly SimulatedCareServer[] | undefined;
   readonly now?: (() => Date) | undefined;
+}
+
+const NO_AI: AiDescription = { available: false, providerLabel: "None: answers come from the checks only.", route: "No external service.", region: null };
+
+/** T-079: describe an AI configuration without its key. */
+export function describeAi(config: AiConfig): AiDescription {
+  if (config.provider !== "openai_compatible" || config.openai === null) return NO_AI;
+  let host = "the configured endpoint";
+  try {
+    host = new URL(config.openai.baseUrl).host;
+  } catch {
+    // keep the generic text
+  }
+  return { available: true, providerLabel: `An OpenAI-compatible model service (model ${config.openai.model}).`, route: `HTTPS to ${host}.`, region: null };
 }
 
 /** Simulated servers use obviously fake ids and can never shadow a real server. */
@@ -329,10 +346,25 @@ export async function buildServer(options: BuildServerOptions = {}) {
   const controllerClock = () => (mode === "fixture" ? NOT_CHECKED_CLOCK : service.controlPlane().clock);
   clockStatus = () => controllerClock().status;
   await fastify.register(fleetPlugin, { mode, service, config });
+  // T-079: installation settings (schedule, AI on/off, pause). The owner's
+  // saved schedule and time zone win over hosts.json.
+  const settings = options.findings?.settings ?? new SqliteSettingsStore({ path: ":memory:" });
+  // An assistant passed in without a description (tests) counts as available.
+  const aiDescription =
+    options.aiDescription ??
+    (options.assistant === undefined ? NO_AI : { available: true, providerLabel: "The assistant this process was started with.", route: "Set by the caller.", region: null });
+  const schedule = storedSchedule({ settings, defaults: { intervalMinutes: config.healthIntervalMinutes, timeZone: config.ownerTimeZone } });
+  if (settings.get(SCHEDULE_KEY) !== null) {
+    service.setIntervalMinutes(schedule.intervalMinutes);
+    service.setOwnerTimeZone(schedule.timeZone);
+  }
+  const deterministic = createAssistant(resolveAiConfig({ AI_PROVIDER: "none" }));
+  const configuredAssistant = options.assistant ?? deterministic;
   await fastify.register(assistantRoutes, {
-    assistant: options.assistant ?? createAssistant(resolveAiConfig({ AI_PROVIDER: "none" })),
+    // Turning AI off takes effect on the next message: no new inference.
+    assistant: () => (aiEnabled(settings, aiDescription) ? configuredAssistant : deterministic),
     fleet: () => (mode === "fixture" ? buildFixtureFleet(config, new Date()) : service.snapshot()),
-    timeZone: config.ownerTimeZone,
+    timeZone: () => (mode === "fixture" ? config.ownerTimeZone : service.ownerTimeZone()),
     now: options.now,
     controllerClock,
     ownerContext: ownerContextSource(options, fastify.log),
@@ -459,10 +491,24 @@ export async function buildServer(options: BuildServerOptions = {}) {
     },
   });
 
+  await fastify.register(settingsRoutes, {
+    mode,
+    settings,
+    service,
+    care: careStore,
+    servers: () => registryStore.listActive(),
+    ai: aiDescription,
+    defaults: { intervalMinutes: config.healthIntervalMinutes, timeZone: config.ownerTimeZone },
+    owner: (request) => {
+      if (request.authSession === null) throw new Error("settings route reached without a session");
+      return request.authSession.info.username;
+    },
+    now: options.findings?.now,
+  });
+
   // Fixture mode never contacts any server.
   // T-076: findings and the scheduler. Fixture mode keeps its [FIXTURE DATA]
   // findings in memory only, never in the persistent store.
-  const settings = options.findings?.settings ?? new SqliteSettingsStore({ path: ":memory:" });
   const findingStore = mode === "fixture" ? new SqliteFindingStore({ path: ":memory:" }) : (options.findings?.store ?? new SqliteFindingStore({ path: ":memory:" }));
   const fleetSnapshot = () => (mode === "fixture" ? buildFixtureFleet(config, new Date()) : service.snapshot());
   const tracker = new FindingTracker({ store: findingStore, fleet: fleetSnapshot, now: options.findings?.now });
