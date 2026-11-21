@@ -118,13 +118,14 @@ def submit(signed: dict, config: Config, system: System) -> dict:
     if manifest["preconditionDigest"] == "none" or precondition_digest(system, manifest) != manifest["preconditionDigest"]:
         return _rejected("PRECONDITION_CHANGED")
     if manifest["operation"] == "apply.packages.v1":
-        # T-090 (D-S7): refused before acceptance when a package has a configuration file the owner changed.
         keys = sorted("%s:%s" % (c["name"], c["arch"]) for c in manifest["scope"]["packages"])
-        changed = system.modified_conffiles(keys)
-        if changed is None:
-            return _rejected("PRECONDITION_CHANGED", "the changed configuration files could not be checked")
-        if changed:
-            return _rejected("CONFFILE_MODIFIED", "configuration files you changed: %s" % ", ".join(changed[:10]))
+        # T-092 (ADR-024): owner-modified configuration files no longer refuse the update (they are kept);
+        # only a package that would still ask a question does.
+        risk = system.prompt_risk(keys)
+        if risk is None:
+            return _rejected("PRECONDITION_CHANGED", "ServrSit could not check whether the update would ask a question")
+        if risk:
+            return _rejected("INTERACTIVE_PROMPT", "these packages could ask a question during installation that ServrSit never answers: %s" % ", ".join(risk[:10]))
         # T-090 (D-S8): a held package is refused before acceptance too.
         held = system.held_packages(keys)
         if held is None:
@@ -162,8 +163,11 @@ def query(operation_id: str, config: Config, system: System) -> dict:
         # T-090 (D-S6): services an update left needing a restart. Never restarted by the helper;
         # the controller proposes a separate restart.service.v1 plan for each.
         "restartNeeded": record.get("restartNeeded", []),
-        # T-090: PACKAGE_HELD, PACKAGE_LOCKED or CONFFILE_MODIFIED when a package update changed nothing for that reason.
+        # T-090: PACKAGE_HELD or PACKAGE_LOCKED when a package update changed nothing for that reason
+        # (CONFFILE_MODIFIED appears only in records written by 0.2.0).
         "reasonCode": record.get("reasonCode"),
+        # T-092 (ADR-024): [{path, newDefault}] for every owner file kept and every new default created.
+        "keptFiles": record.get("keptFiles", []),
         "evidence": record["evidence"][-20:],
     }
 

@@ -40,7 +40,7 @@ def run(operation_id: str, config: Config, system: System) -> int:
         ledger.update(operation_id, exitCode=result["exitCode"], evidence=result["evidence"])
         return 0
     ledger.update(operation_id, state=FINAL, outcome=result["outcome"], exitCode=result["exitCode"], finishedAt=system.now(),
-                  restartNeeded=result.get("restartNeeded", []), reasonCode=result.get("reasonCode"), evidence=result["evidence"])
+                  restartNeeded=result.get("restartNeeded", []), reasonCode=result.get("reasonCode"), keptFiles=result.get("keptFiles", []), evidence=result["evidence"])
     return 0
 
 
