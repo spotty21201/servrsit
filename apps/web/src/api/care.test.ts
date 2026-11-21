@@ -103,3 +103,10 @@ test("a refused CSRF token is refreshed once and the call retried; abort and tim
   const hang = ((_u: string, init?: RequestInit) => new Promise((_r, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("aborted"))))) as unknown as typeof fetch;
   assert.deepEqual(await createCareClient({ fetchImpl: hang, csrf, timeoutMs: 10 }).getPlan("p"), { ok: false, kind: "timeout" });
 });
+
+test("T-092: owner-modified files a package update keeps are exposed for the plan screen; malformed lists are refused", () => {
+  assert.deepEqual(toPlanView(PLAN)?.keptOwnerFiles, []);
+  const kept = { ...PLAN, scope: { ...PLAN.scope, keptOwnerFiles: [{ package: "openssh-server:amd64", path: "/etc/ssh/sshd_config" }] } };
+  assert.deepEqual(toPlanView(kept)?.keptOwnerFiles, [{ package: "openssh-server:amd64", path: "/etc/ssh/sshd_config" }]);
+  assert.equal(toPlanView({ ...PLAN, scope: { ...PLAN.scope, keptOwnerFiles: [{ package: "x", path: "/root/.ssh/id" }] } }), null);
+});

@@ -47,6 +47,11 @@ export interface PlanView {
     readonly includesServiceRestart: boolean;
     readonly includesReboot: boolean;
   };
+  /**
+   * T-092 (ADR-024): owner-modified configuration files this package update
+   * will keep (the new default goes beside each as .dpkg-dist). Empty when none.
+   */
+  readonly keptOwnerFiles?: readonly { readonly package: string; readonly path: string }[];
   /** The plan's full scope as the API sent it, for kinds other than packages. */
   readonly detail: Readonly<Record<string, unknown>>;
   readonly preconditions: { readonly previewDigest: string };
@@ -196,6 +201,9 @@ export function toPlanView(v: unknown): PlanView | null {
   const packages = packagesOf(scope["packages"]);
   if (packages === null) return null;
   if (op === "apply.packages.v1" && scope["packages"] === undefined) return null;
+  const keptRaw = scope["keptOwnerFiles"];
+  if (keptRaw !== undefined && (!Array.isArray(keptRaw) || !keptRaw.every((k) => isObj(k) && isStr(k["package"]) && isStr(k["path"]) && k["path"].startsWith("/etc/")))) return null;
+  const keptOwnerFiles = (keptRaw ?? []).map((k: Record<string, string>) => ({ package: k["package"]!, path: k["path"]! }));
   const blockers = v["blockers"];
   if (!Array.isArray(blockers) || !blockers.every((b) => isObj(b) && isStr(b["code"]) && isStr(b["message"]))) return null;
   const acks = v["requiredAcknowledgements"];
@@ -217,6 +225,7 @@ export function toPlanView(v: unknown): PlanView | null {
     serverId: v["serverId"],
     production: v["production"],
     scope: { packages, includesServiceRestart: scope["includesServiceRestart"] === true, includesReboot: scope["includesReboot"] === true },
+    keptOwnerFiles,
     detail: scope,
     preconditions: { previewDigest: v["preconditions"]["previewDigest"] },
     verification: { ...v["verification"], expectInstalled: (expect ?? {}) as Record<string, string> },

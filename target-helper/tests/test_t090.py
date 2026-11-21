@@ -311,6 +311,9 @@ class CommitPolicyTests(unittest.TestCase):
 
 
 class RunnerAndSubmitTests(unittest.TestCase):
+    # The D-S7 tests that refused owner-modified configuration files (CONFFILE_MODIFIED) were removed
+    # with ADR-024: helper 0.3.0 updates and keeps the owner's file instead (see test_t092.py).
+
     def setUp(self):
         self.env = Env()
 
@@ -342,21 +345,6 @@ class RunnerAndSubmitTests(unittest.TestCase):
         self.assertEqual(q["restartNeeded"], [])
         self.assertIn("ServrSit could not check which services need a restart", q["evidence"])
 
-    def test_D_S7_a_changed_configuration_file_is_refused_before_acceptance(self):
-        self.env.system.changed_conffiles = ["/etc/vim/vimrc"]
-        r = handle(self.env.request(self.env.manifest("apply.packages.v1", operationId=OP)), self.env.config, self.env.system)
-        self.assertEqual(r["code"], "CONFFILE_MODIFIED")
-        self.assertIn("/etc/vim/vimrc", r["detail"])
-        self.assertFalse([c for c in self.env.system.calls if c[0] in ("launch", "apply")])
-
-    def test_D_S7_a_configuration_file_changed_after_acceptance_stops_the_runner_before_apt(self):
-        self.accept()
-        self.env.system.changed_conffiles = ["/etc/vim/vimrc"]
-        run(OP, self.env.config, self.env.system)
-        q = self.query()
-        self.assertEqual(q["outcome"], "failed")
-        self.assertFalse([c for c in self.env.system.calls if c[0] == "apply"])
-
     def test_D_S9_a_locked_package_manager_ends_failed_with_PACKAGE_LOCKED_in_query(self):
         self.env.system.locked = True
         self.accept()
@@ -371,12 +359,6 @@ class RunnerAndSubmitTests(unittest.TestCase):
         self.assertEqual(r["code"], "PACKAGE_HELD")
         self.assertIn("does not override holds", r["detail"])
         self.assertFalse([c for c in self.env.system.calls if c[0] in ("launch", "apply")])
-
-    def test_D_S7_a_conffile_refusal_in_the_runner_is_typed(self):
-        self.accept()
-        self.env.system.changed_conffiles = ["/etc/x.conf"]
-        run(OP, self.env.config, self.env.system)
-        self.assertEqual(self.query()["reasonCode"], "CONFFILE_MODIFIED")
 
     def test_D_S7_a_half_configured_package_after_the_commit_is_not_success(self):
         self.env.system.audit = "The following packages are only half configured: vim"
@@ -397,7 +379,7 @@ class LedgerCompatibilityTests(unittest.TestCase):
             p.write_text(json.dumps(rec, sort_keys=True))
             os.chmod(p, 0o600)
             q = handle(env.query(OP), env.config, env.system)
-            self.assertEqual((q["found"], q["outcome"], q["restartNeeded"], q["helperVersion"]), (True, "succeeded", [], "0.2.0"))
+            self.assertEqual((q["found"], q["outcome"], q["restartNeeded"], q["helperVersion"]), (True, "succeeded", [], servrsit_helper.HELPER_VERSION))
         finally:
             env.close()
 
@@ -428,14 +410,13 @@ class VersionAndUpgradeTests(unittest.TestCase):
             capture_output=True, text=True, env={**os.environ, "SERVRSIT_ROOT": str(self.root)},
         )
 
-    def test_the_version_is_0_2_0_and_the_package_is_named_for_it(self):
-        self.assertEqual(servrsit_helper.HELPER_VERSION, "0.2.0")
-        self.assertEqual(self.package.name, "servrsit-helper-0.2.0.tar.gz")
+    def test_the_package_is_named_for_the_helper_version(self):
+        self.assertEqual(self.package.name, "servrsit-helper-%s.tar.gz" % servrsit_helper.HELPER_VERSION)
 
     def test_a_fresh_install_says_so(self):
         r = self.bootstrap()
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("installing helper 0.2.0", r.stdout)
+        self.assertIn("installing helper %s" % servrsit_helper.HELPER_VERSION, r.stdout)
 
     def test_installing_over_0_1_0_is_an_upgrade_that_replaces_the_code_and_keeps_the_ledger(self):
         lib = self.root / "usr" / "lib" / "servrsit"
@@ -446,7 +427,7 @@ class VersionAndUpgradeTests(unittest.TestCase):
         (led / (OP + ".json")).write_text(json.dumps({"operationId": OP, "state": "finished"}, sort_keys=True))
         r = self.bootstrap()
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("upgrading the helper from 0.1.0 to 0.2.0 (the ledger is kept)", r.stdout)
+        self.assertIn("upgrading the helper from 0.1.0 to %s (the ledger is kept)" % servrsit_helper.HELPER_VERSION, r.stdout)
         self.assertIn("would run: rm -rf -- %s/servrsit_helper %s/bin" % (lib, lib), r.stdout)
         self.assertNotIn("var/lib/servrsit/ledger\n", [l for l in r.stdout.splitlines() if "rm -rf" in l])
 

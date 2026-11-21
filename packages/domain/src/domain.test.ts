@@ -287,3 +287,27 @@ test("T-059: directories only under /srv or the user's home, safe modes, existin
   const bad = buildDirectoriesPlan({ ...base, requested: [d("/srv/a"), d("/etc/x")], preview: { existing: [], stateDigest: "x" } });
   assert.deepEqual(bad.blockers.map((b) => b.code), ["DIRECTORY_NOT_ALLOWED"], "one bad path blocks the whole plan");
 });
+
+test("T-092 (ADR-024): owner-modified files the update keeps are in the plan; none means the earlier shape and digest", () => {
+  const without = plan();
+  assert.equal("keptOwnerFiles" in without.scope, false, "no field when there is nothing to keep");
+  const same = plan({ preview: preview({ keptConffiles: [] }) });
+  assert.equal(same.digest, without.digest, "an empty list does not change the digest");
+  const kept = plan({
+    preview: preview({
+      keptConffiles: [
+        { package: "openssl:amd64", path: "/etc/ssl/openssl.cnf" },
+        { package: "not-in-plan:amd64", path: "/etc/other.conf" },
+        { package: "openssl:amd64", path: "/var/evil" },
+      ],
+    }),
+  });
+  assert.deepEqual(kept.scope.keptOwnerFiles, [{ package: "openssl:amd64", path: "/etc/ssl/openssl.cnf" }]);
+  assert.deepEqual(kept.blockers, [], "kept files do not block (ADR-024)");
+  assert.notEqual(kept.digest, without.digest, "approving the plan approves the kept files too");
+});
+
+test("T-092: a package that would still prompt blocks the plan", () => {
+  const p = plan({ preview: preview({ promptRisk: ["openssl:amd64"] }) });
+  assert.deepEqual(p.blockers.map((b) => b.code), ["INTERACTIVE_PROMPT"]);
+});

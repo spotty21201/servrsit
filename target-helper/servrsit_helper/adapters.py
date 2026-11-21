@@ -49,7 +49,45 @@ DPKG_LOCKS = ("/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock", "/var/cache/a
 #: Typed reasons for a package operation that ended without changing anything (Tech Spec 13).
 PACKAGE_HELD = "PACKAGE_HELD"
 PACKAGE_LOCKED = "PACKAGE_LOCKED"
-CONFFILE_MODIFIED = "CONFFILE_MODIFIED"
+#: T-092: a package would still ask an interactive question; refused before acceptance.
+INTERACTIVE_PROMPT = "INTERACTIVE_PROMPT"
+DIST_SUFFIXES = (".dpkg-dist", ".ucf-dist")
+MAX_DIST_FILES = 2000
+NONINTERACTIVE_FRONTEND = "/usr/share/perl5/Debconf/FrontEnd/Noninteractive.pm"
+
+
+def find_dist_files(root: str) -> set[str]:
+    """New-default files dpkg or ucf left beside kept configuration files, under <root>/etc.
+
+    Walks without following symlinks, bounded. Returns absolute paths as the
+    server sees them ("/etc/...").
+    """
+    base = os.path.join(root, "etc")
+    out: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
+        for name in filenames:
+            if name.endswith(DIST_SUFFIXES):
+                full = os.path.join(dirpath, name)
+                rel = "/" + os.path.relpath(full, root)
+                if _CONFFILE.fullmatch(rel) and not os.path.islink(full):
+                    out.add(rel)
+                    if len(out) >= MAX_DIST_FILES:
+                        return out
+    return out
+
+
+def kept_files(kept: list[str], before: set[str], after: set[str]) -> list[dict]:
+    """ADR-024: each kept owner file with the new default dpkg left beside it (or null), plus any other new default."""
+    created = sorted(after - before)
+    out = []
+    for path in sorted(kept):
+        new = next((d for d in created if d in (path + ".dpkg-dist", path + ".ucf-dist")), None)
+        out.append({"path": path, "newDefault": new})
+    paired = {k["newDefault"] for k in out if k["newDefault"] is not None}
+    for d in created:
+        if d not in paired:
+            out.append({"path": d.rsplit(".", 1)[0], "newDefault": d})
+    return out[:MAX_DIST_FILES]
 LOCKED_TEXT = "another program is using the package manager (an apt or dpkg lock is held); nothing was changed, try again when it has finished"
 
 
@@ -187,6 +225,8 @@ class System:
     def held_packages(self, keys: list[str]) -> list[str] | None: raise NotImplementedError
     def package_locks_free(self) -> bool: raise NotImplementedError
     def modified_conffiles(self, keys: list[str]) -> list[str] | None: raise NotImplementedError
+    def prompt_risk(self, keys: list[str]) -> list[str] | None: raise NotImplementedError
+    def dist_files(self) -> set[str]: return find_dist_files(self.root)
     def services_needing_restart(self) -> list[str] | None: raise NotImplementedError
     def dpkg_audit(self) -> str | None: raise NotImplementedError
     def service_state(self, unit: str) -> dict | None: raise NotImplementedError
@@ -282,6 +322,12 @@ class RealSystem(System):
     def package_locks_free(self) -> bool:
         return locks_free()
 
+    def prompt_risk(self, keys: list[str]) -> list[str] | None:
+        """T-092: packages that could still ask a question. With debconf's non-interactive
+        frontend present, debconf, dpkg (confdef/confold) and ucf (UCF_FORCE_CONFFOLD) all
+        answer without asking; without it, any package could prompt."""
+        return [] if os.path.isfile(NONINTERACTIVE_FRONTEND) else list(keys)
+
     def modified_conffiles(self, keys: list[str]) -> list[str] | None:
         # Names are schema-checked (start with a letter or digit), so none can look like an option.
         r = self._run(["dpkg", "--verify", *[dpkg_name(k) for k in keys]], timeout=120)
@@ -363,18 +409,24 @@ def run_operation(system: System, manifest: dict, allowed_units: list[str]) -> d
 
     if op == "apply.packages.v1":
         keys = sorted("%s:%s" % (c["name"], c["arch"]) for c in scope["packages"])
-        # D-S7: a configuration file the owner changed is never decided by an update approval.
-        changed_conf = system.modified_conffiles(keys)
-        if changed_conf is None:
-            return {"outcome": "failed", "exitCode": None, "evidence": ["the changed configuration files could not be checked; nothing was changed"]}
-        if changed_conf:
-            return {"outcome": "failed", "exitCode": None, "restartNeeded": [], "reasonCode": CONFFILE_MODIFIED,
-                    "evidence": ["you changed configuration files of these packages; nothing was changed: %s" % ", ".join(changed_conf[:10])]}
+        # T-092 (ADR-024): files the owner changed are kept (dpkg --force-confold); the update still runs.
+        kept_before = system.modified_conffiles(keys)
+        if kept_before is None:
+            return {"outcome": "failed", "exitCode": None, "restartNeeded": [], "keptFiles": [],
+                    "evidence": ["the changed configuration files could not be checked; nothing was changed"]}
+        dist_before = system.dist_files()
         ok, ev, reason_code = system.apply_packages(scope["packages"])
         evidence += ev
         if reason_code is not None:
             # D-S8 / D-S9: refused before apt changed anything, with a typed reason.
-            return {"outcome": "failed", "exitCode": None, "restartNeeded": [], "reasonCode": reason_code, "evidence": evidence}
+            return {"outcome": "failed", "exitCode": None, "restartNeeded": [], "keptFiles": [], "reasonCode": reason_code, "evidence": evidence}
+        kept = kept_files(kept_before, dist_before, system.dist_files())
+        for k in kept[:20]:
+            evidence.append(
+                "your file was kept: %s; the new default is at %s" % (k["path"], k["newDefault"])
+                if k["newDefault"] is not None
+                else "your file was kept: %s (this version brought no new default for it)" % k["path"]
+            )
         expect = verification["expectInstalled"]
         found = system.installed(sorted(expect))
         matched = [k for k, v in expect.items() if found.get(k) == v]
@@ -392,7 +444,7 @@ def run_operation(system: System, manifest: dict, allowed_units: list[str]) -> d
             evidence.append("no service needs a restart")
         all_ok = len(matched) == len(expect) and audit is None
         outcome = "succeeded" if all_ok else ("partially_succeeded" if matched else "failed")
-        return {"outcome": outcome, "exitCode": 0 if ok else 1, "evidence": evidence, "restartNeeded": (restart or [])[:20]}
+        return {"outcome": outcome, "exitCode": 0 if ok else 1, "evidence": evidence, "restartNeeded": (restart or [])[:20], "keptFiles": kept}
 
     if op == "restart.service.v1":
         unit = scope["unit"]

@@ -25,8 +25,10 @@ export type RejectCode =
   | "DIGEST_MISMATCH"
   | "TARGET_BUSY"
   | "PRECONDITION_CHANGED"
-  /** T-090: a package in the update has a configuration file the owner changed (helper 0.2.0). */
+  /** Helper 0.2.0 only: replaced in 0.3.0 by keeping the owner's file (ADR-024). */
   | "CONFFILE_MODIFIED"
+  /** T-092: a package would still ask an interactive question (helper 0.3.0). */
+  | "INTERACTIVE_PROMPT"
   /** T-090 (D-S8): a package in the update is on hold; ServrSit never overrides a hold. */
   | "PACKAGE_HELD";
 

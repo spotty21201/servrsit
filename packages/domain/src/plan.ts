@@ -56,6 +56,8 @@ export const BLOCKER_CODES = [
   "UNIT_NOT_FOUND",
   /** T-059: a requested directory breaks the path, owner or mode rules (Tech Spec §8.3). */
   "DIRECTORY_NOT_ALLOWED",
+  /** T-092 (ADR-024): a package would still ask an interactive question; ServrSit never answers one. */
+  "INTERACTIVE_PROMPT",
 ] as const;
 export type BlockerCode = (typeof BLOCKER_CODES)[number];
 
@@ -74,6 +76,7 @@ export const BLOCKER_MESSAGES: Readonly<Record<BlockerCode, string>> = {
   PACKAGE_REMOVAL_UNSUPPORTED: "The update would remove packages, which is not supported.",
   DOWNGRADE_UNSUPPORTED: "The update would downgrade packages, which is not supported.",
   HELD_PACKAGE: "The update involves held packages. Holds are never overridden.",
+  INTERACTIVE_PROMPT: "A package in this update would ask a question during installation that has no safe automatic answer. Update it yourself.",
   PACKAGE_LOCKED: "The package manager is in use by another process.",
   ONLY_EXCLUDED_PACKAGES:
     "The only pending updates come from sources outside Ubuntu's archive. Update plans leave those out by default.",
@@ -121,7 +124,28 @@ export interface TransactionPreview {
   readonly locked: boolean;
   /** Digest of the observed package state the preview was computed from. */
   readonly stateDigest: string;
+  /**
+   * T-092 (ADR-024): configuration files the owner changed that belong to
+   * packages in the update. The update still runs; each file is kept and
+   * the new default is left beside it (.dpkg-dist). Absent means none.
+   */
+  readonly keptConffiles?: readonly KeptConffile[] | undefined;
+  /**
+   * T-092: packages the target says would still ask an interactive question
+   * even with ServrSit's non-interactive settings. Any entry blocks the plan.
+   */
+  readonly promptRisk?: readonly string[] | undefined;
 }
+
+/** One owner-modified configuration file an update will keep (ADR-024). */
+export interface KeptConffile {
+  /** "name:arch" of the package the file belongs to. */
+  readonly package: string;
+  /** Absolute path under /etc. */
+  readonly path: string;
+}
+
+const KEPT_PATH = /^\/etc\/[A-Za-z0-9._@+/-]{1,250}$/;
 
 export interface PlanServer {
   readonly id: string;
@@ -156,6 +180,11 @@ export interface PackagesPlan {
     readonly packages: readonly PackageChange[];
     /** Pending updates the plan leaves out (T-062). Shown to the owner; never applied. */
     readonly excludedPackages: readonly ExcludedPackage[];
+    /**
+     * T-092 (ADR-024): owner-modified configuration files the update will keep
+     * (the new default goes beside each as .dpkg-dist). Present only when non-empty.
+     */
+    readonly keptOwnerFiles?: readonly KeptConffile[];
     readonly includesServiceRestart: false;
     readonly includesReboot: false;
   };
@@ -240,6 +269,7 @@ export function buildPlan(input: BuildPlanInput): PackagesPlan {
   const preview = input.preview;
   let packages: PackageChange[] = [];
   let excludedPackages: ExcludedPackage[] = [];
+  let keptOwnerFiles: KeptConffile[] = [];
   if (preview === null) {
     if (input.server.writesEnabled) blockers.push(block("PLAN_UNAVAILABLE"));
   } else {
@@ -260,6 +290,12 @@ export function buildPlan(input: BuildPlanInput): PackagesPlan {
     if (preview.downgrades.length > 0) blockers.push(block("DOWNGRADE_UNSUPPORTED"));
     if (preview.held.length > 0) blockers.push(block("HELD_PACKAGE"));
     if (preview.locked) blockers.push(block("PACKAGE_LOCKED"));
+    if ((preview.promptRisk ?? []).length > 0) blockers.push(block("INTERACTIVE_PROMPT"));
+    const inPlan = new Set(packages.map((c) => `${c.name}:${c.arch}`));
+    keptOwnerFiles = (preview.keptConffiles ?? [])
+      .filter((k) => inPlan.has(k.package) && KEPT_PATH.test(k.path))
+      .map((k) => ({ package: k.package, path: k.path }))
+      .sort((a, b) => a.path.localeCompare(b.path) || a.package.localeCompare(b.package));
     if (packages.length === 0 && blockers.every((b) => b.code !== "PLAN_UNAVAILABLE")) {
       blockers.push(block(excludedPackages.length > 0 ? "ONLY_EXCLUDED_PACKAGES" : "NO_CHANGES"));
     }
@@ -271,7 +307,14 @@ export function buildPlan(input: BuildPlanInput): PackagesPlan {
     operation: input.operation,
     serverId: input.server.id,
     production: input.server.production,
-    scope: { packages, excludedPackages, includesServiceRestart: false, includesReboot: false },
+    // T-092: listed only when there are any, so plans without kept files keep their earlier shape and digest.
+    scope: {
+      packages,
+      excludedPackages,
+      ...(keptOwnerFiles.length === 0 ? {} : { keptOwnerFiles }),
+      includesServiceRestart: false,
+      includesReboot: false,
+    },
     preconditions: { previewDigest: preview?.stateDigest ?? "none" },
     verification: {
       expectInstalled: Object.fromEntries(packages.map((c) => [`${c.name}:${c.arch}`, c.to])),

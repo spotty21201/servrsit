@@ -12,7 +12,7 @@ export {
   PRODUCTION_ACKS,
   verifyPlanDigest,
 } from "./plan.js";
-export type { Blocker, BlockerCode, BuildPlanInput, ExcludedPackage, PackageChange, PackagesPlan, Plan, PlanServer, TransactionPreview } from "./plan.js";
+export type { Blocker, BlockerCode, BuildPlanInput, ExcludedPackage, KeptConffile, PackageChange, PackagesPlan, Plan, PlanServer, TransactionPreview } from "./plan.js";
 export {
   ALL_STATES,
   assertTransition,

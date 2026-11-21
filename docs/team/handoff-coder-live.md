@@ -2006,3 +2006,49 @@ sentani-helper-install.sh --no-copy (temporary keys): builds servrsit-helper-0.2
 ```
 
 **Not proven** (Sentani, T-088): python-apt's real `selected_state` on a held package, and the real lock error during commit.
+
+## T-092: helper 0.3.0, keep owner-modified configuration files (ADR-024; branch `feat/coder/helper-0.3`, from `integration/live-v1`)
+
+Nothing was run on Sentani; the Tester is mid-run on 0.2.0 there.
+
+**Helper changes:**
+
+- **No more refusal for changed configuration files.** The `CONFFILE_MODIFIED` refusal (at submit and in the runner) is removed. The update runs with `--force-confdef --force-confold` (and `UCF_FORCE_CONFFOLD=1`, unchanged from 0.2.0), so dpkg keeps a file the owner changed and leaves the new default beside it.
+- **Before the commit,** the helper records the owner-modified files (`dpkg --verify`) and the existing `.dpkg-dist` and `.ucf-dist` files under `/etc` (the walk follows no symlinks and is bounded).
+- **After the commit,** each kept file is paired with the new default dpkg created. The result is recorded as:
+  - `keptFiles: [{path, newDefault|null}]` in the ledger and in `query.operation.v1`;
+  - evidence lines such as "your file was kept: /etc/x; the new default is at /etc/x.dpkg-dist", or "… (this version brought no new default for it)";
+  - any other new default that appeared, which is listed too.
+
+  Verification still runs: versions, `dpkg --audit`, and the needrestart list (invariant 9).
+- **Refused at submit only when a package could still prompt:** `INTERACTIVE_PROMPT`. On the target, this check returns every package as at risk when debconf's non-interactive frontend (`/usr/share/perl5/Debconf/FrontEnd/Noninteractive.pm`) is missing. With it present, debconf, dpkg and ucf all answer without asking. If the check cannot be made, the reply is `PRECONDITION_CHANGED`.
+- **Worker:** `INTERACTIVE_PROMPT` is added to `RejectCode`. `CONFFILE_MODIFIED` is kept, marked as 0.2.0 only.
+
+**Planner** (`packages/domain/src/plan.ts`):
+
+- `TransactionPreview` gains optional `keptConffiles: [{package, path}]` and `promptRisk: string[]`.
+- The package plan's scope gets `keptOwnerFiles`. It holds only files of packages in the plan, with paths under `/etc`, sorted, and only when the list is non-empty. That means existing plans keep their shape and digest. When the list is present, the digest covers it, so approval covers the kept files.
+- `promptRisk` adds the new blocker `INTERACTIVE_PROMPT`. Kept files never block.
+- **Web:** the care client's `PlanView.keptOwnerFiles` is validated (paths must be under `/etc`) and always set by `toPlanView`. It is optional in the type so the Designer's fixtures still compile.
+
+**Not built: the target-side preview (`plan.packages.v1`) that would fill in `keptConffiles` and `promptRisk`.** Until it exists, the plan screen shows the field only when a preview provides it. The helper still keeps and records the files at run time either way.
+
+**Tests:**
+
+- **`target-helper/tests/test_t092.py`:**
+  - **Fake-root case:** an owner-modified `/etc/ssl/openssl.cnf`, and a fake apt that acts like confold and writes `.dpkg-dist`. The update is accepted and succeeds. The owner's file is unchanged. `keptFiles` and the evidence name the new default.
+  - **Other cases:** a kept file without a new default; an old `.dpkg-dist` not claimed as new; a symlink-safe walk; the prompt refusal; prompt-check failure; the real frontend check; the version.
+- **Retired:** the three T-090 tests for the 0.2.0 refusal, superseded by ADR-024.
+- **Domain:** no field and the same digest when nothing is kept; kept files are filtered to the plan and `/etc`; the prompt blocker.
+- **Web:** `keptOwnerFiles` parsing.
+
+**Package:** `servrsit-helper-0.3.0.tar.gz`, SHA-256 `604f3fce0afc26fad6a25c18b140a138ce83bb30accf4d7df71f2f7df21540e2`. The install script builds it, and `dry-run.sh` and `install.sh` are unchanged. Installing over 0.2.0 is an upgrade that keeps the ledger. It is refused while an operation is unfinished, which matters because the Tester is mid-run.
+
+**Checks:**
+
+```
+target-helper unittest: Ran 104 tests, OK; guarded PATH (sudo, runuser, systemctl, systemd-run, apt, apt-get, dpkg, needrestart, useradd, userdel, install, ssh): 0 calls
+pnpm -r test exit 0 (api 250, web 216, ai 156, ssh 61, store 28, domain 24, worker 19, infra 9); typecheck all 9 exit 0; web build ok
+```
+
+**Not proven** (Sentani): dpkg's real confold behaviour and real `.dpkg-dist` creation under the transient unit.

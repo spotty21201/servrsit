@@ -44,7 +44,7 @@ checksum-verified package; bootstrap reads them only from there.
 Package updates (helper 0.2.0, T-090):
 - **Architecture: all packages** are matched by apt's own name resolution.
 - **No service restarts during an update.** The commit runs with needrestart suspended and in list-only mode. Services that need a restart afterwards are reported (`restartNeeded`) for a separate restart approval.
-- **Prompts and configuration files.** The commit runs with no prompts (`DEBIAN_FRONTEND=noninteractive`) and with `--force-confdef --force-confold`. An update touching a configuration file the owner changed is refused before acceptance (`CONFFILE_MODIFIED`).
+- **Prompts and configuration files** (0.3.0, ADR-024). The commit runs with no prompts (`DEBIAN_FRONTEND=noninteractive`) and with `--force-confdef --force-confold`. A configuration file the owner changed is **kept**, and the package's new default is left beside it as `.dpkg-dist`. Both are recorded (`keptFiles` in the query, and "your file was kept: …; the new default is at …" in the evidence). An update is refused before acceptance (`INTERACTIVE_PROMPT`) only when a package could still ask a question, which happens when debconf's non-interactive frontend is missing.
 - **Unfinished packages.** `dpkg --audit` must be clean after the commit, or the operation is not reported as succeeded.
 - **Holds and locks.** A held package (`apt-mark hold`) is refused with `PACKAGE_HELD` and its name; holds are never overridden. If another program holds an apt or dpkg lock, the operation ends `failed` with `reasonCode: PACKAGE_LOCKED` and "nothing was changed, try again".
 

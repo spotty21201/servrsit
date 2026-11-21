@@ -40,6 +40,7 @@ class FakeSystem(System):
         self.restart_needed: list[str] | None = []
         self.audit: str | None = None
         self.held: list[str] = []
+        self.prompting: list[str] | None = []
         self.locked = False
 
     def host_key_fingerprints(self):
@@ -59,6 +60,9 @@ class FakeSystem(System):
             for c in changes:
                 self.packages["%s:%s" % (c["name"], c["arch"])] = c["to"]
         return self.apply_ok, ["fake apt"], None
+
+    def prompt_risk(self, keys):
+        return None if self.prompting is None else [k for k in keys if k in self.prompting]
 
     def held_packages(self, keys):
         return [k for k in keys if k in self.held]
