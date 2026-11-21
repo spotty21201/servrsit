@@ -80,7 +80,7 @@ class SourceTests(unittest.TestCase):
             for node in ast.walk(ast.parse(path.read_text())):
                 names = [a.name for a in node.names] if isinstance(node, ast.Import) else [node.module] if isinstance(node, ast.ImportFrom) and node.level == 0 else []
                 for mod in names:
-                    self.assertIn(mod.split(".")[0], stdlib_ok | {"cryptography", "apt"}, "%s imports %s" % (path.name, mod))
+                    self.assertIn(mod.split(".")[0], stdlib_ok | {"cryptography", "apt", "apt_pkg"}, "%s imports %s" % (path.name, mod))
 
 
 class SudoersTests(unittest.TestCase):

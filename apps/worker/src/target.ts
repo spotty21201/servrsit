@@ -24,7 +24,9 @@ export type RejectCode =
   | "EXPIRED"
   | "DIGEST_MISMATCH"
   | "TARGET_BUSY"
-  | "PRECONDITION_CHANGED";
+  | "PRECONDITION_CHANGED"
+  /** T-090: a package in the update has a configuration file the owner changed (helper 0.2.0). */
+  | "CONFFILE_MODIFIED";
 
 export interface RemoteRecord {
   readonly operationId: string;

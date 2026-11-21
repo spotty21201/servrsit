@@ -9,5 +9,5 @@ python3-cryptography (signature checks) and python3-apt (package adapter).
 Nothing comes from pip.
 """
 
-HELPER_VERSION = "0.1.0"
+HELPER_VERSION = "0.2.0"
 """Reported by query and checked by the controller before it sends an operation."""

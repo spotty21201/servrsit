@@ -36,6 +36,9 @@ class FakeSystem(System):
         self.calls: list[tuple] = []
         self.launch_code = 0
         self.apply_ok = True
+        self.changed_conffiles: list[str] = []
+        self.restart_needed: list[str] | None = []
+        self.audit: str | None = None
 
     def host_key_fingerprints(self):
         return {HOST_KEY}
@@ -52,6 +55,16 @@ class FakeSystem(System):
             for c in changes:
                 self.packages["%s:%s" % (c["name"], c["arch"])] = c["to"]
         return self.apply_ok, ["fake apt"]
+
+    def modified_conffiles(self, keys):
+        self.calls.append(("verify", tuple(keys)))
+        return list(self.changed_conffiles)
+
+    def services_needing_restart(self):
+        return None if self.restart_needed is None else list(self.restart_needed)
+
+    def dpkg_audit(self):
+        return self.audit
 
     def service_state(self, unit):
         s = self.services.get(unit)

@@ -117,6 +117,14 @@ def submit(signed: dict, config: Config, system: System) -> dict:
         return _rejected("EXPIRED", "the manifest's acceptance window is longer than this helper allows")
     if manifest["preconditionDigest"] == "none" or precondition_digest(system, manifest) != manifest["preconditionDigest"]:
         return _rejected("PRECONDITION_CHANGED")
+    if manifest["operation"] == "apply.packages.v1":
+        # T-090 (D-S7): refused before acceptance when a package has a configuration file the owner changed.
+        keys = sorted("%s:%s" % (c["name"], c["arch"]) for c in manifest["scope"]["packages"])
+        changed = system.modified_conffiles(keys)
+        if changed is None:
+            return _rejected("PRECONDITION_CHANGED", "the changed configuration files could not be checked")
+        if changed:
+            return _rejected("CONFFILE_MODIFIED", "configuration files you changed: %s" % ", ".join(changed[:10]))
 
     status, record = ledger.claim(manifest["operationId"], digest, manifest, system.now())
     if record is None:
@@ -145,6 +153,9 @@ def query(operation_id: str, config: Config, system: System) -> dict:
         "helperVersion": HELPER_VERSION,
         "record": _public(record),
         "outcome": record["outcome"],
+        # T-090 (D-S6): services an update left needing a restart. Never restarted by the helper;
+        # the controller proposes a separate restart.service.v1 plan for each.
+        "restartNeeded": record.get("restartNeeded", []),
         "evidence": record["evidence"][-20:],
     }
 
