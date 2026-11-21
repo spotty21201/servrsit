@@ -194,6 +194,13 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 - **NOT proven:** a client kill **inside dpkg's ~5-second unpack/configure window**. The transient unit does not depend on the SSH session, as the kills at 08:18:20 to 08:18:23 already show, so I don't expect a different result. But the instruction asked for mid-dpkg, and it was not achieved.
 - **Proposed redo:** a founder step F4 downgrades the LLVM set again, the same as F1 for those 3 packages. Then a revised script fires a killed query and a killed identical resubmit **every second** from acceptance until the ledger says finished, so several kills must land inside the dpkg window. dpkg.log timestamps then confirm which ones did.
 
+### 3c redo — preparation
+
+- **Approved** by Orchestrator: the mid-dpkg kill matters for FR-17.
+- **Founder script** `~spotty/servrsit-t088/f4.sh`, reviewed read-only: spotty:spotty mode 664 (D-S3 still applies), sha256 `55be73df01ec59449073af21c9e9b27bcb9ea455716a6266e63db560c8f26674`. Its simulation guard requires exactly 3 `Inst` lines and ` 0 to remove`. The real install has **no pipe**, and the script prints `apt exit $RC`, so D-S2 does not apply to this script.
+- **Waiting** for "T-088 F4 done, apt exit 0".
+- **Script:** `tests/live/t088/t3c2.sh`.
+
 ### 4, 5 — not run yet
 
 - ~~**Step 2 is blocked**~~ (resolved by option B / F1, see step 2 above): there was no pending update that `apt-get upgrade` (the product's own observation) would install. Applying the 11 phased systemd packages would override Ubuntu's staged rollout, re-execute systemd, and restart resolved, timesyncd and udev. That is a founder decision. The options are in `docs/team/t088-founder-steps.md`; option B (downgrade 8 harmless packages, then install them back through the helper) is recommended.
