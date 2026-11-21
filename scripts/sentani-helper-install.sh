@@ -101,7 +101,7 @@ fi
 
 CMD="sh bootstrap.sh --package $NAME.tar.gz --sha256 $SHA --installation-id $INSTALLATION_ID --trust trust.json --account $ACCOUNT --create-account --home-user $HOME_USER --install-deps --from $FROM --authorized-key \"$PUBLIC_LINE\""
 echo
-echo "== 5. On $SERVER, run these yourself (log in as $TARGET; nothing has been installed yet)"
+echo "== 5. On $SERVER, run these yourself (log in as $TARGET; nothing has been installed by this script)"
 echo
 echo "   Short version (recommended):  cd ~/$NAME   then   sudo sh dry-run.sh   then   sudo sh install.sh"
 echo
@@ -112,6 +112,10 @@ echo
 echo "   Then, if the dry run looks right, the real install:"
 echo
 echo "     cd ~/$NAME && sudo $CMD"
+echo
+echo "   Upgrading from an older helper (T-090): run the same two commands in this new folder."
+echo "   The install replaces the helper code and keeps the ledger, the account and the key."
+echo "   It refuses while an operation is unfinished."
 echo
 echo "   To remove it later (keeps the ledger):"
 echo

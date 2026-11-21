@@ -1957,3 +1957,33 @@ api tests 250/250 (2 new bench tests); tsc --noEmit exit 0
 ```
 
 ssh was never run.
+
+## T-090: helper 0.2.0, fixes from test-report-sentani-001 (branch `feat/coder/helper-0.2`, from `integration/live-v1`)
+
+Nothing was run on Sentani or any other server. The founder reinstalls.
+
+| ID | Fix | Tests (`target-helper/tests/test_t090.py`) |
+|---|---|---|
+| **D-S5** | `resolve_transaction()` looks up each change with apt's own resolution (`cache["vim-common:all"]` gives the package whose fullname is `vim-common:amd64`). The marked set is compared with `cache.get_changes()` by **resolved** fullname, so a manifest that labels an Architecture: all package `:all` is accepted. Extra, removed, unknown or duplicated packages still refuse the whole transaction. dpkg calls use the bare name for an `all` package. | The real `RealSystem.apply_packages` against a fake `apt`/`apt_pkg` whose `fullname` differs from the lookup key, like python-apt on Sentani. Also extra-change, delete, unknown and duplicate cases. |
+| **D-S6** (High, invariant 5) | The commit runs with `NEEDRESTART_SUSPEND=1` and `NEEDRESTART_MODE=l`, so needrestart's apt hook restarts nothing. The environment is restored afterwards. Then `needrestart -b -r l` (list only) records the services that need a restart. They go in the ledger record and in `query.operation.v1` as `restartNeeded`, with the evidence line "not restarted; needs a separate restart approval". If needrestart cannot answer, the evidence says so. | Commit env checked inside the fake commit; fixed argv; parser refuses odd names; the runner never calls restart or reboot; `restartNeeded` is in the query reply. |
+| **D-S7** | The commit runs with `DEBIAN_FRONTEND=noninteractive`, `DEBCONF_NONINTERACTIVE_SEEN=true`, `APT_LISTCHANGES_FRONTEND=none`, `UCF_FORCE_CONFFOLD=1`, `DPkg::Options::=--force-confdef` and `--force-confold`, and `Dpkg::Use-Pty=0`. **Refused at submit, before acceptance:** any package with a configuration file the owner changed (`dpkg --verify`), with the new reject code `CONFFILE_MODIFIED`, which is also added to the worker's `RejectCode`. The runner checks this again before apt, and does nothing if one changed after acceptance. After the commit, `dpkg --audit` must be clean, or the operation is not `succeeded`. | Refusal at submit and in the runner (apt is not called); a half-configured package after the commit is not success; dpkg-verify parser. |
+| Upgrade | `HELPER_VERSION` is **0.2.0**. Bootstrap over an installed helper is an **upgrade**. It prints "upgrading the helper from X to Y (the ledger is kept)", replaces `servrsit_helper/` and `bin/`, and keeps the ledger, account and key line. It is refused while any ledger operation is unfinished. Uninstall followed by a fresh install also works (the ledger is kept; records from 0.1.0 are still answered). | Fresh install, upgrade over 0.1.0, refused with an unfinished operation, a 0.1.0 ledger record queried by 0.2.0. |
+| Install script | `scripts/sentani-helper-install.sh` builds `servrsit-helper-0.2.0` and writes `dry-run.sh` and `install.sh` (unchanged wrappers). It now says that upgrading means running the same two commands in the new folder. | `--no-copy` run with temporary keys; the generated `dry-run.sh` run against a fake root that has 0.1.0 installed: rc=0, "upgrading … 0.1.0 to 0.2.0". |
+
+**D-S2 is not fixed by me.** `f1.sh` exists only on Sentani, as the Orchestrator's script; it is not in any repository, and I don't touch Sentani. The fix: run `apt-get install -y --allow-downgrades $PKGS` without the `| tail -n 2` pipe (or add `set -o pipefail` under bash), and check the 8 versions with `dpkg-query` before printing "done".
+
+**Package:** `servrsit-helper-0.2.0.tar.gz`, SHA-256 `55b6d1178ef4d7b597c28820b0ef779483eb8351179fe4fc8464cd05bee53384` (reproducible build).
+
+**Checks:**
+
+```
+target-helper unittest: Ran 88 tests, OK (18+1 new); with stubs for sudo, runuser, systemctl, systemd-run, apt, apt-get, dpkg, needrestart, useradd, userdel, install, ssh first on PATH: 0 calls
+pnpm -r test exit 0 (api 250, web 215, ai 156, ssh 61, store 28, domain 22, worker 19, infra 9); typecheck all 9 exit 0
+```
+
+**Not proven** (needs Sentani, T-088):
+
+- the real python-apt behaviour of the fix, and that needrestart's hook honours `NEEDRESTART_SUSPEND` in the transient unit;
+- `dpkg --verify` and `--audit` output on Ubuntu 24.04.
+
+**The controller does not yet turn `restartNeeded` into a finding or a restart plan.** That needs the real SSH write target (T-089). Until then the helper reports it in query and evidence.

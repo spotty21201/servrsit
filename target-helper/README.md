@@ -41,6 +41,14 @@ checksum-verified package; bootstrap reads them only from there.
 `uninstall.sh` stops if the ledger has an unfinished operation or a
 `servrsit-op-*` unit is running, unless `--force` (and then keeps the ledger).
 
+Package updates (helper 0.2.0, T-090):
+- **Architecture: all packages** are matched by apt's own name resolution.
+- **No service restarts during an update.** The commit runs with needrestart suspended and in list-only mode. Services that need a restart afterwards are reported (`restartNeeded`) for a separate restart approval.
+- **Prompts and configuration files.** The commit runs with no prompts (`DEBIAN_FRONTEND=noninteractive`) and with `--force-confdef --force-confold`. An update touching a configuration file the owner changed is refused before acceptance (`CONFFILE_MODIFIED`).
+- **Unfinished packages.** `dpkg --audit` must be clean after the commit, or the operation is not reported as succeeded.
+
+Installing a newer version over an older one is an upgrade. It replaces the code, keeps the ledger, the account and the key, and is refused while an operation is unfinished.
+
 Dependencies, from Ubuntu's archive only: `python3` (3.12), `python3-apt`,
 `python3-cryptography`. Nothing from pip. The package is a reproducible
 tarball with a SHA-256 that bootstrap checks before installing anything.

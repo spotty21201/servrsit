@@ -108,6 +108,23 @@ tar -xzf "$PACKAGE" -C "$WORK" --no-same-owner --no-same-permissions
 PKG="$WORK/servrsit-helper/packaging"
 for f in sudoers.in account-add-key.sh; do [ -f "$PKG/$f" ] && [ ! -L "$PKG/$f" ] || die "the package has no $f; nothing was installed"; done
 LIB="${ROOT%/}/usr/lib/servrsit"; ETC="${ROOT%/}/etc/servrsit"; VAR="${ROOT%/}/var/lib/servrsit"
+NEW_VERSION=$(cat "$WORK/servrsit-helper/VERSION")
+# T-090: installing over an existing helper (an upgrade) is supported. It
+# replaces the code and configuration, keeps the ledger and the account, and
+# is refused while an operation is unfinished (it must not change the code
+# under a running job).
+if [ -f "$LIB/VERSION" ]; then
+  step "upgrading the helper from $(cat "$LIB/VERSION") to $NEW_VERSION (the ledger is kept)"
+  if [ -d "$VAR/ledger" ]; then
+    for f in "$VAR"/ledger/*.json; do
+      [ -f "$f" ] || continue
+      grep -q '"state": "finished"' "$f" || die "operation $(basename "$f" .json) is not finished; wait for it before upgrading. Nothing was changed."
+    done
+  fi
+  run rm -rf -- "$LIB/servrsit_helper" "$LIB/bin"
+else
+  step "installing helper $NEW_VERSION"
+fi
 step "installing the helper into $LIB"
 run install -d -m 0755 -o root -g root "$LIB" "$LIB/bin" "$LIB/servrsit_helper"
 for f in "$WORK"/servrsit-helper/servrsit_helper/*.py; do run install -m 0644 -o root -g root "$f" "$LIB/servrsit_helper/"; done

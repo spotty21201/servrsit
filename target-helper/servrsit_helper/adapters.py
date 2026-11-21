@@ -16,6 +16,7 @@ import grp
 import hashlib
 import os
 import pwd
+import re
 import stat
 import subprocess
 from datetime import datetime, timezone
@@ -26,6 +27,71 @@ from .paths import PathRefused, create_directory, exists_nofollow
 RUNNER = "/usr/lib/servrsit/bin/servrsit-runner"
 HOST_KEY_FILES = ("/etc/ssh/ssh_host_ed25519_key.pub", "/etc/ssh/ssh_host_ecdsa_key.pub", "/etc/ssh/ssh_host_rsa_key.pub")
 CHILD_ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C", "LANG": "C"}
+
+# T-090 (D-S6, D-S7): the environment of an APT commit. needrestart is
+# suspended (its apt hook would otherwise restart services inside a
+# package-only approval, invariant 5) and set to list-only; debconf and
+# apt-listchanges never prompt; dpkg keeps a configuration file the owner
+# changed (--force-confold) and takes the default for an unchanged one.
+COMMIT_ENV = {
+    "NEEDRESTART_SUSPEND": "1",
+    "NEEDRESTART_MODE": "l",
+    "DEBIAN_FRONTEND": "noninteractive",
+    "DEBCONF_NONINTERACTIVE_SEEN": "true",
+    "APT_LISTCHANGES_FRONTEND": "none",
+    "UCF_FORCE_CONFFOLD": "1",
+}
+DPKG_OPTIONS = ("--force-confdef", "--force-confold")
+
+_UNIT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9@_.:-]{0,95}\.service$")
+_CONFFILE = re.compile(r"^/etc/[A-Za-z0-9._@+/-]{1,250}$")
+
+
+def dpkg_name(key: str) -> str:
+    """'name:arch' for dpkg; an Architecture: all package goes by its bare name."""
+    name, _, arch = key.partition(":")
+    return name if arch == "all" else key
+
+
+def resolve_transaction(cache, changes: list[dict]) -> tuple[dict | None, str | None]:
+    """T-090 (D-S5): resolve each change through apt's own lookup.
+
+    Returns ({resolved fullname: (key, package, change)}, None) or (None, reason). apt
+    resolves "vim-common:all" to the package whose fullname is
+    "vim-common:amd64"; comparing by resolved fullname on both sides means an
+    Architecture: all package is matched, and nothing else is.
+    """
+    resolved: dict = {}
+    for c in changes:
+        key = "%s:%s" % (c["name"], c["arch"])
+        pkg = cache[key] if key in cache else None
+        if pkg is None:
+            return None, "%s is not known to apt" % key
+        if pkg.fullname in resolved:
+            return None, "%s appears twice in the transaction" % key
+        resolved[pkg.fullname] = (key, pkg, c)
+    return resolved, None
+
+
+def parse_needrestart(stdout: str) -> list[str]:
+    """`needrestart -b` lines 'NEEDRESTART-SVC: <unit>' -> valid unit names (sorted, unique)."""
+    units = set()
+    for line in stdout.splitlines():
+        if line.startswith("NEEDRESTART-SVC:"):
+            unit = line.split(":", 1)[1].strip()
+            if _UNIT.fullmatch(unit):
+                units.add(unit)
+    return sorted(units)
+
+
+def parse_dpkg_verify(stdout: str) -> list[str]:
+    """`dpkg --verify` lines like '??5?????? c /etc/x' -> changed configuration files."""
+    out = set()
+    for line in stdout.splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[1] == "c" and len(parts[0]) == 9 and parts[0][2] == "5" and _CONFFILE.fullmatch(parts[2]):
+            out.add(parts[2])
+    return sorted(out)
 
 
 def now_iso() -> str:
@@ -53,6 +119,9 @@ class System:
     def boot_id(self) -> str: raise NotImplementedError
     def installed(self, keys: list[str]) -> dict[str, str | None]: raise NotImplementedError
     def apply_packages(self, changes: list[dict]) -> tuple[bool, list[str]]: raise NotImplementedError
+    def modified_conffiles(self, keys: list[str]) -> list[str] | None: raise NotImplementedError
+    def services_needing_restart(self) -> list[str] | None: raise NotImplementedError
+    def dpkg_audit(self) -> str | None: raise NotImplementedError
     def service_state(self, unit: str) -> dict | None: raise NotImplementedError
     def restart(self, unit: str) -> int: raise NotImplementedError
     def reboot(self) -> int: raise NotImplementedError
@@ -94,27 +163,60 @@ class RealSystem(System):
     def apply_packages(self, changes: list[dict]) -> tuple[bool, list[str]]:
         """Install exactly these versions from Ubuntu's archive, or nothing."""
         import apt
+        import apt_pkg
 
         cache = apt.Cache()
-        evidence = []
+        resolved, reason = resolve_transaction(cache, changes)
+        if resolved is None:
+            return False, [reason]
         with cache.actiongroup():
-            for c in changes:
-                key = "%s:%s" % (c["name"], c["arch"])
-                pkg = cache[key] if key in cache else None
-                if pkg is None or pkg.installed is None or pkg.installed.version != c["from"]:
+            for key, pkg, c in resolved.values():
+                if pkg.installed is None or pkg.installed.version != c["from"]:
                     return False, ["%s is not installed at %s" % (key, c["from"])]
                 target = pkg.versions.get(c["to"])
                 if target is None or not any(o.origin == "Ubuntu" for o in target.origins):
                     return False, ["%s %s is not available from Ubuntu's archive" % (key, c["to"])]
                 pkg.candidate = target
                 pkg.mark_install(auto_fix=False, from_user=False)
-        wanted = {"%s:%s" % (c["name"], c["arch"]) for c in changes}
         changed = {p.fullname for p in cache.get_changes()}
-        if changed != wanted or cache.delete_count > 0:
+        if changed != set(resolved) or cache.delete_count > 0:
             return False, ["the transaction would change other packages; nothing was changed"]
-        ok = cache.commit()
-        evidence.append("apt commit returned %s" % ("success" if ok else "failure"))
-        return bool(ok), evidence
+        for opt in DPKG_OPTIONS:
+            apt_pkg.config.set("DPkg::Options::", opt)
+        apt_pkg.config.set("Dpkg::Use-Pty", "0")
+        saved = {k: os.environ.get(k) for k in COMMIT_ENV}
+        os.environ.update(COMMIT_ENV)
+        try:
+            ok = cache.commit()
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        return bool(ok), ["apt commit returned %s (needrestart suspended, no prompts, your changed configuration files kept)" % ("success" if ok else "failure")]
+
+    def modified_conffiles(self, keys: list[str]) -> list[str] | None:
+        # Names are schema-checked (start with a letter or digit), so none can look like an option.
+        r = self._run(["dpkg", "--verify", *[dpkg_name(k) for k in keys]], timeout=120)
+        if r.returncode not in (0, 1):
+            return None
+        return parse_dpkg_verify(r.stdout.decode("utf-8", "replace"))
+
+    def services_needing_restart(self) -> list[str] | None:
+        # -b batch output, -r l list only: needrestart never restarts anything here.
+        try:
+            r = self._run(["needrestart", "-b", "-r", "l"], timeout=120)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if r.returncode != 0:
+            return None
+        return parse_needrestart(r.stdout.decode("utf-8", "replace"))
+
+    def dpkg_audit(self) -> str | None:
+        r = self._run(["dpkg", "--audit"], timeout=60)
+        out = r.stdout.decode("utf-8", "replace").strip()
+        return None if r.returncode == 0 and out == "" else (out[:300] or "dpkg --audit reported a problem")
 
     def service_state(self, unit: str) -> dict | None:
         r = self._run(["systemctl", "show", "--property=LoadState", "--property=ActiveState", "--property=ActiveEnterTimestampMonotonic", unit])
@@ -174,14 +276,34 @@ def run_operation(system: System, manifest: dict, allowed_units: list[str]) -> d
     evidence: list[str] = []
 
     if op == "apply.packages.v1":
+        keys = sorted("%s:%s" % (c["name"], c["arch"]) for c in scope["packages"])
+        # D-S7: a configuration file the owner changed is never decided by an update approval.
+        changed_conf = system.modified_conffiles(keys)
+        if changed_conf is None:
+            return {"outcome": "failed", "exitCode": None, "evidence": ["the changed configuration files could not be checked; nothing was changed"]}
+        if changed_conf:
+            return {"outcome": "failed", "exitCode": None, "restartNeeded": [],
+                    "evidence": ["you changed configuration files of these packages; nothing was changed: %s" % ", ".join(changed_conf[:10])]}
         ok, ev = system.apply_packages(scope["packages"])
         evidence += ev
         expect = verification["expectInstalled"]
         found = system.installed(sorted(expect))
         matched = [k for k, v in expect.items() if found.get(k) == v]
         evidence.append("%d of %d packages at the planned version" % (len(matched), len(expect)))
-        outcome = "succeeded" if len(matched) == len(expect) else ("partially_succeeded" if matched else "failed")
-        return {"outcome": outcome, "exitCode": 0 if ok else 1, "evidence": evidence}
+        audit = system.dpkg_audit()
+        if audit is not None:
+            evidence.append("dpkg reports packages that are not fully configured: %s" % audit)
+        # D-S6: services are never restarted here; the ones that now need it are reported for a separate restart plan.
+        restart = system.services_needing_restart()
+        if restart is None:
+            evidence.append("ServrSit could not check which services need a restart")
+        elif restart:
+            evidence.append("services that need a restart (not restarted; needs a separate restart approval): %s" % ", ".join(restart[:20]))
+        else:
+            evidence.append("no service needs a restart")
+        all_ok = len(matched) == len(expect) and audit is None
+        outcome = "succeeded" if all_ok else ("partially_succeeded" if matched else "failed")
+        return {"outcome": outcome, "exitCode": 0 if ok else 1, "evidence": evidence, "restartNeeded": (restart or [])[:20]}
 
     if op == "restart.service.v1":
         unit = scope["unit"]
