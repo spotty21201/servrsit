@@ -2166,7 +2166,7 @@ key scan: AI key not in the diff; 0 private-key blocks
 
 ## T-091 and D-S1: forced-command inspect key, verified root install step (branch `feat/coder/inspect-forced-command`, from `integration/live-v1`)
 
-`writes.json` is unchanged (`writesEnabled: false`). Helper code is unchanged: the package is still `604f3fce…21540e2`.
+This branch does not touch `writes.json`. On live-v1 the Orchestrator set Sentani's `writesEnabled` to `true` in `fa83b7b` (ADR-026, founder approved) before this merge; I did not change it. Helper code is unchanged: the package is still `604f3fce…21540e2`.
 
 ### D-S1 (helper CLI pin): already fixed
 
