@@ -24,7 +24,7 @@ export {
 export type { EventType, OpState } from "./state.js";
 export { buildManifest, MANIFEST_ACCEPT_WINDOW_MS, MANIFEST_SCHEMA_VERSION } from "./manifest.js";
 export type { Manifest, ManifestInput } from "./manifest.js";
-export { createSigner, signManifest, verifyManifestSignature } from "./signature.js";
+export { createSigner, signerFromPrivateKeyPem, signManifest, verifyManifestSignature } from "./signature.js";
 export type { SignedManifest, Signer } from "./signature.js";
 export { canonicalIdOf, resolveIdentities } from "./identity.js";
 export type { IdentityInput, IdentityStatus } from "./identity.js";

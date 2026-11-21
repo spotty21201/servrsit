@@ -16,6 +16,8 @@
 #   5. adds ONE line to that account's ~/.ssh/authorized_keys, forcing the
 #      gateway: restrict,command="/usr/lib/servrsit/bin/servrsit-gateway" <key>.
 #      This step runs AS the account (runuser), never as root inside its home.
+#      With --from, the line also carries from="<address>", so the key works
+#      only from ServrSit's own address (T-087).
 #   6. writes the sudoers rule to a temporary file, checks it with
 #      `visudo -c -f`, installs it 0440 as /etc/sudoers.d/servrsit, then checks
 #      the whole sudoers configuration with `visudo -c` and removes the rule
@@ -28,6 +30,7 @@
 #     --installation-id <id> --trust trust.json --account servrsit \
 #     --authorized-key "ssh-ed25519 AAAA... servrsit-maintenance" \
 #     [--create-account] [--home-user <user>] [--restart-unit nginx.service]... \
+#     [--from 100.104.220.8] \
 #     [--install-deps] [--dry-run]
 #
 # --dry-run prints every step and changes nothing. SERVRSIT_ROOT (default /)
@@ -37,7 +40,7 @@ set -eu
 umask 022
 
 PACKAGE=""; SHA256=""; INSTALLATION_ID=""; TRUST=""; ACCOUNT=""; KEY=""
-CREATE_ACCOUNT=0; HOME_USER=""; UNITS=""; INSTALL_DEPS=0; DRY_RUN=0
+CREATE_ACCOUNT=0; HOME_USER=""; UNITS=""; INSTALL_DEPS=0; DRY_RUN=0; FROM=""
 ROOT="${SERVRSIT_ROOT:-/}"
 
 die() { printf 'bootstrap: %s\n' "$1" >&2; exit 1; }
@@ -56,6 +59,7 @@ while [ $# -gt 0 ]; do
     --home-user) HOME_USER=$2; shift 2 ;;
     --restart-unit) UNITS="$UNITS $2"; shift 2 ;;
     --install-deps) INSTALL_DEPS=1; shift ;;
+    --from) FROM=$2; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     *) die "unknown option (see the usage at the top of this file)" ;;
   esac
@@ -63,7 +67,7 @@ done
 
 # --- inputs ---------------------------------------------------------------
 # One line each: grep checks lines, so a value with a newline could hide a second line.
-for v in "$SHA256" "$INSTALLATION_ID" "$ACCOUNT" "$KEY" "$HOME_USER" $UNITS; do
+for v in "$SHA256" "$INSTALLATION_ID" "$ACCOUNT" "$KEY" "$HOME_USER" "$FROM" $UNITS; do
   [ "$(printf '%s' "$v" | wc -l)" -eq 0 ] || die "an option value contains a line break"
 done
 [ -n "$PACKAGE" ] && [ -f "$PACKAGE" ] || die "--package must name the helper package file"
@@ -74,6 +78,8 @@ printf '%s' "$ACCOUNT" | grep -Eq '^[a-z_][a-z0-9_-]{0,31}$' || die "--account i
 [ "$ACCOUNT" != "root" ] || die "--account may not be root"
 printf '%s' "$KEY" | grep -Eq '^ssh-ed25519 [A-Za-z0-9+/]+={0,2}( [A-Za-z0-9._@-]{1,64})?$' || die "--authorized-key must be one ssh-ed25519 public key line"
 [ -z "$HOME_USER" ] || printf '%s' "$HOME_USER" | grep -Eq '^[a-z_][a-z0-9_-]{0,31}$' || die "--home-user is not valid"
+# T-087: the key works only from ServrSit's own address (an IPv4 address, CIDR or plain host name; no wildcards, no lists).
+[ -z "$FROM" ] || printf '%s' "$FROM" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]{1,2})?$|^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$' || die "--from must be one IPv4 address, CIDR or host name"
 for u in $UNITS; do printf '%s' "$u" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9@_.:-]{0,95}\.service$' || die "--restart-unit must be a plain .service unit"; done
 
 # --- 1. platform ------------------------------------------------------------
@@ -112,6 +118,7 @@ run install -d -m 0755 -o root -g root "$ETC"
 UNITS_JSON=$(for u in $UNITS; do printf '"%s",' "$u"; done | sed 's/,$//')
 HOME_JSON=$( [ -n "$HOME_USER" ] && printf '"%s"' "$HOME_USER" || printf 'null' )
 printf '{"installationId":"%s","homeUser":%s,"restartableUnits":[%s],"clockSkewToleranceSeconds":120}\n' "$INSTALLATION_ID" "$HOME_JSON" "$UNITS_JSON" > "$WORK/helper.json"
+if [ "$DRY_RUN" -eq 1 ]; then step "helper.json will be: $(cat "$WORK/helper.json")"; fi
 run install -m 0644 -o root -g root "$WORK/helper.json" "$ETC/helper.json"
 run install -m 0644 -o root -g root "$TRUST" "$ETC/trust.json"
 step "creating the ledger directory $VAR/ledger"
@@ -128,7 +135,8 @@ if [ "$DRY_RUN" -eq 0 ]; then id -u "$ACCOUNT" >/dev/null 2>&1 || die "the accou
 # T-084 (D-H3): root never writes inside the account's home. The key line is
 # added by account-add-key.sh running AS the account (runuser), which refuses
 # symlinks and anything the account does not own.
-LINE="restrict,command=\"/usr/lib/servrsit/bin/servrsit-gateway\" $KEY"
+if [ -n "$FROM" ]; then OPTIONS="restrict,from=\"$FROM\",command=\"/usr/lib/servrsit/bin/servrsit-gateway\""; else OPTIONS="restrict,command=\"/usr/lib/servrsit/bin/servrsit-gateway\""; fi
+LINE="$OPTIONS $KEY"
 if [ "$DRY_RUN" -eq 1 ]; then
   step "would run as $ACCOUNT: account-add-key.sh <home> with the line: $LINE"
 else

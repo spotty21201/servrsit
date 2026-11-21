@@ -287,6 +287,7 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 - `python3-cryptography` (Ubuntu archive, `41.0.7` on 24.04) is a helper dependency next to `python3-apt`.
 - **Before KMS:** check whether KMS supports an Edwards-curve key in the chosen region. If it does, staying on Ed25519 is possible. If not, use RSA-PSS as the spec says.
 - **A compromised controller can still sign** (Tech Spec §8.2). Approval, operation limits and audit remain the other controls.
+- **T-087 (step 2 done):** the persistent key is `apps/api/.data/helper/manifest-signing-ed25519.pem` (PKCS#8, 0600 in a 0700 directory, gitignored), made once by `scripts/sentani-helper-install.sh`. Key id `ctrl-<first 16 hex of SHA-256 of the public PEM>`. `trust.json` is exported from it with the public key only.
 
 ## ADR-021 — Sentani becomes the disposable test server
 

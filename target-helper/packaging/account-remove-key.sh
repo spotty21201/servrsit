@@ -9,7 +9,8 @@ umask 077
 HOMEDIR=${1:?home directory}
 D="$HOMEDIR/.ssh"
 F="$D/authorized_keys"
-PREFIX='restrict,command="/usr/lib/servrsit/bin/servrsit-gateway" '
+# Any line that forces ServrSit's gateway, with or without from="..." (T-087).
+PREFIX='command="/usr/lib/servrsit/bin/servrsit-gateway"'
 fail() { printf 'remove-key: %s\n' "$1" >&2; exit 3; }
 [ ! -L "$HOMEDIR" ] || fail "the home directory is a symlink; nothing was changed"
 if [ ! -e "$F" ] && [ ! -L "$F" ]; then printf 'remove-key: no authorized_keys file; nothing to remove\n'; exit 0; fi

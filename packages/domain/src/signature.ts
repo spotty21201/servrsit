@@ -36,6 +36,20 @@ export function createSigner(keyId: string): Signer {
   };
 }
 
+/**
+ * T-087 (ADR-020 step 2): a signer from a persistent PKCS#8 Ed25519 private key.
+ * The caller reads the file; this function never logs, returns or exports the private key.
+ */
+export function signerFromPrivateKeyPem(keyId: string, privateKeyPem: string): Signer {
+  const priv = createPrivateKey(privateKeyPem);
+  if (priv.asymmetricKeyType !== "ed25519") throw new Error("the manifest signing key must be Ed25519");
+  return {
+    keyId,
+    publicKeyPem: createPublicKey(priv).export({ format: "pem", type: "spki" }).toString(),
+    sign: (data) => sign(null, data, priv).toString("base64"),
+  };
+}
+
 export function signManifest(manifest: Manifest, signer: Signer): SignedManifest {
   return { manifest, keyId: signer.keyId, signature: signer.sign(Buffer.from(canonicalJson(manifest), "utf8")) };
 }
