@@ -18,6 +18,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -443,12 +444,25 @@ def script_text(name: str) -> str:
     return _pkg("packaging", name)
 
 
-def authorized_keys_line() -> str:
-    """The line bootstrap.sh appends, taken from the script itself (LINE=...)."""
-    for line in script_text("bootstrap.sh").splitlines():
+def authorized_keys_lines() -> list[str]:
+    """The key line(s) bootstrap.sh can write, taken from the script itself (T-083: LINE=...; T-084: OPTIONS=... both branches)."""
+    key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITEST servrsit-maintenance"
+    text = script_text("bootstrap.sh")
+    opts = re.findall(r'OPTIONS="((?:[^"\\]|\\.)*)"', text)
+    if opts:
+        return [o.replace('\\"', '"').replace("$FROM", "100.104.220.8") + " " + key for o in opts]
+    for line in text.splitlines():
         if line.startswith("LINE="):
-            return line.split("=", 1)[1].strip('"').replace('\\"', '"').replace("$KEY", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITEST servrsit-maintenance")
-    raise AssertionError("bootstrap.sh has no LINE= for the key")
+            return [line.split("=", 1)[1].strip('"').replace('\\"', '"').replace("$KEY", key)]
+    raise AssertionError("bootstrap.sh has no key line")
+
+
+def authorized_keys_line() -> str:
+    return authorized_keys_lines()[0]
+
+
+def packaging_files() -> dict[str, str]:
+    return {p.name: p.read_text() for p in Path(SRC, "packaging").iterdir() if p.is_file()}
 
 
 def entry_points() -> dict[str, str]:

@@ -117,7 +117,6 @@ def test_H04_a_duplicate_key_that_changes_the_parsed_manifest_cannot_pass_the_si
     assert b.adapter_calls(t) == []
 
 
-@pytest.mark.xfail(strict=True, reason="D-H5 (Info): duplicate JSON keys are accepted, last value wins; not required by Tech Spec 8.2")
 def test_H04b_duplicate_json_keys_are_rejected_outright(env):
     t, key, clock = env
     m = b.manifest(t, issued=NOW); sig = key.sign(m)
@@ -577,9 +576,11 @@ def test_H41_sudoers_is_validated_with_visudo_before_it_is_applied_and_after():
 
 
 def test_H42_the_ssh_key_line_is_restricted_to_the_gateway():
-    line = b.authorized_keys_line()
-    assert line.startswith('restrict,command="/usr/lib/servrsit/bin/servrsit-gateway" ssh-ed25519 '), line
-    assert not re.search(r"permitopen|port-forwarding|pty|agent-forwarding|X11|environment=", line.split(" ssh-")[0])
+    lines = b.authorized_keys_lines()
+    assert lines
+    for line in lines:
+        assert re.fullmatch(r'restrict,(from="[0-9.]+",)?command="/usr/lib/servrsit/bin/servrsit-gateway" ssh-ed25519 \S+ \S+', line), line
+        assert not re.search(r"permitopen|port-forwarding|pty|agent-forwarding|X11|environment=", line.split(" ssh-")[0])
 
 
 def test_H43_bootstrap_preserves_independent_owner_access():
@@ -594,9 +595,13 @@ def test_H43_bootstrap_preserves_independent_owner_access():
 def test_H44_uninstall_removes_only_servrsit_access_verifies_it_and_keeps_the_ledger():
     s = b.script_text("uninstall.sh")
     code = "\n".join(l for l in s.splitlines() if not l.lstrip().startswith("#"))
-    assert "/etc/sudoers.d/servrsit" in code and "servrsit-gateway" in code
-    assert re.search(r'\[ ! -e "\$SUDOERS" \]', code) and re.search(r'grep -qF -- "\$LINE_PREFIX" "\$AK"', code), "removal is not verified"
-    assert not re.search(r"rm\s+(-\w+\s+)*\S*authorized_keys", code), "uninstall deletes the whole authorized_keys file"
+    files = b.packaging_files()
+    keyer = files.get("account-remove-key.sh", "")
+    key_code = "\n".join(l for l in (code + "\n" + keyer).splitlines() if not l.lstrip().startswith("#"))
+    assert "/etc/sudoers.d/servrsit" in code and "servrsit-gateway" in key_code
+    assert re.search(r'\[ ! -e "\$SUDOERS" \]', code), "sudoers removal is not verified"
+    assert re.search(r'grep -qF -- "\$(LINE_PREFIX|PREFIX)" "\$(AK|F)"', key_code), "key-line removal is not verified"
+    assert not re.search(r"rm\s+(-\w+\s+)*\S*authorized_keys", key_code), "uninstall deletes the whole authorized_keys file"
     assert re.search(r'if \[ "\$REMOVE_LEDGER" -eq 1 \]', code) and "kept the ledger" in code
     assert code.index("$SUDOERS") < code.index("LINE_PREFIX"), "the key line is removed before the sudoers rule"
     assert not re.search(r"step \"verified", code.split("DRY_RUN\" -eq 1 ]; then")[0]), "a dry run claims verification"
