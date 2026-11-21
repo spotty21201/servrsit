@@ -1,19 +1,27 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildCollectorScript, isValidNonce, REMOTE_COMMAND } from "./script.js";
+import { buildCollectorScript, isValidNonce, REMOTE_COMMAND, remoteCommand } from "./script.js";
 import { COLLECTOR_SECTIONS } from "./sections.js";
 import { NONCE } from "./collector.fixtures.js";
 
-const script = buildCollectorScript(NONCE);
+const script = buildCollectorScript();
 
 test("nonce must be 32 lowercase hex characters", () => {
   assert.equal(isValidNonce(NONCE), true);
   assert.equal(isValidNonce("xyz"), false);
-  assert.throws(() => buildCollectorScript("not-hex; rm -rf /"));
+  assert.throws(() => remoteCommand("not-hex; rm -rf /"));
+  assert.throws(() => remoteCommand(NONCE.toUpperCase()));
 });
 
-test("remote command line is the fixed `sh -s`", () => {
+test("remote command line is the fixed `sh -s`, and an inspect run adds only the nonce (T-091)", () => {
   assert.deepEqual([...REMOTE_COMMAND], ["sh", "-s"]);
+  assert.deepEqual([...remoteCommand(NONCE)], ["sh", "-s", NONCE]);
+});
+
+test("T-091: the script text is the same on every run; the nonce comes from $1 and is checked again", () => {
+  assert.equal(buildCollectorScript(), script);
+  assert.equal(script.includes(NONCE), false);
+  assert.ok(script.startsWith("N=$1\ncase $N in " + "[0-9a-f]".repeat(32) + ") ;; *) exit 2 ;; esac\n"));
 });
 
 test("script is read-only: no privilege, refresh, write, or service control", () => {
@@ -62,6 +70,6 @@ test("every collector command is on the reviewed allowlist", () => {
 
 test("each section is wrapped with the nonce markers", () => {
   for (const s of COLLECTOR_SECTIONS) assert.ok(script.includes(`section ${s.name} `));
-  assert.ok(script.includes(`@@BEGIN ${NONCE} %s@@`));
-  assert.ok(script.includes(`@@END ${NONCE} %s %s@@`));
+  assert.ok(script.includes(`@@BEGIN %s %s@@\\n' "$N" "$s_name"`));
+  assert.ok(script.includes(`@@END %s %s %s@@\\n' "$N" "$s_name" "$s_rc"`));
 });

@@ -109,8 +109,12 @@ export async function assertResolvesToAllowedAddress(host: string): Promise<void
   }
 }
 
-/** The complete ssh argument vector. Contains no secrets and no shell string. */
-export function buildSshArgv(target: SshTarget, options: SshOptions): string[] {
+/**
+ * The complete ssh argument vector. Contains no secrets and no shell string.
+ * `remote` is a fixed command: `sh -s` or, for an inspect run, `sh -s <nonce>`
+ * (remoteCommand); a key's forced command sees it only as SSH_ORIGINAL_COMMAND.
+ */
+export function buildSshArgv(target: SshTarget, options: SshOptions, remote: readonly string[] = REMOTE_COMMAND): string[] {
   validateTarget(target, options);
   const argv: string[] = [
     "-F", "/dev/null",
@@ -142,7 +146,7 @@ export function buildSshArgv(target: SshTarget, options: SshOptions): string[] {
   if (target.identityFile !== undefined) {
     argv.push("-o", "IdentitiesOnly=yes", "-i", expandHome(target.identityFile));
   }
-  argv.push("-p", String(target.port), "-l", target.user, "--", target.host, ...REMOTE_COMMAND);
+  argv.push("-p", String(target.port), "-l", target.user, "--", target.host, ...remote);
   return argv;
 }
 

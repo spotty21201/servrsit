@@ -14,7 +14,7 @@ import { randomBytes } from "node:crypto";
 import { splitSections } from "./parse.js";
 import { spawnRunner, type CommandRunner } from "./runner.js";
 import { sanitizeLines } from "./sanitize.js";
-import { buildCollectorScript } from "./script.js";
+import { buildCollectorScript, remoteCommand } from "./script.js";
 import type { CollectorSection } from "./sections.js";
 import {
   FAILURE_MESSAGES,
@@ -146,8 +146,8 @@ async function runSections(
   const nonce = (deps.nonce ?? (() => randomBytes(16).toString("hex")))();
   const r = await (deps.runner ?? spawnRunner)({
     file: "/usr/bin/ssh",
-    args: buildSshArgv(target, options),
-    stdin: buildCollectorScript(nonce, sections),
+    args: buildSshArgv(target, options, remoteCommand(nonce)),
+    stdin: buildCollectorScript(sections),
     timeoutMs: 60_000,
     maxStdoutBytes: LIMITS.maxTotalOutputBytes,
     maxStderrBytes: 8 * 1024,

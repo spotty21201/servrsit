@@ -37,7 +37,7 @@ import {
   type RawSection,
 } from "./parse.js";
 import { unavailable, ok, type Field } from "./schema.js";
-import { buildCollectorScript } from "./script.js";
+import { buildCollectorScript, isValidNonce } from "./script.js";
 import { spawnRunner, type CommandRunner } from "./runner.js";
 import {
   FAILURE_MESSAGES,
@@ -179,12 +179,14 @@ async function runCollector(
   const now = deps.now ?? (() => new Date());
   const runner = deps.runner ?? spawnRunner;
   const nonce = (deps.nonce ?? newNonce)();
+  if (!isValidNonce(nonce)) throw new Error("collector nonce must be 32 lowercase hex characters");
   const started = now();
 
   const result = await runner({
     file,
-    args,
-    stdin: buildCollectorScript(nonce),
+    // T-091: the nonce is the script's argument (`sh -s <nonce>`), never part of its text.
+    args: [...args, nonce],
+    stdin: buildCollectorScript(),
     timeoutMs: deps.timeoutMs ?? COLLECTOR_BUDGET_MS,
     maxStdoutBytes: LIMITS.maxTotalOutputBytes,
     maxStderrBytes: MAX_STDERR_BYTES,

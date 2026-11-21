@@ -74,9 +74,10 @@ test("a pinned host runs exactly ssh with the fixed argv and the script on stdin
   assert.equal(calls.length, 1);
   const call = calls[0]!;
   assert.equal(call.file, "/usr/bin/ssh");
-  assert.deepEqual(call.args.slice(-4), ["--", "nabire", "sh", "-s"]);
+  assert.deepEqual(call.args.slice(-5), ["--", "nabire", "sh", "-s", NONCE], "T-091: the nonce is the script's argument");
   assert.ok(call.args.includes("StrictHostKeyChecking=yes"));
-  assert.ok(call.stdin.includes(`@@BEGIN ${NONCE} %s@@`));
+  assert.equal(call.stdin.includes(NONCE), false, "T-091: the script text has no nonce");
+  assert.ok(call.stdin.includes(`@@BEGIN %s %s@@`));
   assert.ok(call.stdin.includes("section hostname uname -n"));
   assert.equal(call.timeoutMs, 30_000);
   assert.equal(call.maxStdoutBytes, 1024 * 1024);

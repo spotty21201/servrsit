@@ -14,6 +14,10 @@
 #      (your own login; you may be asked for it)
 #   5. PRINTS (does not run) the commands to run on Sentani: a --dry-run
 #      first, then the real install. Nothing is installed until you run them.
+#      T-091 (D-S3): each printed command copies the files into a fresh
+#      root-only directory and checks every copy's SHA-256 (made here, on
+#      Merauke) before anything runs as root. Nothing in your home folder on
+#      Sentani is run by root directly.
 #
 # It never runs anything on Sentani itself, never uses sudo, and changes no
 # ServrSit setting (writes stay disabled).
@@ -73,16 +77,18 @@ echo "   installation id:      $INSTALLATION_ID"
 echo "   maintenance key line: $PUBLIC_LINE"
 if grep -q "PRIVATE KEY" "$STAGE"/* 2>/dev/null; then echo "STOP: a private key ended up in the copy folder. Nothing was copied."; exit 1; fi
 
+# T-091: the root step, with every file's SHA-256 written inside it (it must be made after trust.json).
+SRC_ON_SERVER="/home/$HOME_USER/$NAME"
+ROOT_STEP=$(python3 "$REPO/target-helper/packaging/root_step.py" "$STAGE" "$SRC_ON_SERVER" "$ACCOUNT" "$INSTALLATION_ID" "$HOME_USER" "$FROM" "$PUBLIC_LINE") \
+  || { echo "Could not make the root step. Nothing was copied."; exit 1; }
+rstep() { python3 -c 'import json, sys; d = json.loads(sys.argv[1]); print(d["commands"][sys.argv[2]] if sys.argv[2] != "sha256" else d["sha256"])' "$ROOT_STEP" "$1"; }
+
 echo
 echo "== 3. Files that will be copied to $TARGET:$NAME/"
 ( cd "$STAGE" && for f in *; do printf '   %-40s %8s bytes  sha256 %s\n' "$f" "$(stat -c %s "$f")" "$(sha256sum "$f" | cut -c1-16)…"; done )
 echo "   trust.json holds ONLY the public key $KEY_ID."
 echo "   The package checksum is $SHA"
-
-CMD_EARLY="sh bootstrap.sh --package $NAME.tar.gz --sha256 $SHA --installation-id $INSTALLATION_ID --trust trust.json --account $ACCOUNT --create-account --home-user $HOME_USER --install-deps --from $FROM --authorized-key \"$PUBLIC_LINE\""
-# Short wrappers so the founder never has to paste a long line (pastes split in the founder's terminal).
-printf '#!/bin/sh\n# ServrSit helper: DRY RUN (changes nothing). Run: sudo sh dry-run.sh\nset -eu\ncd "$(dirname "$0")"\n%s --dry-run\n' "$CMD_EARLY" > "$STAGE/dry-run.sh"
-printf '#!/bin/sh\n# ServrSit helper: REAL INSTALL. Run: sudo sh install.sh\nset -eu\ncd "$(dirname "$0")"\n%s\n' "$CMD_EARLY" > "$STAGE/install.sh"
+echo "   root-step.sh SHA-256 (checked by the printed commands): $(rstep sha256)"
 
 if [ "$COPY" -eq 1 ]; then
   if [ "$YES" -ne 1 ]; then
@@ -99,26 +105,27 @@ else
   echo "== 4. --no-copy: nothing was copied"
 fi
 
-CMD="sh bootstrap.sh --package $NAME.tar.gz --sha256 $SHA --installation-id $INSTALLATION_ID --trust trust.json --account $ACCOUNT --create-account --home-user $HOME_USER --install-deps --from $FROM --authorized-key \"$PUBLIC_LINE\""
 echo
 echo "== 5. On $SERVER, run these yourself (log in as $TARGET; nothing has been installed by this script)"
 echo
-echo "   Short version (recommended):  cd ~/$NAME   then   sudo sh dry-run.sh   then   sudo sh install.sh"
+echo "   Each command copies the files from ~/$NAME into a new root-only folder in /root,"
+echo "   checks every file's SHA-256 against the values made here on Merauke, and stops"
+echo "   before running anything if one differs. Paste each command as ONE line."
 echo
 echo "   First, the dry run (prints every step, changes nothing):"
 echo
-echo "     cd ~/$NAME && sudo $CMD --dry-run"
+echo "     $(rstep dry-run)"
 echo
 echo "   Then, if the dry run looks right, the real install:"
 echo
-echo "     cd ~/$NAME && sudo $CMD"
+echo "     $(rstep install)"
 echo
-echo "   Upgrading from an older helper (T-090): run the same two commands in this new folder."
+echo "   Upgrading from an older helper (T-090): run the same two commands for this new folder."
 echo "   The install replaces the helper code and keeps the ledger, the account and the key."
 echo "   It refuses while an operation is unfinished."
 echo
 echo "   To remove it later (keeps the ledger):"
 echo
-echo "     cd ~/$NAME && sudo sh uninstall.sh --account $ACCOUNT"
+echo "     $(rstep uninstall)"
 echo
 echo "Tell Kiro Orchestrator when the install has finished. ServrSit writes stay disabled until the Tester's gates pass (T-088)."

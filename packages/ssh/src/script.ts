@@ -1,10 +1,12 @@
 /**
- * The fixed, reviewed read-only collector script.
+ * The fixed, reviewed read-only collector scripts.
  *
  * Technical Spec §7.1: inspect-only mode runs fixed, reviewed, nonprivileged
- * collectors with bounded output. This script is sent over stdin to `sh -s`,
- * so no variable input is ever placed in a remote command line. The only
- * generated part is a random hex nonce used to delimit sections.
+ * collectors with bounded output. A script is sent over stdin to `sh -s`, and
+ * its text is the same on every run. T-091: the per-run nonce that delimits
+ * sections travels as the script's only argument (`sh -s <nonce>`), so a key
+ * with a forced command can check each script against a list of SHA-256
+ * digests (inspect-access.ts). The script checks the nonce's form again.
  *
  * Rules enforced by tests (see script.test.ts):
  *  - no sudo, no privilege change
@@ -25,26 +27,41 @@ export function isValidNonce(nonce: string): boolean {
   return NONCE_PATTERN.test(nonce);
 }
 
-/** Remote command line. Fixed. `sh -s` reads the script from stdin. */
+/** A shell `case` pattern for exactly 32 lowercase hex characters. */
+export const NONCE_CASE_PATTERN = "[0-9a-f]".repeat(32);
+
+/** Fixed remote command without a nonce (the helper gateway ignores it). */
 export const REMOTE_COMMAND: readonly string[] = ["sh", "-s"];
 
-/** The script for a fixed list of reviewed sections (default: the health collector). */
-export function buildCollectorScript(nonce: string, sections: readonly CollectorSection[] = COLLECTOR_SECTIONS): string {
-  if (!isValidNonce(nonce)) {
-    throw new Error("collector nonce must be 32 lowercase hex characters");
-  }
-  const lines = [
+/** The remote command for one inspect run: `sh -s <nonce>`. Only a valid nonce is accepted. */
+export function remoteCommand(nonce: string): readonly string[] {
+  if (!isValidNonce(nonce)) throw new Error("collector nonce must be 32 lowercase hex characters");
+  return ["sh", "-s", nonce];
+}
+
+/** Lines every script starts with: the nonce from $1, checked, then a fixed environment. */
+export function scriptPrelude(): string[] {
+  return [
+    "N=$1",
+    `case $N in ${NONCE_CASE_PATTERN}) ;; *) exit 2 ;; esac`,
     "LC_ALL=C; export LC_ALL",
     "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export PATH",
+  ];
+}
+
+/** The script for a fixed list of reviewed sections (default: the health collector). Same text on every run. */
+export function buildCollectorScript(sections: readonly CollectorSection[] = COLLECTOR_SECTIONS): string {
+  const lines = [
+    ...scriptPrelude(),
     'T=""',
     'if command -v timeout >/dev/null 2>/dev/null; then T="timeout 15"; fi',
     "section() {",
     "  s_name=$1",
     "  shift",
-    `  printf '@@BEGIN ${nonce} %s@@\\n' "$s_name"`,
+    `  printf '@@BEGIN %s %s@@\\n' "$N" "$s_name"`,
     '  "$@" 2>/dev/null </dev/null',
     "  s_rc=$?",
-    `  printf '\\n@@END ${nonce} %s %s@@\\n' "$s_name" "$s_rc"`,
+    `  printf '\\n@@END %s %s %s@@\\n' "$N" "$s_name" "$s_rc"`,
     "}",
     ...sections.map((s) => `section ${s.name} ${s.command}`),
     "exit 0",

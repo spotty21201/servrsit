@@ -56,7 +56,7 @@ test("a marker without the run's nonce is data, not a section boundary", () => {
 });
 
 test("the inventory script is read-only: no privilege, no writes, no package tools, no network, no pipes or substitution", () => {
-  const script = buildCollectorScript(NONCE, INVENTORY_SECTIONS);
+  const script = buildCollectorScript(INVENTORY_SECTIONS);
   for (const re of [/\bsudo\b/, /\bsu\b/, /\bdoas\b/, /\bapt\s/, /apt-get/, /\bdpkg\b(?!\/status)/, /\bcurl\b/, /\bwget\b/, /\brm\b/, /\bmv\b/, /\bcp\b/, /\btee\b/, /\bchmod\b/, /\bchown\b/, /\bmkdir\b/, /\btouch\b/, /-delete\b/, /-exec\b/, /-fprintf\b/, /\bsystem\(/, /getline/]) {
     assert.equal(re.test(script), false, `inventory script must not match ${re}`);
   }

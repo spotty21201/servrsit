@@ -103,9 +103,11 @@ export const AccessKeySchema = z
   .object({
     /**
      * The exact line to add to `~/.ssh/authorized_keys` on the server, with
-     * options: `restrict,from="<controllerAddress>" ssh-ed25519 AAAA... servrsit-<name>`.
+     * options: `restrict,from="<controllerAddress>",command="<forced command>" ssh-ed25519 AAAA... servrsit-<name>`.
+     * T-091: the forced command runs only the reviewed inspect scripts (about 1 KB). Lines made
+     * before T-091 have no command= and still work.
      */
-    authorizedKeysLine: z.string().min(20).max(800),
+    authorizedKeysLine: z.string().min(20).max(2048),
     algorithm: z.literal("ED25519"),
     keyFingerprint: z.string().regex(SSH_FINGERPRINT),
     /** The address ServrSit connects from, used in `from=`. */
@@ -274,7 +276,7 @@ export const DisconnectResponseSchema = z
     /** Fixed steps for the owner to remove ServrSit's line on the server. */
     remoteSteps: z.array(z.string().max(300)).min(1).max(10),
     /** The authorized_keys line to look for (public, safe to show). */
-    authorizedKeysLine: z.string().max(800).nullable(),
+    authorizedKeysLine: z.string().max(2048).nullable(),
   })
   .strict();
 export type DisconnectResponse = z.infer<typeof DisconnectResponseSchema>;

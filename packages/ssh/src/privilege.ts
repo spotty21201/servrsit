@@ -12,7 +12,7 @@ import { randomBytes } from "node:crypto";
 import { splitSections } from "./parse.js";
 import { spawnRunner, type CommandRunner } from "./runner.js";
 import { sanitizeLines } from "./sanitize.js";
-import { isValidNonce } from "./script.js";
+import { remoteCommand, scriptPrelude } from "./script.js";
 import {
   FAILURE_MESSAGES,
   TargetRejectedError,
@@ -46,15 +46,13 @@ export const PRIVILEGE_SUMMARIES = {
   unreadable: "The sudo rules could not be read, so this account's privileges are unknown.",
 } as const;
 
-/** The fixed script. The only generated part is the nonce. */
-export function buildPrivilegeScript(nonce: string): string {
-  if (!isValidNonce(nonce)) throw new Error("privilege nonce must be 32 lowercase hex characters");
+/** The fixed script, the same on every run. The nonce is its argument (`sh -s <nonce>`, T-091). */
+export function buildPrivilegeScript(): string {
   return [
-    "LC_ALL=C; export LC_ALL",
-    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export PATH",
-    `printf '@@BEGIN ${nonce} sudorules@@\\n'`,
+    ...scriptPrelude(),
+    `printf '@@BEGIN %s sudorules@@\\n' "$N"`,
     "if command -v sudo >/dev/null 2>/dev/null; then sudo -n -l 2>&1 </dev/null; s_rc=$?; else s_rc=127; fi",
-    `printf '\\n@@END ${nonce} sudorules %s@@\\n' "$s_rc"`,
+    `printf '\\n@@END %s sudorules %s@@\\n' "$N" "$s_rc"`,
     "exit 0",
     "",
   ].join("\n");
@@ -104,8 +102,8 @@ export async function probePrivilegeViaSsh(target: SshTarget, options: SshOption
   const nonce = (deps.nonce ?? (() => randomBytes(16).toString("hex")))();
   const result = await (deps.runner ?? spawnRunner)({
     file: "/usr/bin/ssh",
-    args: buildSshArgv(target, options),
-    stdin: buildPrivilegeScript(nonce),
+    args: buildSshArgv(target, options, remoteCommand(nonce)),
+    stdin: buildPrivilegeScript(),
     timeoutMs: 20_000,
     maxStdoutBytes: 64 * 1024,
     maxStderrBytes: 8 * 1024,

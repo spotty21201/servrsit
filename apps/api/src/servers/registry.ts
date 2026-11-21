@@ -33,7 +33,7 @@ import {
   type ServerRegistrationErrorCode,
   type ServerUpdateRequest,
 } from "@servrsit/contracts";
-import { collectViaSsh, probePrivilegeViaSsh, TargetRejectedError, type CollectionResult, type PrivilegeProbeResult } from "@servrsit/ssh";
+import { collectViaSsh, inspectKeyOptions, probePrivilegeViaSsh, TargetRejectedError, type CollectionResult, type PrivilegeProbeResult } from "@servrsit/ssh";
 import type { NewServer, SqliteServerStore, StoredDraft, StoredServer } from "@servrsit/store";
 import { isSafeFromAddress, type AddressPolicy } from "./address.js";
 import { finishedCheck, runningCheck } from "./first-check.js";
@@ -335,7 +335,9 @@ export class ServerRegistry {
     const slug = slugOf(draft.name);
     const key = await this.o.vault.generate(id, `servrsit-${slug}`);
     const accessKey: AccessKey = {
-      authorizedKeysLine: `restrict,from="${from}" ${key.keyType} ${key.keyBase64} servrsit-${slug}`,
+      // T-091 (D-S3): the key may run only ServrSit's reviewed read-only checks (a forced command that
+      // checks each script's SHA-256), not a shell. Nothing is installed on the server for this.
+      authorizedKeysLine: `${inspectKeyOptions(from)} ${key.keyType} ${key.keyBase64} servrsit-${slug}`,
       algorithm: "ED25519",
       keyFingerprint: key.fingerprint,
       controllerAddress: from,

@@ -96,8 +96,8 @@ class FakeSentani {
     return { status: "accepted", record: pub(r, m.operationId) };
   }
 
-  private inspect(script: string): RunResult {
-    const nonce = /@@BEGIN ([0-9a-f]{32})/.exec(script)?.[1] ?? "";
+  /** T-091: the nonce is the remote command's last argument (`sh -s <nonce>`). */
+  private inspect(script: string, nonce: string): RunResult {
     const sections = [...script.matchAll(/^section (\w+) /gm)].map((m) => m[1]!);
     let out = "";
     for (const s of sections) {
@@ -137,7 +137,7 @@ class FakeSentani {
     }
     this.inspectRequests.push({ sections: [...r.stdin.matchAll(/^section (\w+) /gm)].map((m) => m[1]!), identity });
     if (this.inspectDown) return { ...lost, stderr: "ssh: connect to host 100.64.0.89 port 22: No route to host" };
-    return this.inspect(r.stdin);
+    return this.inspect(r.stdin, r.args.at(-1) ?? "");
   };
 }
 
