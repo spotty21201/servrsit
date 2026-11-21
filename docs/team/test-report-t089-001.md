@@ -5,14 +5,14 @@
 **Code under test:** `integration/live-v1` at **`fd4bc03`** (includes T-089 `b4927c9`, T-092 helper 0.3.0, ADR-026 `fa83b7b`, and T-091 `b8e86ba`)
 **Target:** Sentani only. Helper 0.3.0 per the last verification (to be re-confirmed at the start of the main run).
 
-## Status: PARTIAL. Everything that needs no pending package is done and passes. (1), (2) and (3) are waiting for founder downgrades (§5).
+## Status: PARTIAL. (1), (2), (4) and (5) PASS (§3, Addendum B). (3) waits for founder round R2.
 
 | # | Requirement | Status |
 |---|---|---|
 | (4) | Nabire, Timika, Merauke plans blocked `WRITES_DISABLED`, zero SSH writes | **PASS**, including at approval (§3.1) |
 | (5) | restart, reboot and directory plans still refused | **PASS**, including at approval, for Sentani and a protected server (§3.2) |
-| (1) | controller `previewDigest` equals the helper's package precondition rule | **NOT YET PROVEN.** Needs pending packages. Method in §5.2 |
-| (2) | plan → approve → dispatch → helper → independent verification → `succeeded`, with operation record and Activity entry | **NOT YET RUN** (§5.3) |
+| (1) | controller `previewDigest` equals the helper's package precondition rule | **PASS** (Addendum B) |
+| (2) | plan → approve → dispatch → helper → independent verification → `succeeded`, with operation record and Activity entry | **PASS** (Addendum B), one defect on pre-approval disclosure (D-T2) |
 | (3) | lost ack, client kill, API restart mid-operation reconcile to the same op, no duplicate | **NOT YET RUN** (§5.4) |
 
 > ## ⚠ Founder's API on :3001 is DOWN (found 11:41 UTC, still down at 11:52)
@@ -188,3 +188,53 @@ Unchanged from `test-report-sentani-001.md` §7.2 until (1), (2) and (3) run. Wh
 **Two coordination points while my operations run:**
 1. **Please don't approve anything in the founder's own app on Sentani.** The helper allows one unresolved mutation per server, so two instances would collide on `TARGET_BUSY`.
 2. **Please keep the T-091 forced-command inspect line off Sentani** until the run is finished (O-T3).
+
+---
+
+## Addendum B: (1) digest equality and (2) the happy path, through the app (13:01 to 13:02 UTC)
+
+**Founder round R1** (read-back by the founder, then my own read-only check at 13:01:32): `vim`, `vim-common`, `vim-runtime`, `vim-tiny`, `xxd` at `2:9.1.0016-1ubuntu7` and `wget` at `1.21.4-1ubuntu4`. `/etc/wgetrc` unchanged by the downgrade (sha256 `658b6a5de6aa…9774`, md5 `e5cca7a09bcf…`, one owner marker line). Helper 0.3.0, confirmed over the gateway. `apt-get -s upgrade` showed exactly those 6 packages, all from `noble-updates`/`noble-security`, with no third-party origin.
+
+**Instance:** my own, run from the founder's rebuilt checkout (Addendum A). Run log: `evidence/t089-001/s3-happy-path-run.txt`; summary: `s3-happy-path-summary.json`.
+
+### (1) previewDigest equality: PASS
+
+| | Value |
+|---|---|
+| Controller's `plan.preconditions.previewDigest` | `sha256:b13f31fdb34d33af5c351bf693546782b2173113a8fc8c314eeca6ab59499b02` |
+| My independent computation (own canonical JSON; the helper's rule `digest_of({"installed": {"name:arch": fromVersion}})` over the 6 sorted keys, including `vim-common:all` and `vim-runtime:all`) | `sha256:b13f31fdb34d33af5c351bf693546782b2173113a8fc8c314eeca6ab59499b02` |
+| **Equal** | **yes** |
+
+End to end, the helper recomputes the same rule on Sentani at submit and would have rejected the manifest with `PRECONDITION_CHANGED` on any difference. The event log shows `remote_accepted`. My Node and Python digest implementations also agree with each other (Addendum A).
+
+### (2) Happy path: PASS
+
+Plan `eac19992…` v1: 6 packages, `blockers: []`, `approvable: true`, no acknowledgements required (non-production server), nothing excluded.
+
+| Step | Result |
+|---|---|
+| Approve (digest, version, idempotency key) | **201**, operation `02f6c275-40e0-459a-a7cc-9e94745d3153`, `queued` |
+| **Same approval again** (same idempotency key) | **200**, `replayed: true`, **the same operation id** |
+| States over time | `queued` +5 s → `running` +11 s → `verifying` +29 s → **`succeeded` +35 s** |
+| Events | `created` → `dispatch_attempted` 13:01:50 (manifest digest `sha256:803e8849…861f`, `retry: false`) → `remote_accepted` 13:01:53 → `remote_progress` ×2 → `remote_finished` 13:02:10 (exit 0, helper 0.3.0, outcome `succeeded`, `restartNeeded: []`, `keptFiles: [{path: /etc/wgetrc, newDefault: null}]`) → `verification_recorded` 13:02:15 (**6 verified, 0 not verified**) |
+| Helper ledger, queried by the same operation id | `finished`, exit 0, `succeeded`; the manifest digest equals the one in `dispatch_attempted`; evidence "6 of 6 packages at the planned version", "no service needs a restart", "your file was kept: /etc/wgetrc (this version brought no new default for it)" |
+| Activity entry | 1 record: `op-02f6c275…`, "Update packages", result `succeeded`, "Finished, and the result was verified.", link `/operations/02f6c275…` |
+
+**My own checks on Sentani, not through the app or the helper (as `spotty`):**
+- **dpkg:** all 6 packages at the planned versions, state `ii`; `dpkg --audit` clean.
+- **apt history:** exactly **one** transaction, 13:01:55 to 13:02:00, upgrading those 6 packages.
+- **Journal:** the operation's `servrsit-op-…` unit started **once**.
+- **Owner's file:** `/etc/wgetrc` sha256 and md5 **identical before and after**, owner marker line still present, `dpkg --verify` still shows it as locally changed. No `.dpkg-dist`: this wget ships the same default.
+- **Services:** the only difference in the running-service list is `user@999.service`, the per-login user manager of the `servrsit` gateway account, which restarts with my SSH sessions. It is not a package effect. The upgrade restarted nothing, as `restartNeeded: []` says.
+
+### New finding
+
+| ID | Severity | Where | Description |
+|---|---|---|---|
+| **D-T2** | Low (disclosure; no data effect) | `packages/domain/src/plan.ts` reads `preview.keptConffiles`; **nothing in the real preview sets it** (`packages/ssh/src/preview.ts`, `apps/worker/src/ssh-write-target.ts`); only test doubles do | The T-092 handoff says "the package plan's scope gets `keptOwnerFiles`", and `PlanView.keptOwnerFiles` is wired in the web client. On the real Sentani target the plan has **no** `keptOwnerFiles`, although `/etc/wgetrc` was owner-modified and would be kept. The owner is told only **after** the run (the `keptFiles` in the operation record and events). The helper behaves correctly and keeps the file, and the safety is intact. But product principle 4 (a meaningful approval) and ADR-024 intend the owner to see before approving which of their files will be kept. Fix: have the read-only preview return the `dpkg --verify` result for the plan's packages as `keptConffiles`. For Coder |
+
+**Status of the gate conditions:** the last open condition from `test-report-sentani-001.md` §7.2 (controller digest equals the helper's rule) is now **met**. Scenario (3) is the remaining condition for T-089.
+
+**State left behind:** my instance is stopped. Sentani now has **no pending Ubuntu updates** again, and the owner's `/etc/wgetrc` edit is intact. His checkout's `git status` is clean.
+
+**Next:** round R2 (LLVM set, §5.5) for scenario (3).

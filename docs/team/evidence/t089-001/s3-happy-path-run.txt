@@ -1,0 +1,80 @@
+instance h24s7 started; first health check: ok
+signed in as my own owner: true
+helper: {"found":false,"helperVersion":"0.3.0"}
+R1 seen at 2026-11-21T13:01:32.923Z
+--- before (as spotty)
+vim 2:9.1.0016-1ubuntu7 ii 
+vim-common 2:9.1.0016-1ubuntu7 ii 
+vim-runtime 2:9.1.0016-1ubuntu7 ii 
+vim-tiny 2:9.1.0016-1ubuntu7 ii 
+wget 1.21.4-1ubuntu4 ii 
+xxd 2:9.1.0016-1ubuntu7 ii 
+e5cca7a09bcfde427db9259b6ae2ed22  /etc/wgetrc
+658b6a5de6aa31844c33b9c7c9a324163a2802dbb61c742ff8962ea798be9774  /etc/wgetrc
+owner-marker-lines=1
+-rw-r--r-- 1 root root 4969 09:10:20 /etc/wgetrc
+??5?????? c /etc/wgetrc
+verify-exit=0
+/usr/share/perl5/Debconf/FrontEnd/Noninteractive.pm
+audit-exit=0
+--- pending per apt-get -s upgrade
+The following packages will be upgraded:
+6 upgraded, 0 newly installed, 0 to remove and 11 not upgraded.
+Inst vim [2:9.1.0016-1ubuntu7] (2:9.1.0016-1ubuntu7.20 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [amd64]) []
+Inst vim-common [2:9.1.0016-1ubuntu7] (2:9.1.0016-1ubuntu7.20 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [all]) [vim-tiny:amd64 ]
+Inst vim-tiny [2:9.1.0016-1ubuntu7] (2:9.1.0016-1ubuntu7.20 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [amd64]) []
+Inst vim-runtime [2:9.1.0016-1ubuntu7] (2:9.1.0016-1ubuntu7.20 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [all])
+Inst xxd [2:9.1.0016-1ubuntu7] (2:9.1.0016-1ubuntu7.20 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [amd64])
+Inst wget [1.21.4-1ubuntu4] (1.21.4-1ubuntu4.5 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [amd64])
+plan: 201 id=eac19992-a53a-4137-a1c5-e3b9418d273e v1 blockers=[] approvable=true acks=[]
+plan packages: vim:amd64 2:9.1.0016-1ubuntu7->2:9.1.0016-1ubuntu7.20, vim-common:all 2:9.1.0016-1ubuntu7->2:9.1.0016-1ubuntu7.20, vim-runtime:all 2:9.1.0016-1ubuntu7->2:9.1.0016-1ubuntu7.20, vim-tiny:amd64 2:9.1.0016-1ubuntu7->2:9.1.0016-1ubuntu7.20, wget:amd64 1.21.4-1ubuntu4->1.21.4-1ubuntu4.5, xxd:amd64 2:9.1.0016-1ubuntu7->2:9.1.0016-1ubuntu7.20
+plan excluded: [] | keptOwnerFiles: null
+(1) controller previewDigest sha256:b13f31fdb34d33af5c351bf693546782b2173113a8fc8c314eeca6ab59499b02
+    my independent computation  sha256:b13f31fdb34d33af5c351bf693546782b2173113a8fc8c314eeca6ab59499b02
+    EQUAL: true
+approve: 201 {"operationId":"02f6c275-40e0-459a-a7cc-9e94745d3153","state":"queued","replayed":false}
+same approval again (same idempotency key): 200 {"operationId":"02f6c275-40e0-459a-a7cc-9e94745d3153","state":"queued","replayed":true}  -> same operation: true
+  +5s state=queued
+  +11s state=running
+  +29s state=verifying
+  +35s state=succeeded
+operation: {"id":"02f6c275-40e0-459a-a7cc-9e94745d3153","approvalId":"2055b457-c0fe-4673-b877-395eaefba9d1","planId":"eac19992-a53a-4137-a1c5-e3b9418d273e","planVersion":1,"serverId":"75e41a8a-6a97-4a06-8151-c0cb33ad0fc1","operation":"apply.packages.v1","targetKind":"ssh","state":"succeeded","stopRequested":false,"remoteOperationId":"02f6c275-40e0-459a-a7cc-9e94745d3153","createdAt":"2026-11-21T13:01:47.494Z","updatedAt":"2026-11-21T13:02:15.898Z","simulated":false}
+events:
+  2026-11-21T13:01:47.494Z created {"approvalId":"2055b457-c0fe-4673-b877-395eaefba9d1","planDigest":"sha256:0f227f58b8955e6459a412c07fc211ce285960622f405c8ae92a44d26fc00dfc"}
+  2026-11-21T13:01:50.198Z dispatch_attempted {"issuedAt":"2026-11-21T13:01:50.195Z","manifestDigest":"sha256:803e8849ab5029323aa82cb89b9a40dab71e66cd2b971b924e932e099fef861f","retry":false}
+  2026-11-21T13:01:53.089Z remote_accepted {"how":"accepted","remoteState":"running"}
+  2026-11-21T13:01:58.763Z remote_progress {"remoteState":"running"}
+  2026-11-21T13:02:04.535Z remote_progress {"remoteState":"running"}
+  2026-11-21T13:02:10.292Z remote_finished {"remoteState":"finished","exitCode":0,"helperReport":{"helperVersion":"0.3.0","outcome":"succeeded","reasonCode":null,"restartNeeded":[],"keptFiles":[{"path":"/etc/wgetrc","newDefault":null}]}}
+  2026-11-21T13:02:15.898Z verification_recorded {"verified":["vim:amd64","vim-common:all","vim-runtime:all","vim-tiny:amd64","wget:amd64","xxd:amd64"],"notVerified":[],"exitCode":0}
+helper ledger (query by the same op id): {"found":true,"helperVersion":"0.3.0","record":{"operationId":"02f6c275-40e0-459a-a7cc-9e94745d3153","manifestDigest":"sha256:803e8849ab5029323aa82cb89b9a40dab71e66cd2b971b924e932e099fef861f","state":"finished","exitCode":0},"outcome":"succeeded","restartNeeded":[],"reasonCode":null,"keptFiles":[{"newDefault":null,"path":"/etc/wgetrc"}],"evidence":["apt commit returned success (needrestart suspended, no prompts, your changed configuration files kept)","your file was kept: /etc/wgetrc (this version brought no new default for it)","6 of 6 packages at the planned version","no service needs a restart"]}
+Activity entries mentioning this operation or plan: 1
+  {"id":"op-02f6c275-40e0-459a-a7cc-9e94745d3153","type":"operation","at":"2026-11-21T13:02:15.898Z","serverId":"75e41a8a-6a97-4a06-8151-c0cb33ad0fc1","serverName":"Sentani","production":false,"simulated":false,"title":"Update packages","result":"succeeded","summary":"Finished, and the result was verified.","href":"/operations/02f6c275-40e0-459a-a7cc-9e94745d3153"}
+--- after (as spotty)
+vim 2:9.1.0016-1ubuntu7.20 ii 
+vim-common 2:9.1.0016-1ubuntu7.20 ii 
+vim-runtime 2:9.1.0016-1ubuntu7.20 ii 
+vim-tiny 2:9.1.0016-1ubuntu7.20 ii 
+wget 1.21.4-1ubuntu4.5 ii 
+xxd 2:9.1.0016-1ubuntu7.20 ii 
+e5cca7a09bcfde427db9259b6ae2ed22  /etc/wgetrc
+658b6a5de6aa31844c33b9c7c9a324163a2802dbb61c742ff8962ea798be9774  /etc/wgetrc
+owner-marker-lines=1
+-rw-r--r-- 1 root root 4969 09:10:20 /etc/wgetrc
+??5?????? c /etc/wgetrc
+verify-exit=0
+/usr/share/perl5/Debconf/FrontEnd/Noninteractive.pm
+audit-exit=0
+independent dpkg check: 6 of 6 packages at the planned version
+apt history (last transactions):
+Start-Date: 2026-11-21  12:59:49
+Commandline: apt-get install -y --allow-downgrades -o Dpkg::Options::=--force-confold vim=2:9.1.0016-1ubuntu7 vim-common=2:9.1.0016-1ubuntu7 vim-runtime=2:9.1.0016-1ubuntu7 vim-tiny=2:9.1.0016-1ubuntu7 xxd=2:9.1.0016-1ubuntu7 wget=1.21.4-1ubuntu4
+Requested-By: spotty (1000)
+End-Date: 2026-11-21  12:59:54
+Start-Date: 2026-11-21  13:01:55
+Upgrade: vim:amd64 (2:9.1.0016-1ubuntu7, 2:9.1.0016-1ubuntu7.20), xxd:amd64 (2:9.1.0016-1ubuntu7, 2:9.1.0016-1ubuntu7.20), vim-common:amd64 (2:9.1.0016-1ubuntu7, 2:9.1.0016-1ubuntu7.20), wget:amd64 (1.21.4-1ubuntu4, 1.21.4-1ubuntu4.5), vim-tiny:amd64 (2:9.1.0016-1ubuntu7, 2:9.1.0016-1ubuntu7.20), vim-runtime:amd64 (2:9.1.0016-1ubuntu7, 2:9.1.0016-1ubuntu7.20)
+End-Date: 2026-11-21  13:02:00
+servrsit-op units that started for this operation: 1
+services changed:
+MainPID=21625 Id=user@999.service ActiveEnterTimestampMonotonic=16219999133 
+summary saved to /tmp/t089/s3.json

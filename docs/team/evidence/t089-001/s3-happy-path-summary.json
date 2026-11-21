@@ -1,0 +1,239 @@
+{
+ "startedAt": "2026-11-21T13:00:59.188Z",
+ "plan": {
+  "id": "eac19992-a53a-4137-a1c5-e3b9418d273e",
+  "version": 1,
+  "digest": "sha256:0f227f58b8955e6459a412c07fc211ce285960622f405c8ae92a44d26fc00dfc",
+  "previewDigest": "sha256:b13f31fdb34d33af5c351bf693546782b2173113a8fc8c314eeca6ab59499b02",
+  "packages": [
+   {
+    "name": "vim",
+    "arch": "amd64",
+    "from": "2:9.1.0016-1ubuntu7",
+    "to": "2:9.1.0016-1ubuntu7.20"
+   },
+   {
+    "name": "vim-common",
+    "arch": "all",
+    "from": "2:9.1.0016-1ubuntu7",
+    "to": "2:9.1.0016-1ubuntu7.20"
+   },
+   {
+    "name": "vim-runtime",
+    "arch": "all",
+    "from": "2:9.1.0016-1ubuntu7",
+    "to": "2:9.1.0016-1ubuntu7.20"
+   },
+   {
+    "name": "vim-tiny",
+    "arch": "amd64",
+    "from": "2:9.1.0016-1ubuntu7",
+    "to": "2:9.1.0016-1ubuntu7.20"
+   },
+   {
+    "name": "wget",
+    "arch": "amd64",
+    "from": "1.21.4-1ubuntu4",
+    "to": "1.21.4-1ubuntu4.5"
+   },
+   {
+    "name": "xxd",
+    "arch": "amd64",
+    "from": "2:9.1.0016-1ubuntu7",
+    "to": "2:9.1.0016-1ubuntu7.20"
+   }
+  ]
+ },
+ "digestCheck": {
+  "controller": "sha256:b13f31fdb34d33af5c351bf693546782b2173113a8fc8c314eeca6ab59499b02",
+  "mine": "sha256:b13f31fdb34d33af5c351bf693546782b2173113a8fc8c314eeca6ab59499b02",
+  "equal": true
+ },
+ "opId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+ "approve": {
+  "operationId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+  "state": "queued",
+  "replayed": false
+ },
+ "replay": {
+  "operationId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+  "state": "queued",
+  "replayed": true
+ },
+ "operation": {
+  "id": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+  "approvalId": "2055b457-c0fe-4673-b877-395eaefba9d1",
+  "planId": "eac19992-a53a-4137-a1c5-e3b9418d273e",
+  "planVersion": 1,
+  "serverId": "75e41a8a-6a97-4a06-8151-c0cb33ad0fc1",
+  "operation": "apply.packages.v1",
+  "targetKind": "ssh",
+  "state": "succeeded",
+  "stopRequested": false,
+  "remoteOperationId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+  "createdAt": "2026-11-21T13:01:47.494Z",
+  "updatedAt": "2026-11-21T13:02:15.898Z",
+  "simulated": false
+ },
+ "events": [
+  {
+   "operationId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+   "seq": 1,
+   "type": "created",
+   "at": "2026-11-21T13:01:47.494Z",
+   "actor": "owner:tester",
+   "fromState": null,
+   "toState": "queued",
+   "payload": {
+    "approvalId": "2055b457-c0fe-4673-b877-395eaefba9d1",
+    "planDigest": "sha256:0f227f58b8955e6459a412c07fc211ce285960622f405c8ae92a44d26fc00dfc"
+   }
+  },
+  {
+   "operationId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+   "seq": 2,
+   "type": "dispatch_attempted",
+   "at": "2026-11-21T13:01:50.198Z",
+   "actor": "worker:api-212693",
+   "fromState": null,
+   "toState": null,
+   "payload": {
+    "issuedAt": "2026-11-21T13:01:50.195Z",
+    "manifestDigest": "sha256:803e8849ab5029323aa82cb89b9a40dab71e66cd2b971b924e932e099fef861f",
+    "retry": false
+   }
+  },
+  {
+   "operationId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+   "seq": 3,
+   "type": "remote_accepted",
+   "at": "2026-11-21T13:01:53.089Z",
+   "actor": "worker:api-212693",
+   "fromState": "queued",
+   "toState": "running",
+   "payload": {
+    "how": "accepted",
+    "remoteState": "running"
+   }
+  },
+  {
+   "operationId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+   "seq": 4,
+   "type": "remote_progress",
+   "at": "2026-11-21T13:01:58.763Z",
+   "actor": "worker:api-212693",
+   "fromState": null,
+   "toState": null,
+   "payload": {
+    "remoteState": "running"
+   }
+  },
+  {
+   "operationId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+   "seq": 5,
+   "type": "remote_progress",
+   "at": "2026-11-21T13:02:04.535Z",
+   "actor": "worker:api-212693",
+   "fromState": null,
+   "toState": null,
+   "payload": {
+    "remoteState": "running"
+   }
+  },
+  {
+   "operationId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+   "seq": 6,
+   "type": "remote_finished",
+   "at": "2026-11-21T13:02:10.292Z",
+   "actor": "worker:api-212693",
+   "fromState": "running",
+   "toState": "verifying",
+   "payload": {
+    "remoteState": "finished",
+    "exitCode": 0,
+    "helperReport": {
+     "helperVersion": "0.3.0",
+     "outcome": "succeeded",
+     "reasonCode": null,
+     "restartNeeded": [],
+     "keptFiles": [
+      {
+       "path": "/etc/wgetrc",
+       "newDefault": null
+      }
+     ]
+    }
+   }
+  },
+  {
+   "operationId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+   "seq": 7,
+   "type": "verification_recorded",
+   "at": "2026-11-21T13:02:15.898Z",
+   "actor": "worker:api-212693",
+   "fromState": "verifying",
+   "toState": "succeeded",
+   "payload": {
+    "verified": [
+     "vim:amd64",
+     "vim-common:all",
+     "vim-runtime:all",
+     "vim-tiny:amd64",
+     "wget:amd64",
+     "xxd:amd64"
+    ],
+    "notVerified": [],
+    "exitCode": 0
+   }
+  }
+ ],
+ "ledger": {
+  "found": true,
+  "helperVersion": "0.3.0",
+  "record": {
+   "operationId": "02f6c275-40e0-459a-a7cc-9e94745d3153",
+   "manifestDigest": "sha256:803e8849ab5029323aa82cb89b9a40dab71e66cd2b971b924e932e099fef861f",
+   "state": "finished",
+   "exitCode": 0
+  },
+  "outcome": "succeeded",
+  "restartNeeded": [],
+  "reasonCode": null,
+  "keptFiles": [
+   {
+    "newDefault": null,
+    "path": "/etc/wgetrc"
+   }
+  ],
+  "evidence": [
+   "apt commit returned success (needrestart suspended, no prompts, your changed configuration files kept)",
+   "your file was kept: /etc/wgetrc (this version brought no new default for it)",
+   "6 of 6 packages at the planned version",
+   "no service needs a restart"
+  ]
+ },
+ "activity": [
+  {
+   "id": "op-02f6c275-40e0-459a-a7cc-9e94745d3153",
+   "type": "operation",
+   "at": "2026-11-21T13:02:15.898Z",
+   "serverId": "75e41a8a-6a97-4a06-8151-c0cb33ad0fc1",
+   "serverName": "Sentani",
+   "production": false,
+   "simulated": false,
+   "title": "Update packages",
+   "result": "succeeded",
+   "summary": "Finished, and the result was verified.",
+   "href": "/operations/02f6c275-40e0-459a-a7cc-9e94745d3153"
+  }
+ ],
+ "matched": [
+  "vim",
+  "vim-common",
+  "vim-runtime",
+  "vim-tiny",
+  "wget",
+  "xxd"
+ ],
+ "servicesUnchanged": false
+}
