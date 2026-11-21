@@ -474,3 +474,88 @@ The helper's mechanics now pass on real Ubuntu for:
 3. D-S1 (CLI default pin) and D-S3 (inspect key is a full shell; T-091) are resolved, because they affect how far the write path can be trusted.
 
 Still untested on a real server: a reboot that returns late (outcome unknown), root-side ENOSPC, and uninstall.
+
+---
+
+## 7. Helper 0.3.0 (T-092, ADR-024) re-run of (c), and final verdict
+
+**Installed version:**
+- Package sha256 **`604f3fce0afc…21540e2`** is reproduced exactly by rebuilding **`ebe0287`** (integration/live-v1).
+- All 13 installed files under `/usr/lib/servrsit` match `ebe0287` (sha256, read as spotty).
+- Orchestrator verified VERSION 0.3.0, ownership, sudoers 0440, the ledger kept, and the gateway still rejecting shell input.
+
+**Fake-root gate (no server):** 126/126 on 0.3.0 and still 126/126 on 0.2.0. H12 and H18 passed 3/3 on repeat. Coder's suite at `ebe0287` passes. The binding was extended for `prompt_risk` and `keptFiles` (`feat/tester/next` `e48567c`).
+
+**0.3.0 behaviour, from reading the code:**
+- **Changed configuration files are kept and the update still runs.** dpkg runs with `--force-confdef --force-confold`, and ucf with `UCF_FORCE_CONFFOLD`. The files are detected with `dpkg --verify` before the commit. Any `.dpkg-dist` or `.ucf-dist` files that appear under `/etc` during the commit are paired with the kept files and recorded as `keptFiles: [{path, newDefault}]` and in the evidence.
+- **`CONFFILE_MODIFIED` is gone.** It survives only in a comment about 0.2.0 records.
+- **The only refusal before acceptance is `INTERACTIVE_PROMPT`.** It fires only when debconf's non-interactive frontend (`/usr/share/perl5/Debconf/FrontEnd/Noninteractive.pm`) is missing; it is not decided per package. See O-S4.
+
+**Pre-run checks (read-only):**
+- Only `wget` was pending (`1.21.4-1ubuntu4` → `1.21.4-1ubuntu4.5`, `noble-updates`/`noble-security`).
+- No hold and no lock. `Noninteractive.pm` is present. `dpkg --audit` is clean.
+
+| Time (UTC) | Op | Digest | Scope | Reply / ledger |
+|---|---|---|---|---|
+| 10:27:38 | **950bb860** | **d9a448748d8c** | `wget:amd64` `1.21.4-1ubuntu4` → `1.21.4-1ubuntu4.5` (from a fresh `apt-get -s upgrade`) | accepted, then finished, exit 0, **`succeeded`**; **`keptFiles: [{"path": "/etc/wgetrc", "newDefault": null}]`**; evidence: "apt commit returned success (needrestart suspended, no prompts, your changed configuration files kept)", **"your file was kept: /etc/wgetrc (this version brought no new default for it)"**, "1 of 1 packages at the planned version", "services that need a restart (not restarted; needs a separate restart approval): multipathd.service" |
+
+**Independent verification of `/etc/wgetrc` (as spotty):**
+
+| | Before (10:27) | After (10:28) |
+|---|---|---|
+| `wget` | `1.21.4-1ubuntu4` `ii` | **`1.21.4-1ubuntu4.5` `ii`** |
+| `/etc/wgetrc` sha256 | `658b6a5de6aa31844c33b9c7c9a324163a2802dbb61c742ff8962ea798be9774` | **identical** |
+| `/etc/wgetrc` md5 / size / mtime | `e5cca7a09bcf…` / 4969 / 09:10:20 | **identical** |
+| owner marker line `# servrsit-t088 owner edit` | 1 | **1** |
+| `/etc/wgetrc.dpkg-dist` | absent | **absent** |
+| `dpkg --verify wget` | `??5?????? c /etc/wgetrc` | the same (the owner's file still differs from the package default) |
+| `dpkg --audit` | clean | **clean** |
+
+**Other checks:**
+- **apt history:** one transaction, 10:27:44 to 10:27:45, `Upgrade: wget:amd64 (1.21.4-1ubuntu4, 1.21.4-1ubuntu4.5)`.
+- **Unit journal** (`servrsit-op-950bb860…`, 10:27:41 to 10:27:51): "Setting up wget (1.21.4-1ubuntu4.5)", the install-info and man-db triggers, "packages have been installed but needrestart is suspended". **No configuration-file prompt and no "keeping old config file" line.** dpkg prints that line only when the package ships a changed default, which matches `newDefault: null`.
+- **Services:** all running services kept their PID and start time, including **multipathd MainPID 4794, started 09:16:35**. The exception is `packagekit.service`, started by apt's hook (O-S3).
+- **`restartNeeded: multipathd.service`** is the state left by (b) on 0.2.0: `libaio1t64` was updated at 09:30 and the service has not been restarted. It does not come from wget. The helper reports it correctly, and nothing was restarted.
+- **Afterwards:** `apt-get -s upgrade` shows 0 to upgrade (only the 11 phased packages remain), and no harness process is left running.
+
+**Result (ADR-024): PASS on Sentani for the kept-file case.** The approved update was applied, the owner's file was kept byte for byte, the evidence names the kept file, there was no prompt and no hang, and dpkg ended clean.
+
+**Not proven live:**
+1. **The `.dpkg-dist` path.** wget `…ubuntu4.5` ships the same `/etc/wgetrc` default as `…ubuntu4`, so dpkg had no decision to make and created no new default. To exercise `--force-confold` together with `newDefault`, a candidate is needed whose packaged default changed between the installed and the target version. It can be found read-only by downloading both `.deb` files as spotty into `/tmp` (`apt-get download`) and comparing the conffile checksums. That needs one more founder downgrade.
+2. **The vim no-false-positive check.** It was skipped because the vim set is no longer pending (applied in 6.1 (a)). `prompt_risk` does not depend on the package: it returns empty whenever `Noninteractive.pm` exists. (c) passed that same check on this server, so **no package can get a false `INTERACTIVE_PROMPT` on Sentani**, the vim set included. A live vim run would add no information beyond 6.1 (a).
+
+**Observation O-S4 (for Coder, Low):** `INTERACTIVE_PROMPT` is not decided per package (`adapters.py` `RealSystem.prompt_risk()`). It cannot catch a package whose maintainer scripts read from a terminal directly, or a ucf conffile that an older ucf would still prompt for. With `stdin` closed and noninteractive debconf, such a package would fail rather than hang, and `dpkg --audit` would then report it. So the risk is a failed update, not a hang. The name suggests more protection than the check gives.
+
+### 7.1 Final defect status (helper 0.3.0)
+
+| ID | Status |
+|---|---|
+| D-S5 `Architecture: all` | **Closed**, verified on 0.2.0 (6.1 (a)); unchanged in 0.3.0 |
+| D-S6 needrestart | **Closed**, verified on 0.2.0 (6.1 (b)); 0.3.0 still suspends needrestart and lists services needing a restart (seen again in (c)) |
+| D-S7 configuration files / prompts | **Closed for the kept-file case** on 0.3.0 (7, ADR-024). `.dpkg-dist` reporting not proven live (gap 1) |
+| D-S8 held | **Closed**, verified on 0.2.0 (6.1 (d1)) |
+| D-S9 lock | **Closed**, verified on 0.2.0 (6.1 (d2)) |
+| D-S1 CLI default pin | Open (Coder) |
+| D-S3 founder scripts / inspect key is a full shell | Open (T-091) |
+| D-S4 | Open (Info) |
+| O-S2 no free-space check | Open |
+| O-S3 packagekit started by apt's hook | Open, still seen on 0.3.0 |
+| O-S4 coarse `INTERACTIVE_PROMPT` | New, Low |
+
+### 7.2 Final gate verdict for T-089
+
+**GO** for building T-089 and running its end-to-end fault-injection suite **on Sentani only** (`writesEnabled` on Sentani only, set in controller config, never via API or UI). On helper 0.3.0, every helper mechanism T-089 relies on has passed on real Ubuntu:
+- signature, binding and expiry; replay, digest mismatch and the atomic ledger;
+- query-before-retry after client kills, including inside dpkg;
+- exact transactions, including `Architecture: all`;
+- `PACKAGE_HELD` and `PACKAGE_LOCKED`;
+- no service restarted inside a package approval, with `restartNeeded` reported;
+- owner configuration files kept, with the update still applied;
+- reboot and return with no second reboot; non-root disk pressure.
+
+**NO-GO for Nabire, Timika, Merauke or any other server**, and T-089 must not be closed, until:
+1. T-089 shows that the controller's `previewDigest` equals the helper's package precondition rule. This report does not prove it; my manifests used the helper's rule directly.
+2. D-S1 and D-S3/T-091 are resolved.
+3. The `.dpkg-dist` reporting case (gap 1) passes live, or the Orchestrator accepts it as tested by code review and fake-root tests only.
+
+Still untested on a real server: a reboot that returns late (outcome unknown at window expiry), root-side ENOSPC, and uninstall. These belong in T-089's fault-injection suite or a later T-088 round.

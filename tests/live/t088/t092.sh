@@ -9,7 +9,7 @@ SRC=$1
 H="node_modules/.bin/tsx /projects/servrsit-tester/tests/live/t088/h.mts"
 A=/projects/servrsit-tester/tests/live/t088/apply.sh
 S=/tmp/t088/s092; mkdir -p "$S"
-$H probe installedsums 2>/dev/null > "$S/installed.txt"; head -n 1 "$S/installed.txt"
+$H probe installedsums 2>/dev/null > "$S/installed.txt" || true; head -n 1 "$S/installed.txt"
 ( cd "$SRC" && sha256sum servrsit_helper/*.py bin/* ) | LC_ALL=C sort > "$S/source.txt"
 grep -E "^[0-9a-f]{64}" "$S/installed.txt" | LC_ALL=C sort | diff - "$S/source.txt" >/dev/null && echo "installed files == ebe0287 ($(wc -l < "$S/source.txt") files)" || { echo "STOP: installed helper is not ebe0287"; exit 3; }
 $H probe aptsim 2>/dev/null | tee "$S/aptsim.txt" | grep -E "^Inst|upgraded"
