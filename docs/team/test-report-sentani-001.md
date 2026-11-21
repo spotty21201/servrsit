@@ -1,0 +1,113 @@
+# Test report — T-088 helper on Sentani, real Ubuntu (sentani-001)
+
+**Author:** Kiro Tester · **For:** Kiro Orchestrator · **Started:** 2026-11-21
+**Authority:** ADR-021 (Sentani is disposable; fault injection allowed on Sentani only), ADR-022 (helper installed by the founder; T-088 rules), T-088
+**Target:** Sentani ONLY. Host `sentani` resolves to 100.119.231.102 (checked before every send). The pin comes from registry row `75e41a8a-6a97-4a06-8151-c0cb33ad0fc1`: its `known_hosts_file` holds only Sentani, with the owner-confirmed key `SHA256:j3nno/hlFOSktmjBlrxPO9oTE3qWFmITlKgKTIt+JrM` (confirmed 2026-11-21T05:44:58Z). Nothing was sent to Nabire, Timika or Merauke.
+**Helper on Sentani:** package `servrsit-helper-0.1.0.tar.gz`, sha256 `8f25e5a3…a6d0d6`. Rebuilding from integration/live-v1 `4101502` gives the identical checksum, so the installed code is `target-helper/` at `4101502`, which includes T-084.
+**Harness:** `tests/live/t088/h.mts`. It uses the bench signer (`ctrl-…` Ed25519 key) and the product's hardened `buildSshArgv`, and spawns `ssh` itself so it can kill the local client at a chosen moment. Every send is logged with the manifest digest and the reply.
+
+> **Not used:** the CLI's default `apps/api/.data/known_hosts`. It pins Sentani's pre-reinstall key (`nhrV6…`), which ADR-021 makes void, and it also pins Timika and Nabire.
+
+## 0. Gate before going live (fake root, no server)
+
+My suite (`feat/tester/next`, `tests/helper`) against the installed source `4101502`: **126/126 passed**. H12 and H18 (race and torn-record tests) passed **10/10** on repeat. Against the old `6c7df23`, the same suite fails 8 tests, so it does separate fixed code from old code. Three tests were adapted to the T-084 layout without weakening them: H04b now asserts that duplicate JSON keys are refused, H42 checks the `$OPTIONS` key line, and H44 checks `account-remove-key.sh`.
+
+## 1. Plan (in order of increasing risk)
+
+| Step | What | Mutation on Sentani | Root outside helper? |
+|---|---|---|---|
+| P | Read-only probes as `spotty` (inspect key, fixed scripts, nothing interpolated): clock, boot id, disk, `apt-get -s upgrade`, dpkg versions, running services, holds, timers, needrestart config | none | no |
+| 1a | `query.operation.v1` for an unknown id | none | no |
+| 1b | Rejections: bad signature, unknown key id, wrong installation id, expired, unsupported op, oversize input, a 5,000-digit integer (D-H1), duplicate keys (D-H5) | none expected | no |
+| 1c | Replay and digest checks with one real accepted op: `prepare.directories.v1` creating `~spotty/servrsit-t088-replay` (spotty:spotty 0755). Then the same id with the same digest gives `existing`, and the same id with another digest gives `DIGEST_MISMATCH` | one empty directory (spotty removes it afterwards) | no |
+| 2 | `apply.packages.v1` with the exact pending Ubuntu-archive updates from a fresh `apt-get -s upgrade`, excluding Docker and other third-party origins. Precondition uses the helper's rule over the observed `from` versions. Versions are verified independently with `dpkg-query` as spotty, and service start times are compared before and after (checks for needrestart restarting services without a separate approval) | package upgrade | no |
+| 3a | Kill the local ssh client **before acceptance**: (i) send half the request, then kill; (ii) send all of it, keep stdin open, then kill. Retry = query the same id first | (i) none; (ii) may be accepted | no |
+| 3b | Kill **right after acceptance**, before the reply is read. Query first; never resubmit a different manifest | one directory | no |
+| 3c | Kill the client **mid-dpkg** of an apply, then query until finished. Never a second transaction (one `servrsit-op-<id>` unit, one dpkg run in the logs) | package upgrade | needs a pending update. If step 2 used them all, a founder downgrade step is required |
+| 4 | `reboot.host.v1` with return verification: new boot id, SSH back as `spotty` and `servrsit`, and the helper's query settles `succeeded` | reboot | no |
+| 5 | Disk pressure as `spotty`: fill files under `~spotty/servrsit-t088-fill/` until only a small margin is free. Check the helper's behaviour (ledger write fails closed; apply refused or failed, never half-recorded). Remove the files and check `df` returns to the earlier value | files as spotty | no |
+| F | External apt lock, `apt-mark hold`, and any downgrade needed for 3c: exact founder commands in `docs/team/t088-founder-steps.md`, then **STOP** | — | yes, founder only |
+
+**Stop rules:**
+- An unexpected `outcome_unknown`, a runner unit still running after 15 minutes, or SSH not returning after a reboot within 10 minutes: I stop, record it, and ask the founder. I don't intervene.
+- Any reply that suggests a second transaction: I stop.
+- No password is asked for or used.
+
+## 2. Runs
+
+All times are UTC on 2026-11-21. Op = first 8 hex characters of the operation id. Digest = the 12 hex characters after `sha256:` of the manifest digest. The full digests and replies are in the local run log `/tmp/t088/runs.jsonl`. It is not committed, because it is raw server output.
+
+### P — read-only baseline (as `spotty`, inspect key)
+
+- **Clock:** Sentani agrees with the controller to within the SSH round trip, about 1.2 s.
+- **System:** boot id `c456de4b-ff23-44e7-9ed0-78a1da95a498`, up since 05:22:32. Ubuntu 24.04. needrestart 3.6-7ubuntu4.6 is installed (`99needrestart` hook).
+- **Disk:** `/` has 230.8 GB available out of 249.3 GB.
+- **apt:** no apt or dpkg process running and no holds. Package lists are from 2026-11-21 ~04:52 (`update-success-stamp` 1795236767). apt-daily-upgrade last ran 06:29, next 2026-11-22 06:14.
+- **Pending updates:** `apt-get -s upgrade` shows **0 to install and 11 kept back**. All 11 are deferred by Ubuntu phasing: `libnss-systemd libpam-systemd libsystemd-shared libsystemd0 libudev1 systemd systemd-dev systemd-resolved systemd-sysv systemd-timesyncd udev`. `dist-upgrade` gives the same result. There is no Docker origin. The only third-party source is Tailscale, and nothing from it is pending.
+
+### 1 — query and rejections
+
+| Time | Kind | Input | Op | Digest | Mode | Reply / ledger |
+|---|---|---|---|---|---|---|
+| 07:03:49 | query | unknown id `00000000-…0001` | — | — | normal | `found: false`, helperVersion 0.1.0 |
+| 07:03:51 | raw | valid request, one signature bit flipped | — | — | normal | rejected `INVALID_SIGNATURE` |
+| 07:03:52 | raw | keyId `ctrl-0000000000000000` | — | — | normal | rejected `UNKNOWN_KEY` |
+| 07:03:53 | raw | 300 KiB request | — | — | normal | rejected `INVALID_REQUEST` "the request is too large" |
+| 07:03:54 | raw | 5,000-digit integer (D-H1) | — | — | normal | rejected `INVALID_REQUEST` (no traceback) |
+| 07:03:54 | raw | duplicate `"op"` key (D-H5) | — | — | normal | rejected `INVALID_REQUEST` |
+| 07:03:55 | raw | query id `../../etc/shadow` | — | — | normal | rejected `INVALID_REQUEST` |
+| 07:03:56 | submit | installationId `servrsit-someone-else-1`, validly signed | 838170c1 | e155c3be82aa | normal | rejected `MISBOUND` |
+| 07:03:57 | submit | acceptBefore 05:15 (past), validly signed | 838170c1… | 20b9d3418402 | normal | rejected `EXPIRED` |
+| 07:03:58 | submit | operation `shell.run.v1`, validly signed | 838170c1… | ade239a6cae6 | normal | rejected `UNSUPPORTED_OPERATION` |
+| 07:04:17 | submit | `prepare.directories.v1` `~spotty/servrsit-t088-replay` | a2e38565 | ef8c87a59b2d | normal | **accepted** |
+| 07:04:21 | query | | a2e38565 | ef8c87a59b2d | normal | finished, exit 0, outcome **succeeded** ("1 of 1 verified with the planned owner and mode") |
+| 07:04:22 | submit | identical manifest again | a2e38565 | ef8c87a59b2d | normal | **existing** (same record) |
+| 07:04:24 | submit | same id, other directory | a2e38565 | faaf4eb889c9 | normal | rejected **`DIGEST_MISMATCH`** |
+| 07:04:24 | query | | a2e38565 | ef8c87a59b2d | normal | unchanged: finished, succeeded |
+
+**Independent checks (as spotty):**
+- `~spotty/servrsit-t088-replay` is spotty:spotty 755 directory.
+- `~spotty/servrsit-t088-other` and `…-reject` do not exist.
+- The journal shows **one** `servrsit-op-a2e38565…` unit: started 07:04:16, deactivated successfully 07:04:17.
+
+All SSH exits were 0, and no reply carried a traceback.
+
+### 3a / 3b — killing the local ssh client (SIGKILL), retry = query the same id first
+
+Each case used its own `prepare.directories.v1` operation. The retry rule: query the same id. If not found, resubmit the **identical** manifest. If found, do nothing. Never use a new id.
+
+| Time | Case | Op | Digest | What was sent before the kill | Kill | First query | Retry action | Final |
+|---|---|---|---|---|---|---|---|---|
+| 07:05:08 | 3a(i) before acceptance | 1063c121 | 7cf23dcdaea1 | first 200 bytes, stdin held open | 3,005 ms | **not found** | resubmitted identical manifest at 07:05:13, accepted | finished, succeeded |
+| 07:05:20 | 3a(ii) full request, no EOF | 1ce216e5 | d17208dde3a3 | whole request, stdin held open | 3,006 ms | **found, finished, succeeded** | none | finished, succeeded |
+| 07:05:36 | 3b reply lost | 8b9d59be | b15cca950930 | whole request + EOF | 704 ms, no reply received | **found, finished, succeeded** | none | finished, succeeded |
+| 07:05:26 | (control) | 8014c6e1 | 5402bd8ca712 | whole request + EOF | 1,000 ms planned; reply came first at 781 ms | found | none | finished, succeeded |
+| 07:05:31 | (control) | 8a3b55b1 | 4bcc8838c9ad | whole request + EOF | 1,150 ms planned; reply came first at 773 ms | found | none | finished, succeeded |
+
+**Independent check:** the journal shows 6 `servrsit-op-*` units in total (1c plus the five above), each **started exactly once**. All five directories existed as spotty:spotty 755. All six test directories were removed afterwards by spotty with `rmdir` (only empty directories can be removed that way). The helper's ledger keeps their records.
+
+**Finding (3a(ii)):** the client was killed while the helper was still waiting for end-of-input. When sshd closed the session, the gateway got EOF with the **complete** request and the helper accepted and ran it. The client never saw a reply. This proves invariant 6 on real Ubuntu: a dropped connection is no evidence that nothing happened. Querying first was the only thing that stopped a duplicate.
+
+### 2, 3c, 4, 5 — not run yet
+
+- **Step 2 is blocked:** there is no pending update that `apt-get upgrade` (the product's own observation) would install. Applying the 11 phased systemd packages would override Ubuntu's staged rollout, re-execute systemd, and restart resolved, timesyncd and udev. That is a founder decision. The options are in `docs/team/t088-founder-steps.md`; option B (downgrade 8 harmless packages, then install them back through the helper) is recommended.
+- **3c, the hold test and the lock test** depend on step 2's packages. Their founder steps are F1 to F3 in `docs/team/t088-founder-steps.md`.
+- **Steps 4 (reboot) and 5 (disk)** are held back to keep the order of increasing risk: they come after step 2.
+- **Planning note for step 5:** `spotty` cannot fill root's reserved blocks. ext4 reserves ~5% by default, which I can't read without root, so it is assumed. A `spotty` fill can therefore prove behaviour when users are out of space, but probably **not** a root-side ENOSPC in the ledger or dpkg.
+
+## 3. Proven on real Ubuntu vs not (so far)
+
+| Claim | Status |
+|---|---|
+| Gateway forced command, bounded stdin, typed rejection codes, no traceback on hostile input (incl. D-H1, D-H5) | **Proven on Sentani** |
+| Signature, unknown key, installation binding, expiry, operation allowlist | **Proven on Sentani** |
+| Replay → `existing`; same id, other digest → `DIGEST_MISMATCH`; ledger unchanged | **Proven on Sentani** |
+| `systemd-run` transient unit runs the accepted operation once and outlives the SSH session (`servrsit-op-*` in the journal) | **Proven on Sentani** for `prepare.directories.v1` |
+| Real root ownership/chown: a directory created as root with the planned owner spotty:spotty and mode 755 | **Proven on Sentani** |
+| Query-before-retry stops duplicates after a client kill before acceptance, with no EOF, and after acceptance with the reply lost | **Proven on Sentani** |
+| Real `sudo -n` with the one sudoers rule | **Proven indirectly:** every reply above came from the root helper through it |
+| APT transaction exactness, `name:all` lookup in python-apt, external lock, held package, dpkg interruption, needrestart side effects | **NOT proven yet** (step 2 / F1 to F3) |
+| Reboot and return verification (boot id, SSH, query settles) | **NOT proven yet** (step 4) |
+| Low disk | **NOT proven yet** (step 5); root-side ENOSPC is probably not reachable as spotty |
+| Uninstall on the real server | **NOT tested** (not in this round's instructions) |
+| The controller's `previewDigest` (packages/domain plans) equals the helper's precondition rule for packages | **NOT proven.** My manifests use the helper's rule directly; this matters for T-089 |
