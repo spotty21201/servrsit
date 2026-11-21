@@ -547,7 +547,8 @@ def test_H55_query_returns_bounded_evidence_and_never_echoes_the_request(env):
     assert q == {"found": False, "helperVersion": q.get("helperVersion")}, q
     send(t, key, clock, b.manifest(t, issued=NOW)); b.run_runner(t, "op-0001")
     q = b.query(t, "op-0001")
-    assert set(q) == {"found", "helperVersion", "record", "outcome", "evidence"} and len(q["evidence"]) <= 20, q
+    extra = {"restartNeeded", "reasonCode"} if b.T090 else set()  # T-090 (0.2.0) adds exactly these two fields
+    assert set(q) == {"found", "helperVersion", "record", "outcome", "evidence"} | extra and len(q["evidence"]) <= 20, q
     assert "manifest" not in q["record"], "query returns the whole manifest"
 
 

@@ -44,7 +44,10 @@ if BOUND:
         HELPER_DIRTY = subprocess.run(["git", "-C", SRC, "status", "--porcelain", "--", "."], capture_output=True, text=True, check=False).stdout.strip()
     except OSError:
         HELPER_COMMIT, HELPER_DIRTY = "unknown", ""
+    import inspect as _inspect
+    T090 = "held_packages" in dict(_inspect.getmembers(System))
 else:  # pragma: no cover
+    T090 = False
     System = object  # type: ignore[assignment,misc]
     HELPER_COMMIT, HELPER_DIRTY = "", ""
 
@@ -168,7 +171,23 @@ class RecordingSystem(System):  # type: ignore[misc,valid-type]
         if self.target.apply_takes_effect:
             for c in changes:
                 self.target.packages["%s:%s" % (c["name"], c["arch"])] = c["to"]
-        return self.target.apply_reports_ok, ["recording system"]
+        return (self.target.apply_reports_ok, ["recording system"]) if not T090 else (self.target.apply_reports_ok, ["recording system"], None)
+
+    # T-090 (0.2.0) System methods: configurable fakes; the defaults are "nothing held, locks free, no changed conffiles"
+    def held_packages(self, keys):
+        return sorted(k for k in keys if k in self.target.held)
+
+    def package_locks_free(self):
+        return not self.target.locked
+
+    def modified_conffiles(self, keys):
+        return sorted(self.target.modified_conf)
+
+    def services_needing_restart(self):
+        return list(self.target.need_restart)
+
+    def dpkg_audit(self):
+        return None
 
     def service_state(self, unit: str) -> dict | None:
         s = self.target.services.get(unit)
@@ -220,6 +239,10 @@ class FakeTarget:
     require_root: bool = False
     clock: Callable[[], float] = lambda: 0.0
     sudo_calls: list = field(default_factory=list)
+    held: tuple = ()
+    locked: bool = False
+    modified_conf: tuple = ()
+    need_restart: tuple = ()
 
     @property
     def root(self) -> Path:
