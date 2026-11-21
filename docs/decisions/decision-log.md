@@ -300,6 +300,17 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 
 **Consequences:** Invariant 11 now excludes Sentani from the no-fault-injection list; Nabire, Timika and Merauke stay protected. Sentani's old pinned host key and ServrSit key are void: re-verify the new fingerprint with the founder and reinstall the ServrSit key before any login. Writes on Sentani stay off until the helper is bootstrapped by the founder and the Tester signs off the disposable-target gates; enabling them is a separate recorded step. If the founder restores the backup, host identity may change again and must be re-verified.
 
+## ADR-022 — Helper installed on Sentani; T-088 test rules
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-21 |
+| **Status** | [FOUNDER ACTION + AGENT DECISION] |
+
+The founder ran the reviewed bootstrap (dry run reviewed by Orchestrator first). Orchestrator verified read-only: `servrsit` uid 999, helper 0.1.0, root-owned files, ledger 0700, sudoers 0440, no private key on the server; the maintenance key reaches only the gateway (a shell command and garbage input were both rejected with INVALID_REQUEST).
+
+**T-088 rules:** Sentani only (ADR-021). Requests go only through the gateway with manifests signed by the controller key via tests/live/helper-cli. ServrSit's app write path stays disabled (T-089). Steps that need root on Sentani beyond the helper (external apt activity, apt-mark hold, network changes) are batched as short founder commands; agents never get the founder's sudo password. Disk pressure may be simulated as `spotty` with files under the home directory, removed afterwards. Every run is recorded with the manifest digest and ledger result.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
