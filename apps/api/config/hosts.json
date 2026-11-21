@@ -50,5 +50,16 @@
       "importantServices": [],
       "collect": true
     }
-  ]
+  ],
+  "registration": {
+    "controllerAddress": "100.104.220.8",
+    "allowedPorts": [
+      22
+    ],
+    "enrolledRoutes": [
+      "100.64.0.0/10"
+    ],
+    "allowPublicAddresses": true,
+    "operatorAddresses": []
+  }
 }
