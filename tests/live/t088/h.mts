@@ -75,6 +75,8 @@ const PROBES: Record<string, string> = {
   madison: "LC_ALL=C; export LC_ALL\napt-cache madison $(dpkg-query -W -f='${binary:Package}\\n' | sed 's/:.*//' | sort -u) 2>/dev/null | grep -E 'noble(-updates|-security)?/main' ; echo ---sizes; dpkg-query -W -f='${binary:Package} ${Installed-Size} ${Priority} ${Essential}\\n'",
   // the only write probe: removes the EMPTY test directories this harness created (rmdir refuses non-empty ones)
   cleanupdirs: "LC_ALL=C; export LC_ALL\nfor n in replay 3a-partial 3a-hold 3b-k1000 3b-k1150 3b-k700; do rmdir \"$HOME/servrsit-t088-$n\" && echo removed $n; done; ls -d $HOME/servrsit-t088* 2>/dev/null; echo done",
+  founderscripts: "LC_ALL=C; export LC_ALL\nfor f in f1 f2 f3; do echo \"=== $f.sh\"; stat -c '%U %G %a %s' \"$HOME/servrsit-t088/$f.sh\"; cat \"$HOME/servrsit-t088/$f.sh\"; done",
+  founderhashes: "LC_ALL=C; export LC_ALL\ncd \"$HOME/servrsit-t088\" && sha256sum f1.sh f2.sh f3.sh",
   holds: "LC_ALL=C; export LC_ALL\napt-mark showhold; echo ---; systemctl list-timers 'apt-daily*' --no-legend --all",
 };
 

@@ -1,6 +1,7 @@
 # Test report — T-088 helper on Sentani, real Ubuntu (sentani-001)
 
 **Author:** Kiro Tester · **For:** Kiro Orchestrator · **Started:** 2026-11-21
+**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 waits for "T-088 F1 done" (option B recommended to the founder). Then 3c, F2/F3, 4 and 5.
 **Authority:** ADR-021 (Sentani is disposable; fault injection allowed on Sentani only), ADR-022 (helper installed by the founder; T-088 rules), T-088
 **Target:** Sentani ONLY. Host `sentani` resolves to 100.119.231.102 (checked before every send). The pin comes from registry row `75e41a8a-6a97-4a06-8151-c0cb33ad0fc1`: its `known_hosts_file` holds only Sentani, with the owner-confirmed key `SHA256:j3nno/hlFOSktmjBlrxPO9oTE3qWFmITlKgKTIt+JrM` (confirmed 2026-11-21T05:44:58Z). Nothing was sent to Nabire, Timika or Merauke.
 **Helper on Sentani:** package `servrsit-helper-0.1.0.tar.gz`, sha256 `8f25e5a3…a6d0d6`. Rebuilding from integration/live-v1 `4101502` gives the identical checksum, so the installed code is `target-helper/` at `4101502`, which includes T-084.
@@ -45,7 +46,7 @@ All times are UTC on 2026-11-21. Op = first 8 hex characters of the operation id
 - **apt:** no apt or dpkg process running and no holds. Package lists are from 2026-11-21 ~04:52 (`update-success-stamp` 1795236767). apt-daily-upgrade last ran 06:29, next 2026-11-22 06:14.
 - **Pending updates:** `apt-get -s upgrade` shows **0 to install and 11 kept back**. All 11 are deferred by Ubuntu phasing: `libnss-systemd libpam-systemd libsystemd-shared libsystemd0 libudev1 systemd systemd-dev systemd-resolved systemd-sysv systemd-timesyncd udev`. `dist-upgrade` gives the same result. There is no Docker origin. The only third-party source is Tailscale, and nothing from it is pending.
 
-### 1 — query and rejections
+### 1 — query and rejections [FINAL]
 
 | Time | Kind | Input | Op | Digest | Mode | Reply / ledger |
 |---|---|---|---|---|---|---|
@@ -72,7 +73,7 @@ All times are UTC on 2026-11-21. Op = first 8 hex characters of the operation id
 
 All SSH exits were 0, and no reply carried a traceback.
 
-### 3a / 3b — killing the local ssh client (SIGKILL), retry = query the same id first
+### 3a / 3b — killing the local ssh client [FINAL] (SIGKILL), retry = query the same id first
 
 Each case used its own `prepare.directories.v1` operation. The retry rule: query the same id. If not found, resubmit the **identical** manifest. If found, do nothing. Never use a new id.
 
@@ -111,3 +112,26 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 | Low disk | **NOT proven yet** (step 5); root-side ENOSPC is probably not reachable as spotty |
 | Uninstall on the real server | **NOT tested** (not in this round's instructions) |
 | The controller's `previewDigest` (packages/domain plans) equals the helper's precondition rule for packages | **NOT proven.** My manifests use the helper's rule directly; this matters for T-089 |
+
+## 4. Defects and review findings
+
+| ID | Severity | File:Line | Description | Repro / evidence | Owner |
+|---|---|---|---|---|---|
+| D-S1 | Medium | `tests/live/helper-cli/cli.mts:42` (also the usage text at :19) | When `SERVRSIT_KNOWN_HOSTS` is unset, the CLI uses `apps/api/.data/known_hosts`. That file (dated 2026-11-17) pins Sentani's **pre-reinstall** key `SHA256:nhrV6lE7…FS4I`, which ADR-021 makes void, and it **also pins Timika and Nabire**. **(a)** With the default, every send to the reinstalled Sentani fails host-key checking. That is safe, but it pushes the user toward "fixing" a pin by hand. **(b)** `SENTANI_HOST` can be set to any name in that file, and the CLI would then contact a protected server with the maintenance key. Authentication would fail there, because the key is not installed, but contacting the server at all breaks the "Sentani only" rule (ADR-021). | Compare `ssh-keygen -lf apps/api/.data/known_hosts`, which shows 3 hosts and Sentani `nhrV6…`, with the registry row `75e41a8a…`'s `known_hosts_file`, which shows Sentani only, `j3nno/…JrM`, owner-confirmed 05:44:58Z. Not reproduced live: I never ran the CLI with its default. | Coder |
+| D-S2 | Low | `~spotty/servrsit-t088/f1.sh` on Sentani (Orchestrator's script), the line `apt-get install -y --allow-downgrades $PKGS \| tail -n 2` | The pipeline's exit status is `tail`'s, so `set -e` does not stop on a failed `apt-get`, and the script still prints **"T-088 F1 done"**. Low, because step 2 starts from a fresh `apt-get -s upgrade` and dpkg observation, so a failed downgrade is caught there. But the founder's message would be wrong. Fix: run `apt-get` without the pipe, or check `dpkg-query` for the 8 versions before printing "done". | Read-only review of the file on Sentani (sha256 below) | Orchestrator |
+| D-S3 | Low (Sentani) / would be High on a real server | `~spotty/servrsit-t088/f{1,2,3}.sh` on Sentani: spotty:spotty mode 664, run by the founder with `sudo sh` | The files are writable by `spotty`, and so by ServrSit's **inspect key**, which is a full `spotty` shell (its key line is `restrict,from=…` with no forced command). Whoever holds that key can change a script between now and the founder's `sudo sh`, which turns inspect access into root. That is acceptable on disposable Sentani, but this pattern must not be used on Nabire, Timika or Merauke. Before running, the founder can check `sha256sum ~/servrsit-t088/f*.sh` against the values below. | Checksums recorded 2026-11-21 (read-only, as spotty) | Orchestrator |
+| D-S4 | Info | `~spotty/servrsit-t088/f2.sh` | Ctrl-C during `sleep 600` exits the script before `apt-mark unhold`, and the script doesn't say how to recover. My founder-steps doc does (`sudo apt-mark unhold libclang1-18`). Suggest a `trap 'apt-mark unhold libclang1-18' EXIT`, or printing the recovery command. | Read-only review | Orchestrator |
+
+**Founder scripts reviewed (read-only, as spotty).** The commands match `docs/team/t088-founder-steps.md` F1 to F3. F1's two automatic stops are correct:
+- `grep -q " 0 to remove"` does not match "10 to remove";
+- the check for exactly 8 `Inst` lines also stops if a new package would be installed.
+
+SHA-256 at review time:
+
+```
+a9813b617a679332d9d7daff5746c5132fb3a68a307a63a87bdcc05086d2f83c  f1.sh
+eeafb796051fcf8e80cb3f668f318bb947ad2564e8648e6fa8e2b836c85599ea  f2.sh
+5f2f54d2fe089e396e8684fb6e14e304d1eb0f420806b24d571999a36ea972c5  f3.sh
+```
+
+No helper defect was found in steps 1 and 3a/3b.
