@@ -77,6 +77,8 @@ const PROBES: Record<string, string> = {
   cleanupdirs: "LC_ALL=C; export LC_ALL\nfor n in replay 3a-partial 3a-hold 3b-k1000 3b-k1150 3b-k700; do rmdir \"$HOME/servrsit-t088-$n\" && echo removed $n; done; ls -d $HOME/servrsit-t088* 2>/dev/null; echo done",
   founderscripts: "LC_ALL=C; export LC_ALL\nfor f in f1 f2 f3; do echo \"=== $f.sh\"; stat -c '%U %G %a %s' \"$HOME/servrsit-t088/$f.sh\"; cat \"$HOME/servrsit-t088/$f.sh\"; done",
   founderhashes: "LC_ALL=C; export LC_ALL\ncd \"$HOME/servrsit-t088\" && sha256sum f1.sh f2.sh f3.sh",
+  // read-only: how python-apt (the helper's library) resolves name:arch keys, as spotty; opens the cache only
+  pyapt: "LC_ALL=C; export LC_ALL\npython3 -c 'import apt; c=apt.Cache()\nfor k in [\"vim:amd64\",\"vim-common:all\",\"vim-common:amd64\",\"vim-runtime:all\",\"vim-runtime:amd64\",\"vim-tiny:amd64\",\"xxd:amd64\",\"libllvm18:amd64\"]:\n  p=c[k] if k in c else None; print(k, k in c, p.fullname if p else None, p.installed.version if p and p.installed else None, p.candidate.version if p and p.candidate else None, p.architecture() if p else None)'",
   holds: "LC_ALL=C; export LC_ALL\napt-mark showhold; echo ---; systemctl list-timers 'apt-daily*' --no-legend --all",
 };
 

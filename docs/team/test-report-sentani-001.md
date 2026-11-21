@@ -1,7 +1,7 @@
 # Test report — T-088 helper on Sentani, real Ubuntu (sentani-001)
 
 **Author:** Kiro Tester · **For:** Kiro Orchestrator · **Started:** 2026-11-21
-**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 waits for "T-088 F1 done" (option B recommended to the founder). Then 3c, F2/F3, 4 and 5.
+**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). Next: F2 (hold) test, then F3 (lock) test, both on the LLVM set, then 3c (mid-dpkg kill) applies the LLVM set. Then steps 4 and 5.
 **Authority:** ADR-021 (Sentani is disposable; fault injection allowed on Sentani only), ADR-022 (helper installed by the founder; T-088 rules), T-088
 **Target:** Sentani ONLY. Host `sentani` resolves to 100.119.231.102 (checked before every send). The pin comes from registry row `75e41a8a-6a97-4a06-8151-c0cb33ad0fc1`: its `known_hosts_file` holds only Sentani, with the owner-confirmed key `SHA256:j3nno/hlFOSktmjBlrxPO9oTE3qWFmITlKgKTIt+JrM` (confirmed 2026-11-21T05:44:58Z). Nothing was sent to Nabire, Timika or Merauke.
 **Helper on Sentani:** package `servrsit-helper-0.1.0.tar.gz`, sha256 `8f25e5a3…a6d0d6`. Rebuilding from integration/live-v1 `4101502` gives the identical checksum, so the installed code is `target-helper/` at `4101502`, which includes T-084.
@@ -89,9 +89,40 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 
 **Finding (3a(ii)):** the client was killed while the helper was still waiting for end-of-input. When sshd closed the session, the gateway got EOF with the **complete** request and the helper accepted and ran it. The client never saw a reply. This proves invariant 6 on real Ubuntu: a dropped connection is no evidence that nothing happened. Querying first was the only thing that stopped a duplicate.
 
-### 2, 3c, 4, 5 — not run yet
+### 2 — real `apt-get`-equivalent transaction through the helper [FINAL]
 
-- **Step 2 is blocked:** there is no pending update that `apt-get upgrade` (the product's own observation) would install. Applying the 11 phased systemd packages would override Ubuntu's staged rollout, re-execute systemd, and restart resolved, timesyncd and udev. That is a founder decision. The options are in `docs/team/t088-founder-steps.md`; option B (downgrade 8 harmless packages, then install them back through the helper) is recommended.
+**Founder F1** (Orchestrator's `f1.sh`, verified by Orchestrator): 8 packages downgraded at 07:36:19 to 07:36:29 UTC. apt history records it as `Requested-By: spotty (1000)`.
+
+**Split:** step 2 applies the **vim set** (5 packages). The **LLVM set** (3 packages) stays pending for the F2 hold test, the F3 lock test and 3c, which need a pending update. Each of those would otherwise need another downgrade. All 8 go through the helper.
+
+**Fresh read-only observation, 07:37 UTC (as spotty):**
+- Clock: Sentani's clock and the controller's agree to the second.
+- Boot id `c456de4b…`, unchanged.
+- No apt or dpkg process running, no holds.
+- `apt-get -s upgrade`: **8 upgraded, 0 newly installed, 0 to remove**. All 8 come from `Ubuntu:24.04/noble-updates` (and `noble-security` for the vim set). No third-party origin is involved.
+- The manifest's `from`/`to` versions and architectures were taken from these `Inst` lines.
+
+**python-apt key check (read-only, as spotty, through the helper's own library):** `cache["vim-common:all"]` and `cache["vim-runtime:all"]` resolve, but their `fullname` is `vim-common:amd64` and `vim-runtime:amd64`. This predicts D-S5.
+
+| Time | Run | Op | Digest | Scope | Ledger / outcome | Independent check |
+|---|---|---|---|---|---|---|
+| 07:38:25 | 2a, architectures exactly as apt prints them (`vim-common`, `vim-runtime` = `all`) | 254d3315 | 9d194d8e9a01 | 5 vim packages | accepted, then finished, **exit 1, `failed`**: "the transaction would change other packages; nothing was changed", "0 of 5 packages at the planned version" | dpkg: all 5 still at `2:9.1.0016-1ubuntu7`; dpkg.log shows no change; one unit, 07:38:27 to 07:38:29 |
+| 07:38:50 | 2b, same 5 packages, all labelled `amd64` (python-apt's convention) | 24793587 | 9a2b5042c03f | 5 vim packages | accepted, then finished after ~45 s, **exit 0, `succeeded`**: "apt commit returned success", "5 of 5 packages at the planned version" | see below |
+
+**Independent verification of 2b (as spotty, not through the helper):**
+- **dpkg:** a full `dpkg-query` diff before and after shows **exactly 5 lines changed**, `vim vim-common vim-runtime vim-tiny xxd` `2:9.1.0016-1ubuntu7` → `2:9.1.0016-1ubuntu7.20`. Every package is still in state `ii`. The LLVM set is unchanged at `1:18.1.3-1`.
+- **dpkg.log:** 5 `upgrade` lines at 07:39:29 to 07:39:31, then `status installed`, plus the `man-db` trigger at 07:39:33. The trigger is not a version change.
+- **apt history:** one transaction, 07:39:28 to 07:39:33, `Upgrade:` the 5 packages, with no Commandline or Requested-By line (python-apt commit). apt itself lists the `all` packages as `:amd64`.
+- **Journal:** one `servrsit-op-24793587…` unit, started 07:38:53, finished 07:39:39, 12.0 s CPU.
+- **`apt-get -s upgrade` afterwards:** 3 to upgrade, only the LLVM set.
+- **Services:** all 23 running services kept their PID and start time. needrestart restarted nothing for this set. vim is not loaded by any service, so this does **not** show what needrestart does when a library used by a service is upgraded.
+- **Timing:** ~35 s between acceptance and dpkg start, which covered cache open and download; ~4 s of dpkg.
+
+**Unattended-upgrades:** next run 2026-11-22 06:14 UTC. The vim set is already done. The LLVM set is in `noble-updates` only, which Ubuntu's default unattended-upgrades configuration does not install. The package steps should finish well before then.
+
+### 3c, F2, F3, 4, 5 — not run yet
+
+- ~~**Step 2 is blocked**~~ (resolved by option B / F1, see step 2 above): there was no pending update that `apt-get upgrade` (the product's own observation) would install. Applying the 11 phased systemd packages would override Ubuntu's staged rollout, re-execute systemd, and restart resolved, timesyncd and udev. That is a founder decision. The options are in `docs/team/t088-founder-steps.md`; option B (downgrade 8 harmless packages, then install them back through the helper) is recommended.
 - **3c, the hold test and the lock test** depend on step 2's packages. Their founder steps are F1 to F3 in `docs/team/t088-founder-steps.md`.
 - **Steps 4 (reboot) and 5 (disk)** are held back to keep the order of increasing risk: they come after step 2.
 - **Planning note for step 5:** `spotty` cannot fill root's reserved blocks. ext4 reserves ~5% by default, which I can't read without root, so it is assumed. A `spotty` fill can therefore prove behaviour when users are out of space, but probably **not** a root-side ENOSPC in the ledger or dpkg.
@@ -107,7 +138,11 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 | Real root ownership/chown: a directory created as root with the planned owner spotty:spotty and mode 755 | **Proven on Sentani** |
 | Query-before-retry stops duplicates after a client kill before acceptance, with no EOF, and after acceptance with the reply lost | **Proven on Sentani** |
 | Real `sudo -n` with the one sudoers rule | **Proven indirectly:** every reply above came from the root helper through it |
-| APT transaction exactness, `name:all` lookup in python-apt, external lock, held package, dpkg interruption, needrestart side effects | **NOT proven yet** (step 2 / F1 to F3) |
+| APT transaction through the helper: exact set, exact versions, nothing else changed, verified independently by dpkg | **Proven on Sentani** (2b) |
+| A transaction that would not be exact is refused whole, with nothing changed | **Proven on Sentani** (2a) |
+| Transactions with `Architecture: all` packages labelled as apt prints them | **FAILS on Sentani** (D-S5) |
+| needrestart: no service restart from a package update | **Proven only for packages no service loads** (vim). Not proven for libraries used by services |
+| External lock, held package, dpkg interruption | **NOT proven yet** (F3, F2, 3c) |
 | Reboot and return verification (boot id, SSH, query settles) | **NOT proven yet** (step 4) |
 | Low disk | **NOT proven yet** (step 5); root-side ENOSPC is probably not reachable as spotty |
 | Uninstall on the real server | **NOT tested** (not in this round's instructions) |
@@ -134,4 +169,6 @@ eeafb796051fcf8e80cb3f668f318bb947ad2564e8648e6fa8e2b836c85599ea  f2.sh
 5f2f54d2fe089e396e8684fb6e14e304d1eb0f420806b24d571999a36ea972c5  f3.sh
 ```
 
-No helper defect was found in steps 1 and 3a/3b.
+| D-S5 | **High** (functional; safe failure) | `target-helper/servrsit_helper/adapters.py` `RealSystem.apply_packages()`: `wanted = {"%s:%s" % (c["name"], c["arch"]) …}` against `changed = {p.fullname for p in cache.get_changes()}` | For a package with `Architecture: all`, apt prints `[all]` (`apt-get -s upgrade`, `dpkg-query ${Architecture}`, dpkg.log `vim-common:all`), and python-apt resolves `cache["name:all"]`. But `Package.fullname` is `name:amd64`. So any manifest that labels an `all` package as `all` builds a `wanted` set that can never equal `changed`, and **every such transaction is refused** with "would change other packages". The refusal itself is correct and safe: nothing changes. But most Ubuntu updates include `all` packages (here 2 of 5), so `apply.packages.v1` cannot apply typical updates. The fake-root suites (mine and Coder's) could not see this, because their fake System has no python-apt. Fix options: compare on `p.name` + `p.candidate.architecture` after normalising `all` to the native architecture, or key by the resolved package (`cache[key].fullname`) on both sides. The controller's planner and the verification keys (`expectInstalled`) must use the same convention, because `installed()` already accepts both. Add a regression test that uses a fake whose `fullname` differs from the lookup key. | Live: 2a (op 254d3315, failed, nothing changed) vs 2b (op 24793587, the same 5 packages with `amd64` labels, succeeded). Read-only python-apt probe output is in this report | Coder |
+
+No other helper defect was found in steps 1, 2 and 3a/3b.
