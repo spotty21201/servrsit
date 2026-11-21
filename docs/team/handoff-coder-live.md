@@ -1987,3 +1987,22 @@ pnpm -r test exit 0 (api 250, web 215, ai 156, ssh 61, store 28, domain 22, work
 - `dpkg --verify` and `--audit` output on Ubuntu 24.04.
 
 **The controller does not yet turn `restartNeeded` into a finding or a restart plan.** That needs the real SSH write target (T-089). Until then the helper reports it in query and evidence.
+
+### T-090 addendum: D-S8 and D-S9 (same branch, still helper 0.2.0)
+
+| ID | Fix | Tests (`test_t090.py`) |
+|---|---|---|
+| **D-S8** | A held package (`apt-mark hold`, python-apt `selected_state == SELSTATE_HOLD`) is refused with the typed code `PACKAGE_HELD` and its name ("… is held on this server; ServrSit does not override holds, nothing was changed"). It is refused at submit, before acceptance, and checked again in the runner before anything is marked. When the marked set differs from the plan for any other reason, the evidence now says what: "it would also change X" or "apt would not change Y". `PACKAGE_HELD` is added to the worker's `RejectCode`. | The real `apply_packages` with a held fake package: typed refusal, nothing marked or committed. Refusal at submit. The named difference. |
+| **D-S9** | Before the commit, the helper checks the four apt/dpkg locks (`/var/lib/dpkg/lock-frontend`, `/var/lib/dpkg/lock`, `/var/cache/apt/archives/lock`, `/var/lib/apt/lists/lock`) with a non-blocking `fcntl` lock that it releases at once. If the check cannot be done, it counts as locked. A lock lost during `cache.commit()` (`LockFailedException`) is also caught. Both end `failed` with `reasonCode: PACKAGE_LOCKED` and "another program is using the package manager …; nothing was changed, try again when it has finished". The library's raw text is not stored. Other commit errors still propagate (the generic path). `query.operation.v1` now returns `reasonCode` (`PACKAGE_HELD`, `PACKAGE_LOCKED`, `CONFFILE_MODIFIED` or null). | A lock held by a real second process (fork) is seen, and released afterwards. A lock before the commit and a lock during the commit give `PACKAGE_LOCKED` with no raw text. Other errors propagate. The query shows `reasonCode`. |
+
+**Version:** still **0.2.0**, as asked ("same branch and version bump"). **The checksum changed:** `servrsit-helper-0.2.0.tar.gz` is now `25f12d377964130b472de52914ce2d2925d0f7f6130d24758353f2c579862287`. It was `55b6d117…`. If the founder already installed the earlier 0.2.0, installing this one over it is an upgrade ("from 0.2.0 to 0.2.0") and works the same way.
+
+**Checks:**
+
+```
+target-helper unittest: Ran 97 tests, OK (test_t090 3 more runs OK); guarded PATH: 0 calls
+pnpm -r test exit 0 (api 250, web 215, ai 156, ssh 61, store 28, domain 22, worker 19, infra 9); typecheck all 9 exit 0
+sentani-helper-install.sh --no-copy (temporary keys): builds servrsit-helper-0.2.0, checksum 25f12d37…
+```
+
+**Not proven** (Sentani, T-088): python-apt's real `selected_state` on a held package, and the real lock error during commit.

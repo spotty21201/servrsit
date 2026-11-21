@@ -26,7 +26,9 @@ export type RejectCode =
   | "TARGET_BUSY"
   | "PRECONDITION_CHANGED"
   /** T-090: a package in the update has a configuration file the owner changed (helper 0.2.0). */
-  | "CONFFILE_MODIFIED";
+  | "CONFFILE_MODIFIED"
+  /** T-090 (D-S8): a package in the update is on hold; ServrSit never overrides a hold. */
+  | "PACKAGE_HELD";
 
 export interface RemoteRecord {
   readonly operationId: string;

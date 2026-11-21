@@ -46,6 +46,7 @@ Package updates (helper 0.2.0, T-090):
 - **No service restarts during an update.** The commit runs with needrestart suspended and in list-only mode. Services that need a restart afterwards are reported (`restartNeeded`) for a separate restart approval.
 - **Prompts and configuration files.** The commit runs with no prompts (`DEBIAN_FRONTEND=noninteractive`) and with `--force-confdef --force-confold`. An update touching a configuration file the owner changed is refused before acceptance (`CONFFILE_MODIFIED`).
 - **Unfinished packages.** `dpkg --audit` must be clean after the commit, or the operation is not reported as succeeded.
+- **Holds and locks.** A held package (`apt-mark hold`) is refused with `PACKAGE_HELD` and its name; holds are never overridden. If another program holds an apt or dpkg lock, the operation ends `failed` with `reasonCode: PACKAGE_LOCKED` and "nothing was changed, try again".
 
 Installing a newer version over an older one is an upgrade. It replaces the code, keeps the ledger, the account and the key, and is refused while an operation is unfinished.
 

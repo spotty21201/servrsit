@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from . import HELPER_VERSION
-from .adapters import RealSystem, System, precondition_digest
+from .adapters import RealSystem, System, held_reason, precondition_digest
 from .canonical import CanonicalizationError, digest_of
 from .ledger import FINAL, Ledger, LedgerError, UnreadableRecord
 from .schema import MAX_REQUEST_BYTES, QUERY, SchemaError, check_manifest, parse_request
@@ -125,6 +125,12 @@ def submit(signed: dict, config: Config, system: System) -> dict:
             return _rejected("PRECONDITION_CHANGED", "the changed configuration files could not be checked")
         if changed:
             return _rejected("CONFFILE_MODIFIED", "configuration files you changed: %s" % ", ".join(changed[:10]))
+        # T-090 (D-S8): a held package is refused before acceptance too.
+        held = system.held_packages(keys)
+        if held is None:
+            return _rejected("PRECONDITION_CHANGED", "package holds could not be checked")
+        if held:
+            return _rejected("PACKAGE_HELD", held_reason(held))
 
     status, record = ledger.claim(manifest["operationId"], digest, manifest, system.now())
     if record is None:
@@ -156,6 +162,8 @@ def query(operation_id: str, config: Config, system: System) -> dict:
         # T-090 (D-S6): services an update left needing a restart. Never restarted by the helper;
         # the controller proposes a separate restart.service.v1 plan for each.
         "restartNeeded": record.get("restartNeeded", []),
+        # T-090: PACKAGE_HELD, PACKAGE_LOCKED or CONFFILE_MODIFIED when a package update changed nothing for that reason.
+        "reasonCode": record.get("reasonCode"),
         "evidence": record["evidence"][-20:],
     }
 
