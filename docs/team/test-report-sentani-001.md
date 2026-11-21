@@ -383,3 +383,31 @@ No step produced a duplicate operation, a second transaction or a second reboot.
 - Whether the controller's `previewDigest` matches the helper's precondition rule (T-089).
 
 **Gate decision for T-089:** the transport, signature, ledger, retry, lock, hold, reboot and disconnect mechanics **pass** on real Ubuntu. Writes through the app should **not** be enabled until D-S5 and D-S6 are fixed and re-verified on Sentani. D-S5 makes most real updates fail. D-S6 can restart services without their own approval (invariant 5).
+
+---
+
+## 6. Helper 0.2.0 (T-090) re-run
+
+**Installed version:** `VERSION` reads 0.2.0. All 13 files under `/usr/lib/servrsit` match source **`0b59cae`** (integration/live-v1) by sha256; I read them as spotty, since they are world-readable. Rebuilding `0b59cae` gives package sha256 `25f12d377964…862287`, the same as `target-helper/dist/sentani/servrsit-helper-0.2.0`. `adapters.py` is root:root 644 and the sudoers file root:root 440. The ledger directory cannot be read as spotty, which is correct.
+
+**Fake-root gate (no server):** my suite (`tests/helper`, binding extended for the five new `System` methods, H55 allows the two new reply fields `restartNeeded` and `reasonCode`) passes **126/126** on 0.2.0. H12 and H18 passed 5/5 on repeat. The same binding still gives 126/126 on 0.1.0. Coder's own suite at `0b59cae` passes.
+
+**What 0.2.0 does, from reading the code (`adapters.py`, `helper.py`, `runner.py` at `0b59cae`):**
+- **D-S5:** each change is resolved with apt's own lookup, and the plan and the transaction are compared by resolved `fullname`.
+- **D-S6:** the commit runs with `NEEDRESTART_SUSPEND=1` and `NEEDRESTART_MODE=l`. Afterwards `needrestart -b -r l` (list only) is recorded as `restartNeeded` and in the evidence.
+- **D-S7:** `DEBIAN_FRONTEND=noninteractive`, `--force-confdef`/`--force-confold`, `Dpkg::Use-Pty=0`, and `dpkg --audit` after the commit. **Also:** if `dpkg --verify` shows that the owner changed a configuration file of any package in the scope, the submit is **refused** with `CONFFILE_MODIFIED` before acceptance, and checked again in the runner. So the owner's file is kept by **not updating** the package; confold is a second line of defence.
+- **D-S8:** a held package is refused at submit with `PACKAGE_HELD`, naming the package.
+- **D-S9:** the runner checks the package-manager locks before commit, and a lock failure during the commit is also reported as `PACKAGE_LOCKED`.
+
+**Candidates chosen read-only (as spotty):**
+
+| Case | Packages | Why | Read-only pre-checks |
+|---|---|---|---|
+| (a) `Architecture: all` | vim set: `vim`, `vim-common` (**all**), `vim-runtime` (**all**), `vim-tiny`, `xxd`, from `2:9.1.0016-1ubuntu7` to `…ubuntu7.20` | 2 of 5 are `all`; this set failed under 0.1.0 (2a) | `dpkg --verify` clean |
+| (b) needrestart | `libaio1t64` `0.3.113-6build1` to `…6build1.1` | the only running service that loads it is `multipathd.service` (`ldd` of each running service's executable); one small library, no configuration files, and no multipath devices on this machine | `multipathd` active, MainPID 402 |
+| (c) changed configuration file | `wget` `1.21.4-1ubuntu4` to `…ubuntu4.5`, conffile `/etc/wgetrc` | leaf package with one configuration file that owners really edit | `dpkg --verify` clean, `/etc/wgetrc` md5 `c43064699caf…` |
+| (d) hold / lock | vim set, hold on `vim-common` (an `all` package, which also exercises the name lookup) | pending until (a) | — |
+
+**Founder steps:** relayed by the Orchestrator, with no scripts in the founder's home (D-S3). The commands are in my reply of this round. The downgrade runs with `NEEDRESTART_MODE=a`, so `multipathd` restarts once onto the old `libaio`, and any later "needs a restart" comes from our update.
+
+**Status:** waiting for the founder steps.
