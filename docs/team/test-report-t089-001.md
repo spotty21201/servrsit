@@ -238,3 +238,26 @@ Plan `eac19992…` v1: 6 packages, `blockers: []`, `approvable: true`, no acknow
 **State left behind:** my instance is stopped. Sentani now has **no pending Ubuntu updates** again, and the owner's `/etc/wgetrc` edit is intact. His checkout's `git status` is clean.
 
 **Next:** round R2 (LLVM set, §5.5) for scenario (3).
+
+---
+
+## Addendum C: scenario (3) is prepared and tested; waiting for one founder line (13:31 UTC)
+
+**R2 is in place.** The founder's read-back shows `libllvm18`, `libclang-cpp18` and `libclang1-18` at `1:18.1.3-1`. My own read-only check at 13:27 shows exactly those 3 pending (`apt-get -s upgrade`: 3 upgraded, 0 to remove), no dpkg lock and no hold.
+
+**The cache clean has not been done.** All six LLVM `.deb` files, both versions, are still in `/var/cache/apt/archives` (checked at 13:27 and again at 13:30), and `APT::Periodic::AutocleanInterval "0"`, so nothing cleans them by itself. In my T-088 3c runs, the first operation spent about 3 minutes on the download, and the redo, with the files cached, took about 10 seconds. With the cache full, the operation would finish about 10 seconds after approval, which leaves no time for the lost-ack kill, the API crash and the recovery. **I did not consume R2 on a test that could not show the result.**
+
+**What is ready (`tests/live/t089/s4-lostack.mjs`):**
+- **Pre-flight refusal:** read-only. It refuses unless R2 is in place, no lock or hold exists, and no LLVM `.deb` is cached. Tested: it exits with code 6 and the message above while the cache is full.
+- **One operation, three phases:**
+  1. Plan and approve; check the digest again.
+  2. **Lost ack:** SIGKILL the API's own gateway `ssh` client during the submit. Then my own independent gateway query shows whether the helper has the operation, and the app is watched as it re-finds it by id.
+  3. **API crash:** SIGKILL the API process while the helper is still working. Restart it, sign in again, and follow the operation to the end.
+- **Pass criteria:** one operation id, one `servrsit-op` unit, one apt transaction, `dpkg --audit` clean, and the same manifest digest in every event and in the helper's record.
+
+**Mechanics tested without touching R2** (harmless read-only plan previews as load):
+- The API's own `ssh` child is detected within 100 ms of starting.
+- A SIGKILL of the API followed by a restart and re-login works, and the port is freed.
+- **A bug found and fixed:** the pid of the detected child was a string, and `process.kill()` needs a number. A real run would have crashed at the first kill. It is fixed and tested on a harmless child.
+
+**What I need:** the founder runs `sudo apt-get clean` and checks that `ls /var/cache/apt/archives/*.deb` says "No such file or directory". That removes only cached `.deb` files, and apt re-downloads them on demand.

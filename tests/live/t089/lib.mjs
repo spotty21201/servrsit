@@ -172,7 +172,7 @@ function readProc(pid) {
   try {
     const stat = readFileSync(`/proc/${pid}/stat`, "utf8"); const ppid = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1]);
     const args = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").filter(Boolean);
-    return { pid, ppid, args };
+    return { pid: Number(pid), ppid, args };
   } catch { return null; }
 }
 /** ssh clients started by the API process: [{pid, user}] where user is the `-l` value (servrsit = gateway, spotty = inspect). */
