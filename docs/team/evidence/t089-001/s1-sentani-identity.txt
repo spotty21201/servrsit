@@ -1,0 +1,2 @@
+{"blockers":[{"code":"WRITES_DISABLED","message":"Changes are disabled for this server until disposable-server tests pass and live work is authorized."}],"approvable":false}
+{"blockers":[{"code":"NO_CHANGES","message":"There are no package updates to apply."}],"approvable":false}

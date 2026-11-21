@@ -1,0 +1,18 @@
+phase A: signed in as my own owner: true
+plan  nabire: 201 blockers=["WRITES_DISABLED"] approvable=false previewDigest=none
+  approve nabire: 409 {"error":"PLAN_BLOCKED","blockers":["WRITES_DISABLED"]}
+  operation created: false
+plan  timika: 201 blockers=["WRITES_DISABLED"] approvable=false previewDigest=none
+  approve timika: 409 {"error":"PLAN_BLOCKED","blockers":["WRITES_DISABLED"]}
+  operation created: false
+plan  merauke: 201 blockers=["WRITES_DISABLED"] approvable=false previewDigest=none
+  approve merauke: 409 {"error":"PLAN_BLOCKED","blockers":["WRITES_DISABLED"]}
+  operation created: false
+plan  nabire reboot: 201 blockers=["WRITES_DISABLED"] approvable=false previewDigest=none
+  approve nabire reboot: 409 {"error":"PLAN_BLOCKED","blockers":["WRITES_DISABLED"]}
+  operation created: false
+plan  timika restart: 201 blockers=["WRITES_DISABLED","UNIT_NOT_SELECTED"] approvable=false previewDigest=none
+  approve timika restart: 409 {"error":"PLAN_BLOCKED","blockers":["WRITES_DISABLED","UNIT_NOT_SELECTED"]}
+  operation created: false
+strace(e): ssh launches {} | connect to Nabire 0, Timika 0, ssh naming a protected server 0
+strace(e): all connect() destinations {"127.0.0.53:53":2,"142.251.154.119:0":1,"142.251.155.119:0":1,"142.251.153.119:0":1,"142.251.151.119:0":1,"142.251.157.119:0":1,"142.251.156.119:0":1,"142.251.150.119:0":1,"142.251.152.119:0":1,"142.251.154.119:443":1,"104.16.124.96:0":1,"104.16.123.96:0":1,"104.16.124.96:443":1}

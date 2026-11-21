@@ -1,0 +1,153 @@
+# Test report — T-089 end-to-end through the app on Sentani (t089-001)
+
+**Author:** Kiro Tester · **For:** Kiro Orchestrator · **Date:** 2026-11-21 (11:36 to 11:55 UTC)
+**Authority:** ADR-026 (writes enabled for Sentani only), ADR-021/022/024/025, T-088 gate verdict (`test-report-sentani-001.md` §7.2), T-089
+**Code under test:** `integration/live-v1` at **`fd4bc03`** (includes T-089 `b4927c9`, T-092 helper 0.3.0, ADR-026 `fa83b7b`, and T-091 `b8e86ba`)
+**Target:** Sentani only. Helper 0.3.0 per the last verification (to be re-confirmed at the start of the main run).
+
+## Status: PARTIAL. Everything that needs no pending package is done and passes. (1), (2) and (3) are waiting for founder downgrades (§5).
+
+| # | Requirement | Status |
+|---|---|---|
+| (4) | Nabire, Timika, Merauke plans blocked `WRITES_DISABLED`, zero SSH writes | **PASS**, including at approval (§3.1) |
+| (5) | restart, reboot and directory plans still refused | **PASS**, including at approval, for Sentani and a protected server (§3.2) |
+| (1) | controller `previewDigest` equals the helper's package precondition rule | **NOT YET PROVEN.** Needs pending packages. Method in §5.2 |
+| (2) | plan → approve → dispatch → helper → independent verification → `succeeded`, with operation record and Activity entry | **NOT YET RUN** (§5.3) |
+| (3) | lost ack, client kill, API restart mid-operation reconcile to the same op, no duplicate | **NOT YET RUN** (§5.4) |
+
+> ## ⚠ Founder's API on :3001 is DOWN (found 11:41 UTC, still down at 11:52)
+> **Cause (read-only diagnosis, not touched by me):** `integration/live-v1` moved to `fd4bc03` (the T-091 merge, commits `38ba435` and `fd4bc03`) after the founder's API had started at 11:30:43. `apps/api/src/servers/registry.ts` now imports `inspectKeyOptions` from `@servrsit/ssh`, but `packages/ssh/dist` in the founder's checkout was built at **11:30:32**, before the merge, and does not export it. The founder's `tsx watch` restarted its child on the source change, and the child crashes at import with `SyntaxError: The requested module '@servrsit/ssh' does not provide an export named 'inspectKeyOptions'`. The watcher process is still running; the API child is not, and `curl` to :3001 is refused.
+> **Likely fix (Orchestrator or Coder, not me):** rebuild the workspace packages in `/projects/servrsit` (`pnpm -r --workspace-concurrency=1 build`). I did exactly that in a private worktree of `fd4bc03` (1 m 44 s, clean), and `inspectKeyOptions` is then exported, so it is expected to work.
+> **What I did not do:** I did not build, install or edit anything in the founder's checkout.
+> **My own part, disclosed:** at about 11:36 I wrote one temporary file under `apps/api/src` for a few seconds, to seed my own settings copy, and removed it. `git status` was clean afterwards and the founder's process (pid 176455, started 11:30:43) was not restarted by it. It was down before my first failure at 11:41, and the cause is the stale `dist`, not that file. I should have used a path outside his tree, and did from then on.
+
+## 1. Method and isolation
+
+| Item | What I did |
+|---|---|
+| Code | The **unmodified** production entry point `apps/api/src/index.ts`, started as a second instance, under `strace -f -e trace=connect,execve`. Runs `a`/`c`/`d`/`e`/`f` (run `b` failed to start: the stale-`dist` error above) |
+| Build | A private worktree `/tmp/t089/wt` of `fd4bc03`, built by me with the sequential command above. The founder's checkout was only read |
+| Port and data | Port 38917. My own copies of every store: registry (a SQLite **backup-API snapshot** of the founder's registry), findings, activity, baselines, settings, auth, care, intents |
+| Same as the founder's | `config/writes.json`, `config/test-bench.json` and `config/hosts.json` are byte-identical to his (sha256 compared). The manifest signing key and Sentani's maintenance key are **hard links** to his files (same inodes, no copy of key bytes): the product refuses a symlinked key directory ("must be a plain directory"), which is correct hardening. The Sentani registry row is `75e41a8a-6a97-4a06-8151-c0cb33ad0fc1` |
+| Account | My own owner (`tester`, own password, own RFC 6238 code). Never the founder's. Credentials are in a 0600 file under `/tmp/t089`, outside the repository, and are not in any log or this report |
+| No metered calls | `ai.enabled=false` seeded in my settings copy; none made |
+| No background checks on other servers | Phase A: scheduler paused. Phase B: the three protected rows are marked `disconnected` in my copy (the registry's append-only and no-reconnect triggers prevent deleting them or reconnecting them), so the scheduler can only check Sentani |
+| Evidence | `docs/team/evidence/t089-001/` (summaries only; raw `strace` logs contain key paths and stay in `/tmp/t089`) |
+
+**What the instance itself sends outside:** DNS to the local resolver, and HTTPS to two public time hosts (142.251.x.x and 104.16.x.x) from the clock monitor. These happen in every instance, are not SSH, and go to none of the four servers.
+
+## 2. First finding, an artefact of my setup: `IDENTITY_UNVERIFIED`
+
+In my first run the Sentani package plan carried `IDENTITY_UNVERIFIED` ("host key and machine id not confirmed"). The cause is that the machine id comes from the **latest health check** (`ssh-write-target.ts` `machineId()`), and I had paused the scheduler. That is not a product defect. With the scheduler running against Sentani, the identity is verified and the plan shows only `NO_CHANGES` (instance `d`). This is also why the founder's own instance, with checks on, can approve.
+
+## 3. Results that need no pending package
+
+### 3.1 (4) Protected servers: PASS, down to approval (phase A, instance `e`, scheduler paused, protected rows connected)
+
+Fresh registry snapshot and its own care database. For each case I created a plan and then **tried to approve it**, with the acknowledgements the plan asked for.
+
+| Case | Plan | Approval | Operation created |
+|---|---|---|---|
+| Nabire `apply.packages.v1` | blockers `[WRITES_DISABLED]`, `approvable: false`, `previewDigest: "none"` | **409 `PLAN_BLOCKED`** `[WRITES_DISABLED]` | no |
+| Timika `apply.packages.v1` (production) | `[WRITES_DISABLED]` | 409 `PLAN_BLOCKED` | no |
+| Merauke `apply.packages.v1` | `[WRITES_DISABLED]` | 409 `PLAN_BLOCKED` | no |
+| Nabire `reboot.host.v1` | `[WRITES_DISABLED]` | 409 `PLAN_BLOCKED` | no |
+| Timika `restart.service.v1` `ssh.service` | `[WRITES_DISABLED, UNIT_NOT_SELECTED]` | 409 `PLAN_BLOCKED` | no |
+
+**`strace` of the whole run:** **zero `ssh` launches** (`{}`), zero `connect()` to Nabire (100.117.187.86) and to Timika (100.120.143.103). Across **all five** instance runs, the only `ssh` ever started was `-l spotty -> sentani` (the inspect key, read-only), and no connection reached Nabire or Timika (`strace-summaries.json`).
+
+Phase 1 (first run, `a`) gave the same `WRITES_DISABLED` results at plan time, with `strace` showing the same absence of contact.
+
+### 3.2 (5) Refused kinds: PASS, down to approval (phase B, instance `f`, Sentani only, identity verified)
+
+| Plan | Blockers | `approvable` | Approval | Operation created |
+|---|---|---|---|---|
+| Sentani `restart.service.v1` `ssh.service` | `[UNIT_NOT_SELECTED]` | false | 409 `PLAN_CHANGED` (see O-T1) | no |
+| Sentani `restart.service.v1` `multipathd.service` | `[UNIT_NOT_SELECTED]` | false | 409 `PLAN_CHANGED` | no |
+| Sentani `reboot.host.v1` | `[PLAN_UNAVAILABLE]` | false | 409 `PLAN_CHANGED` | no |
+| Sentani `prepare.directories.v1` `/srv/app` | `[PLAN_UNAVAILABLE]` | false | 409 `PLAN_CHANGED` | no |
+| Sentani `apply.packages.v1` (nothing pending) | `[NO_CHANGES]` | false | 409 `PLAN_BLOCKED` `[NO_CHANGES]` | no |
+
+`strace`: only `-l spotty -> sentani` (3 launches: scheduler check and previews), none to a protected server. The Sentani gate is open in this instance (no "write access is closed" and no "no dispatcher" warning in its log).
+
+## 4. Observations from this round
+
+| ID | Severity | Where | Description |
+|---|---|---|---|
+| **O-T1** | Low | `apps/api/src/routes/care.ts` `currentDigest()` and `/api/plans/:id/approvals`; `apps/worker/src/ssh-write-target.ts` `previewService`/`previewBoot`/`previewDirectories` (always `null`) | Approving a blocked restart, reboot or directories plan on Sentani answers **`PLAN_CHANGED`**, not `PLAN_BLOCKED` with its blockers, because the approval-time re-check gets `null` for kinds the target cannot preview and answers before the store's own blocker check. The refusal and the safety are right, and the plan itself lists the real blockers with `approvable: false`, so the UI never offers approval. The reason code is misleading for an API caller or a log reader. Suggest checking `plan.blockers` before the digest re-check. For Coder |
+| **O-T2** | Info, process | integration branch handling | A merge into `integration/live-v1` broke the founder's running API through a stale `dist`. A step that rebuilds after merges, or a start script that fails loudly on an out-of-date build, would prevent a repeat. For Orchestrator |
+| **O-T3** | Info | T-091 | Once the founder applies the new inspect-key line (a forced command that runs only five reviewed scripts), **my own T-088 harness probes** (arbitrary read-only scripts over that key) will be refused, and I can no longer independently verify through that key. The app itself uses only the reviewed scripts. **Please do not apply the replacement line on Sentani until my run finishes, or tell me when it is applied** and I will switch my verification to the five allowed scripts |
+| O-T4 | Info | registry | The registry's triggers make a server's disconnection and its event log irreversible, so every phase in my copy needed a fresh snapshot. Good product behaviour; noted only because it shaped the test setup |
+
+## 5. What is left, and what I need from the founder
+
+### 5.1 Why more than one downgrade round
+
+The package plan covers **all** pending Ubuntu updates and has no way to select a subset (`PlanRequest` for `apply.packages.v1` carries only `serverId`). So each scenario consumes the whole pending set, and each needs its own downgrade round. All three commands were **simulated read-only on Sentani as `spotty`** with `apt-get -s` first:
+
+| Round | Simulated result | Used for |
+|---|---|---|
+| **R1** vim set (5) + `wget` | 6 downgraded, 0 to remove, exactly those 6 | scenarios (1) + (2): happy path with `all`-architecture packages and the kept owner file `/etc/wgetrc` |
+| **R2** LLVM set (3) | 3 downgraded, 0 to remove | scenario (3): the download phase lasts about 3 minutes, which gives a window for a lost ack and an API restart |
+| **R3** `xkb-data` (1) | 1 downgraded, 0 to remove | left pending for the founder's own first update in the app |
+
+`xkb-data` was chosen because it is a data-only leaf: architecture `all`, **no configuration files**, no service. My first candidate, `ncurses-term`, is **unsafe**: it depends on `ncurses-base (= the same version)`, so downgrading it would also downgrade an essential package.
+
+### 5.2 (1) previewDigest equality: method (to run after R1)
+
+1. Take the plan's `scope.packages` and `preconditions.previewDigest` from the API.
+2. Compute independently, with my own canonical JSON and sha256: `digestOf({installed: {"name:arch": fromVersion, ...}})` over the packages sorted by key, as the helper's `precondition_digest` does, and compare with the plan's value.
+3. Check that the helper accepts the manifest: the same digest is recomputed on Sentani at submit, so `accepted` (and not `PRECONDITION_CHANGED`) proves equality end to end. Also read the dpkg versions as `spotty` and compare.
+
+### 5.3 (2) the happy path (after R1)
+
+Plan → approve with the plan's digest, version, idempotency key and acknowledgements → watch the dispatcher → helper accepts → apt commit → independent verification by the app **and** by me (dpkg, apt history, unit journal as `spotty`) → `succeeded`. Then: `GET /api/operations/:id` events, the Activity entry, `keptOwnerFiles` for `/etc/wgetrc`, `restartNeeded`, and a repeat of the same approval (idempotency key) returning the same operation.
+
+### 5.4 (3) lost ack, client kill, API restart (after R2)
+
+One operation, with `strace` and a poll of the API's own `ssh` children:
+- **Lost ack:** SIGKILL the API's gateway `ssh` client during the submit. Expect the app to query the same operation id before anything else, and no second manifest.
+- **API restart:** SIGKILL the API process while the helper is in its download phase, restart it, and expect the reconciler to find the same operation and finish it.
+- **Pass criteria:** one operation id, one `servrsit-op-…` unit, one apt history entry, `dpkg --audit` clean, no second submit with the same id.
+
+### 5.5 Exact founder commands (Sentani, as `spotty`, own sudo; no scripts, no variables, each ends with a read-back)
+
+**R1.** Simulation first. The last line must read `6 downgraded, 0 to remove`:
+```
+sudo apt-get -s install --allow-downgrades vim=2:9.1.0016-1ubuntu7 vim-common=2:9.1.0016-1ubuntu7 vim-runtime=2:9.1.0016-1ubuntu7 vim-tiny=2:9.1.0016-1ubuntu7 xxd=2:9.1.0016-1ubuntu7 wget=1.21.4-1ubuntu4 | tail -n 3
+```
+Then, only if it said exactly that (the same line without `-s` and without the pipe, and with `--force-confold` so the owner's `/etc/wgetrc` is kept):
+```
+sudo apt-get install -y --allow-downgrades -o Dpkg::Options::=--force-confold vim=2:9.1.0016-1ubuntu7 vim-common=2:9.1.0016-1ubuntu7 vim-runtime=2:9.1.0016-1ubuntu7 vim-tiny=2:9.1.0016-1ubuntu7 xxd=2:9.1.0016-1ubuntu7 wget=1.21.4-1ubuntu4
+```
+Read-back. All six must show the older versions (`…ubuntu7` and `1.21.4-1ubuntu4`):
+```
+dpkg-query -W -f='${Package} ${Version}\n' vim vim-common vim-runtime vim-tiny xxd wget
+```
+
+**R2** (only when the Tester says R1 is done). Simulation, then the real command, then the read-back:
+```
+sudo apt-get -s install --allow-downgrades libllvm18=1:18.1.3-1 libclang-cpp18=1:18.1.3-1 libclang1-18=1:18.1.3-1 | tail -n 3
+sudo apt-get install -y --allow-downgrades libllvm18=1:18.1.3-1 libclang-cpp18=1:18.1.3-1 libclang1-18=1:18.1.3-1
+dpkg-query -W -f='${Package} ${Version}\n' libllvm18 libclang-cpp18 libclang1-18
+```
+The simulation's last line must read `3 downgraded, 0 to remove`.
+
+**R3** (only when the Tester says R2 is done; this one stays pending for the founder's first in-app update):
+```
+sudo apt-get -s install --allow-downgrades xkb-data=2.41-2ubuntu1 | tail -n 3
+sudo apt-get install -y --allow-downgrades xkb-data=2.41-2ubuntu1
+dpkg-query -W -f='${Package} ${Version}\n' xkb-data
+```
+Simulation: `1 downgraded, 0 to remove`. Read-back: `xkb-data 2.41-2ubuntu1`.
+
+## 6. Gate status (provisional)
+
+Unchanged from `test-report-sentani-001.md` §7.2 until (1), (2) and (3) run. What this round adds: the protected-server and refused-kind guarantees now hold **through approval** in the real app, not only at plan time, with `strace` evidence of zero contact. **T-089 must not be closed yet.**
+
+## 7. State left behind
+
+- **My instance:** stopped (no process left). My databases and the private worktree `/tmp/t089/wt` (with the hard-linked key files, in a 0700 directory) are kept for the resumed run and will be removed when the task ends.
+- **Sentani:** nothing changed by me this round. Sentani has no pending Ubuntu updates, and the owner's `/etc/wgetrc` edit is still in place.
+- **Founder's checkout:** not modified by me (see the disclosure above).
+- **Commits:** `tests/live/t089/` (library and scenarios), probes added to `tests/live/t088/h.mts`, this report and its evidence.
