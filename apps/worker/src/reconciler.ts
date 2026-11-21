@@ -87,7 +87,11 @@ export class Reconciler {
       return op;
     }
     const via = op.state === "outcome_unknown" ? "reconciled" : "remote_finished";
-    return this.transition(op, "verifying", via, { remoteState: "finished", exitCode: record.exitCode });
+    return this.transition(op, "verifying", via, {
+      remoteState: "finished",
+      exitCode: record.exitCode,
+      ...(record.report === undefined ? {} : { helperReport: record.report }),
+    });
   }
 
   /** Verifying: check the result independently of the ledger (invariant 9), per kind. */

@@ -135,6 +135,29 @@ export interface TransactionPreview {
    * even with ServrSit's non-interactive settings. Any entry blocks the plan.
    */
   readonly promptRisk?: readonly string[] | undefined;
+  /**
+   * T-089: how the plan's precondition digest is computed. "installed-v1" is
+   * the target helper's own rule (`precondition_digest` for apply.packages.v1):
+   * sha256 of canonical {"installed": {"name:arch": installed version}} over
+   * exactly the plan's packages. A real target uses it; the simulated target
+   * keeps its own `stateDigest` (absent rule).
+   */
+  readonly digestRule?: "installed-v1" | undefined;
+}
+
+/**
+ * T-089: the helper's precondition digest for a package transaction, from the
+ * installed versions of exactly these packages (null when not installed).
+ * Must equal target-helper/servrsit_helper/adapters.py precondition_digest().
+ */
+export function packagesPreconditionDigest(installed: Readonly<Record<string, string | null>>): string {
+  return digestOf({ installed });
+}
+
+/** The installed versions a preview shows for the given "name:arch" keys (the `from` of each upgrade, else null). */
+export function installedFromPreview(preview: TransactionPreview, keys: readonly string[]): Record<string, string | null> {
+  const from = new Map(preview.upgrades.map((c) => [`${c.name}:${c.arch}`, c.from]));
+  return Object.fromEntries([...keys].sort().map((k) => [k, from.get(k) ?? null]));
 }
 
 /** One owner-modified configuration file an update will keep (ADR-024). */
@@ -315,7 +338,16 @@ export function buildPlan(input: BuildPlanInput): PackagesPlan {
       includesServiceRestart: false,
       includesReboot: false,
     },
-    preconditions: { previewDigest: preview?.stateDigest ?? "none" },
+    preconditions: {
+      previewDigest:
+        preview === null
+          ? "none"
+          : preview.digestRule === "installed-v1"
+            ? packages.length === 0
+              ? "none"
+              : packagesPreconditionDigest(installedFromPreview(preview, packages.map((c) => `${c.name}:${c.arch}`)))
+            : preview.stateDigest,
+    },
     verification: {
       expectInstalled: Object.fromEntries(packages.map((c) => [`${c.name}:${c.arch}`, c.to])),
     },

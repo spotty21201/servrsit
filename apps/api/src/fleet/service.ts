@@ -303,6 +303,12 @@ export class FleetService {
     return { clock, findings: controllerClockFindings(clock) };
   }
 
+  /** T-089: /etc/machine-id from this server's latest successful check, or null. Part of its identity (T-056). */
+  machineIdOf(id: string): string | null {
+    const mid = this.states.get(id)?.lastSuccess?.observation.host.machineId;
+    return mid?.status === "ok" ? mid.value : null;
+  }
+
   snapshot(): FleetResponse {
     const now = this.now();
     const controlPlane = this.controlPlane();

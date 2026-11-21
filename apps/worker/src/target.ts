@@ -30,7 +30,10 @@ export type RejectCode =
   /** T-092: a package would still ask an interactive question (helper 0.3.0). */
   | "INTERACTIVE_PROMPT"
   /** T-090 (D-S8): a package in the update is on hold; ServrSit never overrides a hold. */
-  | "PACKAGE_HELD";
+  | "PACKAGE_HELD"
+  /** T-089: the helper could not read the request, or could not use its configuration or ledger. Nothing was claimed. */
+  | "INVALID_REQUEST"
+  | "HELPER_UNAVAILABLE";
 
 export interface RemoteRecord {
   readonly operationId: string;
@@ -38,6 +41,23 @@ export interface RemoteRecord {
   readonly state: "running" | "finished";
   /** Set when finished. Exit status alone never proves success (invariant 9). */
   readonly exitCode: number | null;
+  /**
+   * T-089: what the real helper's ledger adds (query only), validated and
+   * shown to the owner. It is the helper's account, never the verification:
+   * success still needs the independent installed-version check.
+   */
+  readonly report?: RemoteReport | undefined;
+}
+
+export interface RemoteReport {
+  readonly helperVersion: string;
+  readonly outcome: "succeeded" | "failed" | "partially_succeeded" | null;
+  /** For example PACKAGE_HELD or PACKAGE_LOCKED when an update changed nothing for that reason. */
+  readonly reasonCode: string | null;
+  /** Services the update left needing a restart. Never restarted by the helper (separate approval). */
+  readonly restartNeeded: readonly string[];
+  /** ADR-024: owner configuration files kept, and the new default left beside each (.dpkg-dist). */
+  readonly keptFiles: readonly { readonly path: string; readonly newDefault: string | null }[];
 }
 
 export type SubmitResult =

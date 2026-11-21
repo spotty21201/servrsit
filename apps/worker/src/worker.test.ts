@@ -244,7 +244,7 @@ test("invariant 12: the gate is rechecked at dispatch; if it is off nothing is s
   assert.equal(ev.payload["code"], "WRITES_DISABLED");
 });
 
-test("invariant 12: even with the gate open, the dispatcher never sends to a real (ssh) target", async () => {
+test("invariant 12: even with the gate open, the dispatcher never sends to an ssh target the API did not connect (T-089)", async () => {
   const h = await harness({ target: "ssh" });
   await h.dispatcher.runOnce();
   assert.equal(h.state(), "cancelled_before_start");
@@ -261,13 +261,16 @@ test("invariant 12: the real SSH write target refuses everything with WRITES_DIS
   await assert.rejects(() => t.inspectInstalled(["x:amd64"]), WritesDisabledError);
 });
 
-test("invariant 12: the real SSH write target cannot start a process or open a connection (no such imports)", () => {
+test("invariant 12 (T-089): the SSH write target opens no process or socket itself; its only routes out are the reviewed packages/ssh functions", () => {
   const src = readFileSync(new URL("./ssh-write-target.ts", import.meta.url), "utf8");
-  for (const mod of ["child_process", "node:net", "node:tls", "node:dgram", "node:http", "node:https", "@servrsit/ssh", "spawn", "exec"]) {
+  for (const mod of ["child_process", "node:net", "node:tls", "node:dgram", "node:http", "node:https", "spawn", "exec"]) {
     assert.equal(new RegExp(`from ["'][^"']*${mod}|\\b${mod}\\(`).test(src), false, mod);
   }
   const imports = [...src.matchAll(/from ["']([^"']+)["']/g)].map((m) => m[1]).sort();
-  assert.deepEqual(imports, ["./target.js", "@servrsit/domain"]);
+  assert.deepEqual(imports, ["./target.js", "@servrsit/domain", "@servrsit/ssh", "zod"]);
+  const fromSsh = /import \{([^}]*)\} from "@servrsit\/ssh"/.exec(src)?.[1] ?? "";
+  const values = fromSsh.split(",").map((s) => s.trim()).filter((s) => s !== "" && !s.startsWith("type ")).sort();
+  assert.deepEqual(values, ["collectInstalledViaSsh", "collectPackagePreviewViaSsh", "sendGatewayRequest"]);
 });
 
 test("invariant 11: fault injection exists only on the simulated target", () => {

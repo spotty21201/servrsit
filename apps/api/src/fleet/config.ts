@@ -119,6 +119,12 @@ export const DEFAULT_BASELINES_PATH = new URL("../../.data/baselines.db", import
 export const DEFAULT_SETTINGS_PATH = new URL("../../.data/settings.db", import.meta.url);
 /** T-069: one 0700 directory per registered server, holding its key pair and pinned known_hosts (gitignored). */
 export const DEFAULT_SERVER_KEYS_DIR = new URL("../../.data/server-keys", import.meta.url);
+/** T-089: plans, approvals, operations and their events; persist so an operation outlives a restart (gitignored). */
+export const DEFAULT_CARE_PATH = new URL("../../.data/care.db", import.meta.url);
+/** T-089: durable intent records written before each dispatch (gitignored, 0700). */
+export const DEFAULT_INTENTS_DIR = new URL("../../.data/intents", import.meta.url);
+/** T-089 (ADR-021): the ONLY place writes to a real server can be enabled. Sentani only. */
+export const DEFAULT_WRITES_CONFIG_PATH = new URL("../../config/writes.json", import.meta.url);
 
 export async function loadFleetConfig(path: URL | string = DEFAULT_CONFIG_PATH): Promise<FleetConfig> {
   const raw = await readFile(path, "utf8");

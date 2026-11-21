@@ -5,5 +5,6 @@ export type { ReconcilerOptions } from "./reconciler.js";
 export { SimulatedTarget } from "./simulated-target.js";
 export type { SimulatedFaults, SimulatedTargetOptions } from "./simulated-target.js";
 export { SshWriteTarget, WritesDisabledError } from "./ssh-write-target.js";
+export type { SshWriteConnection } from "./ssh-write-target.js";
 export { TransportError } from "./target.js";
-export type { QueryResult, RejectCode, RemoteRecord, SubmitResult, TargetIdentity, WriteTarget } from "./target.js";
+export type { QueryResult, RejectCode, RemoteRecord, RemoteReport, SubmitResult, TargetIdentity, WriteTarget } from "./target.js";

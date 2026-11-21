@@ -6,11 +6,11 @@
   "keys": {
     "vector-ed25519": {
       "algorithm": "ed25519",
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAfzjSr3hSjhVT3mClAL/xb1+3RhBcPYc0OqmCXuU3cW8=\n-----END PUBLIC KEY-----\n"
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAvii0+AHAI6BEN3JnMyEU/inPdWQfGc5PRKvvmYztExU=\n-----END PUBLIC KEY-----\n"
     },
     "vector-rsa": {
       "algorithm": "rsa-pss-sha256",
-      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAsMOuKC4RAXnPseCFQ5Mm\ngrUQ3WjFy1coX41aj78Dkpgx+3TTaTKzVtFmvre7kKomOj4LmUVG2tp6W2OstdHG\noQNKhYAiuS0oVDCYXKGt1FVDVvpZfKPzS2eZ2rfLK0DKH0z08YgfWIBHOg8eloWW\nYpqcSzk3XXgmuV5OQSF9euq2UKixes1ZxA3Ohak0Hlhuy4gaN6KAAhvxYr2xznCP\nVKiNgPLgRSGZDIF3AFSPf0mL5KtV6Q98O22gCFfIgGJXWszW2NCFHZgD3pDLnObQ\nf/azEV4D5iGRo4l3AZ1gArOIVpT7G25+J+uUU5dgU84DH+zpLjku9BjY57rXWj4m\nM+c4jvJBP+wcy90ztMHka86gIbzGvxKR4cW5nNUvXji6A/mt+0YHAcP2VPvWTg+g\nripczqsY+AW4+tvSqDDzziGwMIv39f5nsOFZYmo7ohf8N4YpI8W+RRaNZWBOciV1\nY3CYBZ4Vqg29ovY60Nn0YOC0CEip5WVzG2lnwjOyh/xjAgMBAAE=\n-----END PUBLIC KEY-----\n"
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAlJQAOwXSJCizPbwVs3YJ\ne2jgTxVCJn3h5c004+G3JANaaSaoccHebciDtjGMC1OXJmbRoxPnP+e6WosFwps/\n9P4EyZ2ZMpRhMd8A0ea9MjPC3cJeRK7cSzelNdgYxLoBTvzJGD4O8oK/h5DTakiu\n+lVb+xWOBoqI0S40Oo2hso/smKay/nU23dDAfItp/9XlYXp5z8cqtjbmRDgX+xIM\nTQ02Rzb1BVcMuGWau9g8K5amUlqD7aQYtjfFT9e0Qg1j/Bs4l5m9JeWUDsCnUDIK\nR+UMOs5Oh20Qv3ufBbYP5CkAM5aJpeoy5ux4YW9lG0VmoWObjPsiIYuuFWO7HcG2\nOcHEUp5Ti6Pqc5x46xLhMDgjzk3gag2o+M1+2ygRhPdMJdsDtHO12J6jNy9GoyUN\nsPoRgNaLjC7ZTdYWkKUFrRfgEhkIJyjpMu2Mbn4YCJyhYpm4ru/j1LLc+ppy1BOW\nakyfCATBMy8XIPge/GFteAv4E9xO3TCrKQXzVTbhUpLvAgMBAAE=\n-----END PUBLIC KEY-----\n"
     }
   },
   "manifests": [
@@ -51,11 +51,11 @@
           }
         },
         "keyId": "vector-ed25519",
-        "signature": "U8bOSxv/tB215gD/lPwh49AGntOVYB7Se6SHuNHLTsp6/ualhzaOLQJvjZa+HB9AiWbO4ckyTnJzUWpFm4/VBQ=="
+        "signature": "luCpjW6TYE+30AtqBjkovtKH3tVIAjZR5B/91oogSI8z848OYhlUupdAFUNK3d4F5BM6PnpSiYdmVlAF+1HbBw=="
       },
       "canonical": "{\"acceptBefore\":\"2026-11-17T10:10:00.000Z\",\"catalogVersion\":1,\"installationId\":\"inst-vectors\",\"issuedAt\":\"2026-11-17T10:00:00.000Z\",\"operation\":\"apply.packages.v1\",\"operationId\":\"00000000-0000-4000-8000-0000000002a1\",\"plan\":{\"digest\":\"sha256:58b9000c3d68f4d73bde0de12f11b65813b79c9cdeca8ef9b6aacebe150b05fa\",\"id\":\"00000000-0000-4000-8000-0000000001a1\",\"version\":1},\"preconditionDigest\":\"sha256:1111111111111111111111111111111111111111111111111111111111111111\",\"schemaVersion\":1,\"scope\":{\"packages\":[{\"arch\":\"amd64\",\"from\":\"3.0.13-0ubuntu3.4\",\"name\":\"openssl\",\"to\":\"3.0.13-0ubuntu3.5\"}]},\"server\":{\"hostKeyFingerprint\":\"SHA256:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ\",\"id\":\"00000000-0000-4000-8000-0000000000f1\"},\"verification\":{\"expectInstalled\":{\"openssl:amd64\":\"3.0.13-0ubuntu3.5\"}}}",
       "digest": "sha256:128e4839e3a20bc853d4ff0675c8d5855cb588abf459d3100ffdbab39e40540e",
-      "rsaSignature": "GZnEX1mX+twjXmB6LQH+cgNQbok62cjdNDmj4jO0q4z/OAWeAMBK01HdLxlOAgg8V8ia49C4hNJJG6p5VD+EokCQFrTFNAl78L0RGQ0tyATqZuGxAcGPbLE635F2U7Jfm8CX4McfTH9s95siQ5E56Z+z9xY6reZXIXRYdY52hf9F4kerzu5QKJr4Pgr8/K/ORYeVzmclU+1h7/wlEWbMi5iasP/Q6YgPgPMajAsTFPKY5j6IuEQaLLD7Lx4U8cK4UW97s/DEx/15LZdfKVDfDhV5Ff5C+bLJ8x/hw/2qJotYYY+ZAy2+1CXOCeu2PsZEva8obolEuMLBH2M0XtT7BfU6K/Xo/jtwxPn8siiRMGETaKu+afwI1DaT6hs+f0d9AvKeuRzLCy6mgyHc2t88KzVkMoj+RJcnxBQWHyNojJjlCZadFo0oXbJcYRDh95fl15/IE7dIjpzql3fs+2WGAiyUps9UTCYMaAQBDtR2jzWTqDYqjwXjYCTXGK6PvqeU"
+      "rsaSignature": "AXcg89PG+opBvOBZ+i1JwtY0QmfiJCqy7XD1Fk6GM48wDPtbKt0/B3376H/Mdfx5zMdfwoPCO1QdoXVa8z5C8ptD4Hb9hmlQhGIhI0iaYeET2hMy8PDyX0GGdHCCVybi5ZmafyF/HmhFs/axIbgkm9NuSjT0ij1vo4TNg55JB3LVLeonJH1PynKN8SS/rkjytgoxf6EKLjyR+xpLemmgDLXKVkmssdhU6tBJ7sZkkg2MbfdnHjXBi0sSAWyejcoGU4H5kXH8DI51CEsM1qIz82bvsa1LPVeN8pHIpN7Jwr022HbFqYubFY3YdNRxgk7O9TNjxidLZc6fnZcJQ+8LKrWvt0R+KAyVZPTg/TLyTkFagnKUGNAkjs4n2vmjj+UXk40Mcqyzn/+d6Ni4mT3gbuRTFhWY0Ng0pAIH/C5gSofg0/BIb0UFMn/SejkbluRwaJl4BHa6wLOymddwNL+UzleF5uZ108E18feP1yaskdQCaZfScs5DTOcSXbHIhDFE"
     },
     {
       "signed": {
@@ -88,11 +88,11 @@
           }
         },
         "keyId": "vector-ed25519",
-        "signature": "MrJGqFm+D+Qx8uxSCNpsU2s0MqG0vADF/Pdo4KpZ7CcqOVI3iPk3VaoO0FXg3Q8qh3yG5QP77wN67A2rtiXvDA=="
+        "signature": "X+9EIh5Dk2C1DJiaJeeyYpkRLdZyolT9fYlfcKi5YphqAn7qoRAmn+XE4BSf9AF0ZkQ1x3dQNRvPoFOGLasUCQ=="
       },
       "canonical": "{\"acceptBefore\":\"2026-11-17T10:10:00.000Z\",\"catalogVersion\":1,\"installationId\":\"inst-vectors\",\"issuedAt\":\"2026-11-17T10:00:00.000Z\",\"operation\":\"restart.service.v1\",\"operationId\":\"00000000-0000-4000-8000-0000000002a2\",\"plan\":{\"digest\":\"sha256:44268267e5df21849a8ef7dc265a6c02d73c3d90e6b072842371d7339033abe2\",\"id\":\"00000000-0000-4000-8000-0000000001a2\",\"version\":1},\"preconditionDigest\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\",\"schemaVersion\":1,\"scope\":{\"includesReboot\":false,\"includesServiceRestart\":true,\"unit\":\"nginx.service\"},\"server\":{\"hostKeyFingerprint\":\"SHA256:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ\",\"id\":\"00000000-0000-4000-8000-0000000000f1\"},\"verification\":{\"previousActiveSince\":\"123\",\"unit\":\"nginx.service\"}}",
       "digest": "sha256:e5f14b70841404790e0afce18b33e9b01eb9d721fadf429589cd6ac4ec448c1a",
-      "rsaSignature": "iUxjscXuZ4N/v1npEKtORyClPNA1Xsqc3ITKzLuFPcA/WI6zi42PVSyH9ZX1nAgkEIwdWm629+WlGuxdWhqlKyHX9RN30NetkXEnqp4bTsNMs0qT4M/HYtl9bvSuliDc8nrw3hIExOz2/HWLgYfST7vZSkMW6UvMby6J5YFx+gHH2mQiG2toDy+cPj9lSsshpjom5/nE8099Ez2riAawEP1yiLX6CHMyQ2G1hdiyQRsuNLLVggAQaPr/rHBmX3xQ+SwHd5Yac2vbgAqrzUeOGYNazE2opOf5qqbjyFVrorpzHwTeNhn64ZG2Zo4NCNJoRN7nbBLGmT0gvDI7dQ1CZrMIgI5FUkWRKqJ06EoRoOCQH22rDfDMGRYCaBn+qrVy2mUiDyCzmKbKIWqOPehxmh0J58x6MtyP+NC54lJ+ybEIouNXNkOSnk1nw2x8ibFqr9gTTfDINKstp5cfBG/Xi+4LECX/YKw/O/nNcaI3Oe1gcFrQfn3U3kQOtbzob604"
+      "rsaSignature": "WCfXS0ERnXZRyBxLSBIqSrq8fsdjj5y47aYY3MdHYqftZKtDShglV2ujX1UrPKdOr5UCsjo3vWdDlgtizaJZktYf5UjaiS5g05rrpFD5votD3IZmjWgyP2FMPbN4dFF215YsF5i8S3a3m8d3LZdTUUIWQPCPPCfTvQt6YnyncjS8YlgfIQwJ7uEzla0GdUEjLx4sGDjQNYcj4q05qqQLDTizOxmnovQi4/+qB0Yj1g1PSgoNbyyB9eQOZCPx+mu46SJ5MFs2IEsc3tCs/8f4r5cdnpJaAV0elsk5z85/q1lhEgAgGBXO0u7HHDANf68dhkuEOPDfB+6QLKtymlWeneK9fFoBWTnk8FGK58qFOkZk2hUIIMNlL0LDmkc2UettSSPr/gJWR7gq9YtGJ8ZA7pw7T32mq0cArHK2pPFmIGiWNrh0cfM5STpfruvhCu4OEHnQhVOqPlyf7QVEV91hkynY4e/6FQXgtCYaNmd3OzXoEzOhy7BHQPRPQzQoWj3Z"
     },
     {
       "signed": {
@@ -123,11 +123,11 @@
           }
         },
         "keyId": "vector-ed25519",
-        "signature": "oHLTqJf3wauuXp/qi1QG/qmoN2IdiVTe6wG3FqW1Kjflt9fInNfjibuIG98vvSN1DDXwTwLPDdR9D1fkchq9CA=="
+        "signature": "8S1CcqipsXvSchpWkWMx2Z/EFpiv7lZeuaug+ZPRYk9ps80ya7gQYNH4O/nxIlB/b90Cct47q0u0hhBqG2ZWBQ=="
       },
       "canonical": "{\"acceptBefore\":\"2026-11-17T10:10:00.000Z\",\"catalogVersion\":1,\"installationId\":\"inst-vectors\",\"issuedAt\":\"2026-11-17T10:00:00.000Z\",\"operation\":\"reboot.host.v1\",\"operationId\":\"00000000-0000-4000-8000-0000000002a3\",\"plan\":{\"digest\":\"sha256:078f50f3aec066f1634a97bcb666696b7edf5ea6edf6110b668a548db0da16d7\",\"id\":\"00000000-0000-4000-8000-0000000001a3\",\"version\":1},\"preconditionDigest\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\",\"schemaVersion\":1,\"scope\":{\"includesReboot\":true,\"includesServiceRestart\":false},\"server\":{\"hostKeyFingerprint\":\"SHA256:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ\",\"id\":\"00000000-0000-4000-8000-0000000000f1\"},\"verification\":{\"previousBootId\":\"11111111-2222-3333-4444-555555555555\"}}",
       "digest": "sha256:44547696a26a0330f43846b4fb591b857349a47871f64ecd76e0fd770b3bb02f",
-      "rsaSignature": "P8K+ltcf2MKc32nMFF7XmKTjvKfXGp1/S/FHFznQUOW8aMEHMtAxLUJaW4Hku2VpR5xqgpyPDPp/RJapyL2RpY5FCaiUhY66es1/8c+0coB3LgMU9+fXcMSTg4gZ/uAg9mmfNRVAqXB0V5gW+FP84sBqESNsSKMyv41YZQPXu4xu2SVUpaXjpe94GRXPpyS1BlwXA2qeSWljlpubN/zcfnFEROtM2qq5YQbzPAU3VhfMS/+GrEj0cJPB1fj+08HRaI7zegWOm2f8jCrPOi7AfBM68apYWeKNk0I5IVOozNINzkzWzz+8dwHdiosPqQAikZbF7aweHvCXmdxyoqhXwjeyoccmd89ARLWUBdLqrVaK0DHOGLTHcPt2gjkbxH0f/K9Dg5N5OKL7DVHqMGDXLPGRq6/lwbsO3pe8TMmgwdY3KOxncUDrNMng/AQ94HWo6wSCheWa6CWP+hT4eZ2Wm0y5H/+U8JGsIv26OtgTxbCKTjaS5EGfK9VLXmERpGtU"
+      "rsaSignature": "iC+JFUkMCfAuu2mdvaxvmmF+3fDAPfSfDiJyNx9Mll8hYiz7PDV/+VRQXW7pTV9rgE9UtYGDcGsyNiL56k+vTe19ULyRqW+DeZcAxZnosuu8ZLf3Ax+J21eVMzjlLbDHFg47+yjq8SMX6jQt0orNyP5CmxB8EhuLfBMYTcd7eh0Phi9pJt92/Hj/PPDxdbj1k6yTZzLoEdIv8lboYDu6gevkzQNoaZTzj7d017JmTDWgm6/6UzzbzDfHoAyUtfVdqdSHZNGRVh0zAV5YSor5JmCUcAC4ni9ENuMwo3YUFPzXYjXgiqjFKrbEjhLChxhzm2XRgrfY54j78AtVP1BZGDeb6UBNbzyUnO6zh18MB45Py6NsR6HpbhXU3K9DD63vZ20u5aiHm2H/QMaQtu1UCDwp0IYYC1UMS6xtOQ3D+v9sunPLvOIaiv0QYmRbSPQhCHH68KRvA6ReRsm6rY2/sNSgZ0VDi3bYr2sww5pydF2k700j+3lo+qSqdfRwgpm9"
     },
     {
       "signed": {
@@ -200,11 +200,63 @@
           }
         },
         "keyId": "vector-ed25519",
-        "signature": "XFBi/vp6NcP69w1Yaa39HsOa54Vv366eF4fXI+2eqBzn6OJodES52oH+ihuuVvkcP2XrLiSIqs3EGB0nj/4MBw=="
+        "signature": "WmwZ+UeekGXYUgeu+td7FTtd5Exz4THaVRZXO2VwNy6gEuZhOk3EO8Zll7rtVJsv8NAMz2ciLYVLm3IXHroXAA=="
       },
       "canonical": "{\"acceptBefore\":\"2026-11-17T10:10:00.000Z\",\"catalogVersion\":1,\"installationId\":\"inst-vectors\",\"issuedAt\":\"2026-11-17T10:00:00.000Z\",\"operation\":\"prepare.directories.v1\",\"operationId\":\"00000000-0000-4000-8000-0000000002a4\",\"plan\":{\"digest\":\"sha256:bd8fc00f9aa0eb9c56de8da3469229d589ee1fc34a15c44ed2c16593b791a1f6\",\"id\":\"00000000-0000-4000-8000-0000000001a4\",\"version\":1},\"preconditionDigest\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\",\"schemaVersion\":1,\"scope\":{\"directories\":[{\"group\":\"owner\",\"mode\":\"0700\",\"owner\":\"owner\",\"path\":\"/home/owner/projects\"},{\"group\":\"deploy\",\"mode\":\"0755\",\"owner\":\"deploy\",\"path\":\"/srv/app\"}],\"existing\":[],\"includesReboot\":false,\"includesServiceRestart\":false,\"requested\":[{\"group\":\"owner\",\"mode\":\"0700\",\"owner\":\"owner\",\"path\":\"/home/owner/projects\"},{\"group\":\"deploy\",\"mode\":\"0755\",\"owner\":\"deploy\",\"path\":\"/srv/app\"}]},\"server\":{\"hostKeyFingerprint\":\"SHA256:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ\",\"id\":\"00000000-0000-4000-8000-0000000000f1\"},\"verification\":{\"expectDirectories\":[{\"group\":\"owner\",\"mode\":\"0700\",\"owner\":\"owner\",\"path\":\"/home/owner/projects\"},{\"group\":\"deploy\",\"mode\":\"0755\",\"owner\":\"deploy\",\"path\":\"/srv/app\"}]}}",
       "digest": "sha256:dbcc82cf4eb0792eabca12c9aeafe9610630db5d6ea90ddb8cfe4b5b8fea147d",
-      "rsaSignature": "Egcqk5MQsOQqfQaeXwOFb/G94zGvIJwoBh1+L6hjs4nX1h+A794vYHV11pJi3caMfQsbC0y3FwnKsHei9RYXC1eZ9UCIZpTd+jWcx8v/0rIHRG2Tnuvv2hmd7xU41zTSM8VxL4lpZOsMm0LM97/PxPDphYyGOcXqtUlZWfSPr/TQak15WHra0b77jFhVOxbbkl99AzV5xlHR2PC723fIB/p+xWoHw4ciO63ie3ihOgfpgW5Gt0uj4opfsljdtWQ8TPmMVV9/OvO45DsNoOUshWqCEw+zBtg/N0aV3egziQkwiLCEsIFPC9z2AjdX/JmoUfUx8meboNUYTgEodALckWuoCfmmZ272xO80YEcyyN0t2OQrnyUMUB/ngpGeS00XbxxQqmNPTjqbpDpDRbjbG/RkBfgsWKQZVSHU1ZkUvBYKifNzWFNOgVrm+HHrZU1KTh0CFPxwR44A6rh1TnGFTvZa/6QYcrVmW0K832Sx+xICZZnXOI2L4+YV2CWAbOvo"
+      "rsaSignature": "Ctd56LsATWEygVv6h+ArKVMYHqh3M0jUlxLafJ+ADU4WsWVhhG0ymudEytD+nYoiBDxMhT3zADnyGe8BaRNwgXRgHNpf6PXUftTrQ2F6PSKSLtEuQo6gkQRdMpyTAo+A/9Pqt+ApPxJT0BwfCcZeZyO4CDS4gJcvF2C6ar/JTjTMK1aFlH7mUAtgHpWgMrm9O7kDi9/KCqdBktxthr4YJIMSC9EqTJOfoi5T03b6n7yVLfWZ9s64ujagIkAc6+gm5P0HFrjxxRNKFxUDuHO0BuYYbLuU98SFANfKaiGrvN0tn3qm6RaQ/05F2b8zn4+jwgesYJpWQt9lgOEHsLKcxNL93k/0soj3ccCNO3ZNs0RbEzNWoACahX/icV5YUV/fm6m6e15YKdImTI8wHYw+Mp7ErS7TjNCqbq8Yw9ZRmvvSUaAdunQ20dtjHF+/u1xSD4UAb2Nf1slMpSFXpDYv3JPXJYhhTD6Hf7v7VizqnPyO1x0B+oL7cLxbwgsYgl1T"
+    }
+  ],
+  "preconditions": [
+    {
+      "note": "[FIXTURE DATA] T-089 real-target package plan",
+      "installed": {
+        "wget:amd64": "1.21.4-1ubuntu4",
+        "vim-common:all": "2:9.1.0016-1ubuntu7.8",
+        "docker-ce:amd64": "5:27.3.1-1~ubuntu.24.04~noble"
+      },
+      "manifest": {
+        "schemaVersion": 1,
+        "installationId": "inst-vectors",
+        "server": {
+          "id": "00000000-0000-4000-8000-0000000000f1",
+          "hostKeyFingerprint": "SHA256:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+        },
+        "operationId": "00000000-0000-4000-8000-0000000002b1",
+        "operation": "apply.packages.v1",
+        "catalogVersion": 1,
+        "plan": {
+          "id": "00000000-0000-4000-8000-0000000001b1",
+          "version": 1,
+          "digest": "sha256:3ee1658a6d73a2e9b2c7fa955818e761dd5fe60dde7f5fbbee80c315f7669ab8"
+        },
+        "scope": {
+          "packages": [
+            {
+              "name": "vim-common",
+              "arch": "all",
+              "from": "2:9.1.0016-1ubuntu7.8",
+              "to": "2:9.1.0016-1ubuntu7.9"
+            },
+            {
+              "name": "wget",
+              "arch": "amd64",
+              "from": "1.21.4-1ubuntu4",
+              "to": "1.21.4-1ubuntu4.1"
+            }
+          ]
+        },
+        "preconditionDigest": "sha256:9a54dc8de124dedcadd395b3639da4748b796160faba25eb6c1b56d256231225",
+        "issuedAt": "2026-11-17T10:00:00.000Z",
+        "acceptBefore": "2026-11-17T10:10:00.000Z",
+        "verification": {
+          "expectInstalled": {
+            "vim-common:all": "2:9.1.0016-1ubuntu7.9",
+            "wget:amd64": "1.21.4-1ubuntu4.1"
+          }
+        }
+      },
+      "previewDigest": "sha256:9a54dc8de124dedcadd395b3639da4748b796160faba25eb6c1b56d256231225"
     }
   ],
   "canonical": [
