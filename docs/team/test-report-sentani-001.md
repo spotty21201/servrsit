@@ -410,4 +410,9 @@ No step produced a duplicate operation, a second transaction or a second reboot.
 
 **Founder steps:** relayed by the Orchestrator, with no scripts in the founder's home (D-S3). The commands are in my reply of this round. The downgrade runs with `NEEDRESTART_MODE=a`, so `multipathd` restarts once onto the old `libaio`, and any later "needs a restart" comes from our update.
 
-**Status:** waiting for the founder steps.
+**Founder attempt 1 (relayed by the Orchestrator, split into short lines with shell variables):** the founder reported "steps 1-3 done, apt exit 0". The Orchestrator verified read-only that **nothing was downgraded**: the vim set is still at `…ubuntu7.20`, `libaio1t64` at `0.3.113-6build1.1`, `wget` at `1.21.4-1ubuntu4.5`, and `multipathd` still has PID 402 since 08:31:34. The `/etc/wgetrc` edit **is** present. Likely cause: the variables were empty, and `apt-get install` with no package arguments exits 0 having done nothing. So "apt exit 0" is not evidence of a downgrade (the same class of false success as D-S2). The simulation in step 1 would have said `0 downgraded`.
+
+- **Effect on the plan:** none. The edit to `/etc/wgetrc` is kept through the redo, because the downgrade uses `--force-confold` and `dpkg --verify` compares against the installed version. `t090.sh` cannot run on a wrong state: each `scope()` asserts that exactly the expected packages are pending, from a fresh `apt-get -s upgrade`, and stops otherwise.
+- **Recommendation:** end the founder's real downgrade with a version read-back instead of relying on the exit code:
+  `dpkg-query -W -f='${Package} ${Version}\n' vim vim-common vim-runtime vim-tiny xxd libaio1t64 wget`
+- **Status:** ON HOLD. Nothing sent to Sentani since the 0.2.0 pre-checks. The Orchestrator is redoing steps 1-2 with the founder.
