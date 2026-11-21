@@ -151,3 +151,40 @@ Unchanged from `test-report-sentani-001.md` §7.2 until (1), (2) and (3) run. Wh
 - **Sentani:** nothing changed by me this round. Sentani has no pending Ubuntu updates, and the owner's `/etc/wgetrc` edit is still in place.
 - **Founder's checkout:** not modified by me (see the disclosure above).
 - **Commits:** `tests/live/t089/` (library and scenarios), probes added to `tests/live/t088/h.mts`, this report and its evidence.
+
+---
+
+## Addendum A: re-verification against the founder's rebuilt build (12:05 to 12:38 UTC)
+
+**Status: the stale-`dist` incident is resolved. (1) to (3) still wait for founder round R1, which had not landed by 12:38.**
+
+**The founder's build (read-only checks):**
+- His checkout is at `695f25e`, which is `fd4bc03` plus one commit that changes only `.kiro/steering/structure.md`. No code differs from what I tested.
+- `packages/*/dist` were rebuilt at 12:05. `packages/ssh/dist/index.js` exports `inspectKeyOptions`, and :3001 answers HTTP 200 again.
+- The built output of `ssh`, `domain` and `store` is **byte-identical** to my private worktree's build (sha256 over every `.js` file).
+
+**What changed in my setup:**
+- My instance now runs **from the founder's checkout**: the same code and the same `dist` his API runs, with its plain `.data/helper` directory.
+- The private worktree and the hard-linked key files are **removed**. The two key files are back to one link each (mode 600).
+- His `git status` was clean after my runs.
+- **This supersedes the hard-link and worktree method in §1.**
+
+**Verified again on the founder's build** (instance `g`):
+- The write gate is open: `writesEnabled ["sentani"]`, with no "write access is closed" or "no dispatcher" warning.
+- Sentani's identity is verified after its first health check, and its package plan shows only `NO_CHANGES`.
+- The helper answers over the gateway as **version 0.3.0**.
+- `git status` in his checkout: 0 changes.
+
+**Self-test of the oracle for (1):** my Node digest function and my independent Python canonicalizer (the one from the helper suite) give the same value for the same input, `sha256:b5dbb502…52e5`. Both are written from the helper's rule text (`digest_of({"installed": {"name:arch": version}})` over sorted keys), not from the product.
+
+**R1 not applied at 12:37:58:**
+- All six packages are still at the newer versions (vim set `…ubuntu7.20`, wget `1.21.4-1ubuntu4.5`).
+- There has been no apt activity since my own `wget` update at 10:27:45, no dpkg lock and no hold.
+- My script waited read-only for 25 minutes. **Nothing was sent to Sentani.**
+- My instance is stopped.
+
+**To resume:** `node tests/live/t089/s3-happy.mjs` (from node 24). It starts my instance if it is not up, waits for the first health check, waits read-only for R1, then runs (1) and (2) end to end.
+
+**Two coordination points while my operations run:**
+1. **Please don't approve anything in the founder's own app on Sentani.** The helper allows one unresolved mutation per server, so two instances would collide on `TARGET_BUSY`.
+2. **Please keep the T-091 forced-command inspect line off Sentani** until the run is finished (O-T3).

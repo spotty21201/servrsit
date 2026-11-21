@@ -17,8 +17,10 @@ import { createHmac, randomBytes } from "node:crypto";
 import { appendFileSync, closeSync, openSync, readFileSync, readdirSync, readlinkSync, writeFileSync } from "node:fs";
 
 export const T = "/tmp/t089";
-// My own build of the integration/live-v1 head (private worktree; the founder's checkout is never built or edited by me).
-export const WT = "/tmp/t089/wt";
+// The founder's checkout, read-only: I run the same code and the same rebuilt dist his API runs (T-089 re-verified against his
+// build after the 12:05 rebuild). I never build, install or edit anything there. Its .data/helper is a plain directory, as the
+// product's key loader requires.
+export const WT = "/projects/servrsit";
 export const API_DIR = `${WT}/apps/api`;
 export const PORT = 38917;
 export const BASE = `http://127.0.0.1:${PORT}`;
@@ -246,3 +248,25 @@ if ${paused ? "True" : "False"}:
 s.commit(); print("scheduler paused:", ${paused ? "True" : "False"})
 `], { stdio: "inherit" });
 }
+
+// ---------------------------------------------------------------------------------------------- read-only probes on Sentani (T-088 harness)
+const H_MTS = "/projects/servrsit-tester/tests/live/t088/h.mts";
+const TSX = `${WT}/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/cli.mjs`;
+/** A fixed read-only probe over the inspect key (as spotty), or a gateway query: `probe("dpkg")`, `helperQuery(opId)`. */
+export function probe(name, ...args) {
+  return execFileSync(`${NODE_BIN}/node`, [TSX, H_MTS, "probe", name, ...args], { cwd: API_DIR, env: { ...process.env, PATH: `${NODE_BIN}:/usr/bin:/bin` }, encoding: "utf8", timeout: 180000, stdio: ["ignore", "pipe", "ignore"] });
+}
+export function helperQuery(operationId) {
+  const out = execFileSync(`${NODE_BIN}/node`, [TSX, H_MTS, "query", operationId], { cwd: API_DIR, env: { ...process.env, PATH: `${NODE_BIN}:/usr/bin:/bin` }, encoding: "utf8", timeout: 180000, stdio: ["ignore", "pipe", "ignore"] });
+  return JSON.parse(out).reply;
+}
+/** Parses `dpkg-query` lines "name version status" into {name: version}. */
+export const versions = (txt) => Object.fromEntries(txt.split("\n").map((l) => l.trim().split(/\s+/)).filter((p) => p.length >= 3 && /^[a-z0-9][a-z0-9+.-]*(:[a-z0-9]+)?$/.test(p[0]) && /^\d|^\d+:/.test(p[1])).map((p) => [p[0].replace(/:.*/, ""), p[1]]));
+
+// ---------------------------------------------------------------------------------------------- independent digest (own canonical JSON)
+import { createHash } from "node:crypto";
+export const canon = (v) => v === null || typeof v !== "object" ? JSON.stringify(v) : Array.isArray(v) ? `[${v.map(canon).join(",")}]` : `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(",")}}`;
+export const digestOf = (v) => "sha256:" + createHash("sha256").update(canon(v), "utf8").digest("hex");
+/** The helper's package precondition rule, re-implemented from target-helper/servrsit_helper/adapters.py: digest_of({"installed": {"name:arch": installedVersion}}). */
+export const packagesPrecondition = (packages) => digestOf({ installed: Object.fromEntries(packages.map((c) => `${c.name}:${c.arch}`).sort().map((k) => [k, packages.find((c) => `${c.name}:${c.arch}` === k).from])) });
+export const TERMINAL = new Set(["succeeded", "failed", "partially_succeeded", "cancelled", "expired", "blocked"]);
