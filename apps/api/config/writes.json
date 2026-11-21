@@ -1,0 +1,8 @@
+{
+  "note": "T-089 (ADR-021): the ONLY place writes to a real server can be enabled, and only for Sentani (any other name fails to load and every write stays disabled). No API or UI route reads or changes this file. The Orchestrator sets writesEnabled to true only after the Tester's end-to-end fault-injection suite passes on Sentani and the founder agrees. Read on every use: setting it back to false stops new dispatches at once.",
+  "servers": {
+    "sentani": {
+      "writesEnabled": false
+    }
+  }
+}

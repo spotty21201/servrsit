@@ -7,11 +7,13 @@
  *   POST /api/plans/:id/approvals        {planVersion, planDigest, idempotencyKey, acknowledgements}
  *   GET  /api/operations/:id             authoritative state and append-only events
  *
- * HARD GATE: every real server has writesEnabled=false (configuration can only
- * say false, and no route can change it), so every plan for a real server is
- * blocked with WRITES_DISABLED and no approval can succeed. A real server is
- * never contacted to prepare a plan. Only simulated servers, injected in code,
- * can be approved and dispatched.
+ * WRITE GATE (T-089, ADR-021): a real server's writesEnabled comes only from
+ * the controller's config/writes.json, which allows Sentani alone and which no
+ * route reads or changes. Every other real server stays blocked with
+ * WRITES_DISABLED and is never contacted to prepare a plan. Where the gate is
+ * open, the target is asked for a read-only preview (packages only; other
+ * kinds get no preview and are blocked PLAN_UNAVAILABLE). Simulated servers,
+ * injected in code, work as before.
  *
  * Auth (T-053): the global guard has already required a session for every
  * route here, and an allowed Origin plus the session's CSRF token for every
@@ -27,19 +29,21 @@ import {
   buildRebootPlan,
   buildRestartPlan,
   directoryAllowed,
+  installedFromPreview,
   isRestartableUnitName,
+  packagesPreconditionDigest,
   resolveIdentities,
   type Plan,
 } from "@servrsit/domain";
 import type { ApprovalRejection, CareStore, StoredOperation, TargetKind } from "@servrsit/store";
-import { Reconciler, TransportError, type WriteTarget } from "@servrsit/worker";
+import { Reconciler, SshWriteTarget, TransportError, type WriteTarget } from "@servrsit/worker";
 
 export interface CareServer {
   readonly id: string;
   readonly name: string;
   readonly production: boolean;
   readonly kind: TargetKind;
-  /** From configuration only. Always false for real servers. */
+  /** From controller configuration only (T-089: writes.json, Sentani only). Never from a request. */
   readonly writesEnabled: boolean;
   /** T-059: units the owner selected for this server; only these can be restarted. */
   readonly selectedServices?: readonly string[] | undefined;
@@ -123,9 +127,9 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
   });
 
   async function makePlan(id: string, version: number, server: CareServer, request: PlanRequest): Promise<Plan> {
-    // Never contact a server whose writes are disabled, and never a real one.
+    // Never contact a server whose writes are disabled.
     const target = o.targets.get(server.id);
-    const mayPreview = server.writesEnabled && server.kind === "simulated" && target !== undefined;
+    const mayPreview = server.writesEnabled && target !== undefined;
     const identity = identities().get(server.id);
     // T-056: busy if this record, or another record of the same machine, has unresolved work.
     const busy =
@@ -188,8 +192,14 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
   /** The target's current state digest for the kind of work a plan describes (T-054 re-check). */
   async function currentDigest(p: Plan, target: WriteTarget): Promise<string | null> {
     switch (p.operation) {
-      case "apply.packages.v1":
-        return (await target.previewPackages())?.stateDigest ?? null;
+      case "apply.packages.v1": {
+        const preview = await target.previewPackages();
+        if (preview === null) return null;
+        // T-089: a real target's plans carry the helper's own rule; recompute it the same way.
+        if (preview.digestRule !== "installed-v1") return preview.stateDigest;
+        const keys = p.scope.packages.map((c) => `${c.name}:${c.arch}`);
+        return keys.length === 0 ? "none" : packagesPreconditionDigest(installedFromPreview(preview, keys));
+      }
       case "restart.service.v1":
         return (await target.previewService(p.scope.unit))?.stateDigest ?? null;
       case "reboot.host.v1":
@@ -264,11 +274,11 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     }
     // T-054 (F2, Tech Spec §9.2): re-check the target at approval time. If its package state is no
     // longer the state the plan was prepared from, the plan is stale. Same rule as planning: a
-    // server whose writes are disabled, or a real one, is never contacted. A repeat of an approval
-    // that already exists is an idempotent replay (the state has moved on because it ran).
+    // server whose writes are disabled is never contacted. A repeat of an approval that already
+    // exists is an idempotent replay (the state has moved on because it ran).
     const target = o.targets.get(server.id);
     const replay = o.store.hasApproval(plan.id, parsed.data.planVersion);
-    if (!replay && server.writesEnabled && server.kind === "simulated" && target !== undefined) {
+    if (!replay && server.writesEnabled && target !== undefined) {
       const latest = o.store.getPlan(plan.id);
       let current: string | null = null;
       try {
@@ -320,12 +330,15 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
 
   // T-055 (FR-17, Tech Spec §13): reconcile against the target's ledger and installed state. Read-only
   // toward the target: it can never start, retry or stop a mutation. A server whose writes are
-  // disabled, or a real one, is never contacted.
+  // disabled is never contacted.
   fastify.post("/api/operations/:id/reconcile", { bodyLimit: 1024 }, async (request: FastifyRequest<{ Params: { id: string } }>, reply) => {
     const op = o.store.getOperation(request.params.id);
     if (op === null) return notFound(reply);
     const server = serverById(op.serverId);
-    if (server === undefined || server.kind !== "simulated" || !server.writesEnabled) {
+    // T-089: also after writes.json was closed, as long as the target can still read the ledger.
+    const target = server === undefined ? undefined : o.targets.get(server.id);
+    const canRead = server !== undefined && (server.writesEnabled || (target instanceof SshWriteTarget && target.connected));
+    if (!canRead) {
       return reply.code(409).send({ error: "RECONCILE_UNAVAILABLE" });
     }
     const reconciled = await new Reconciler({ store: o.store, targets: o.targets, actor: "owner", now }).reconcile(op.id);

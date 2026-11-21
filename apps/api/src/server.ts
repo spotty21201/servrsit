@@ -42,13 +42,23 @@ import { AddressPolicy, type Resolver } from "./servers/address.js";
 import { ServerRegistry, type FirstCheckCollector, type PrivilegeProbe } from "./servers/registry.js";
 import { createHostKeyScanner, createKeyVault, probeTcp, type HostKeyScanner, type KeyVault } from "./servers/ssh-tools.js";
 import { DEFAULT_OWNER_CONTEXT_PATH, OwnerContextFile } from "./owner-context-file.js";
-import { SqliteAuthStore, SqliteCareStore, SqliteServerStore, SqliteFindingStore, SqliteSettingsStore, SqliteActivityStore, SqliteBaselineStore, type CareStore, type NewServer, type StoredServer } from "@servrsit/store";
-import { SshWriteTarget, type WriteTarget } from "@servrsit/worker";
+import { MemoryIntentStore, SqliteAuthStore, SqliteCareStore, SqliteServerStore, SqliteFindingStore, SqliteSettingsStore, SqliteActivityStore, SqliteBaselineStore, type CareStore, type IntentStore, type NewServer, type StoredServer } from "@servrsit/store";
+import { Dispatcher, SshWriteTarget, type WriteTarget } from "@servrsit/worker";
+import type { CommandRunner } from "@servrsit/ssh";
+import type { WriteAccess, WriteGate } from "./writes/write-gate.js";
+import { startDispatchLoop } from "./writes/dispatch-loop.js";
 import { buildFixtureFleet } from "./fleet/fixture.js";
 import { ControllerClockMonitor, NOT_CHECKED_CLOCK } from "./clock/controller-clock.js";
 import { createLoggerOptions, installResponseRedaction, type LogStream } from "./redaction.js";
 
 const isDev = process.env["NODE_ENV"] !== "production";
+
+declare module "fastify" {
+  interface FastifyInstance {
+    /** T-089: the care-loop dispatcher, or null when no real server can be written to. Tests drive it directly. */
+    careDispatcher: Dispatcher | null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Server factory
@@ -141,8 +151,23 @@ export interface SimulatedCareServer {
 
 export interface CareOptions {
   readonly store?: CareStore | undefined;
+  /** T-089: durable intent records (the entry point passes a directory). Default: in memory. */
+  readonly intents?: IntentStore | undefined;
   readonly simulated?: readonly SimulatedCareServer[] | undefined;
   readonly now?: (() => Date) | undefined;
+  /**
+   * T-089: the write gate for real servers (config/writes.json, Sentani only). Default: none, so every
+   * real server's writes stay disabled. The entry point passes the controller's gate.
+   */
+  readonly writeGate?: WriteGate | undefined;
+  /** T-089: test seam for the write target's ssh runner. Production uses the real OpenSSH runner. */
+  readonly sshRunner?: CommandRunner | undefined;
+  /**
+   * T-089: run the dispatcher in this process. Default: when a write gate is given and background
+   * checks run (live mode, startChecks not false). Tests drive it through `dispatcher` instead.
+   */
+  readonly startDispatcher?: boolean | undefined;
+  readonly dispatchIntervalMs?: number | undefined;
 }
 
 const NO_AI: AiDescription = { available: false, providerLabel: "None: answers come from the checks only.", route: "No external service.", region: null };
@@ -221,25 +246,23 @@ function fleetHost(s: StoredServer): FleetHost {
 /**
  * Real servers come from the registry on every call, so a server added or
  * disconnected through the API is seen at once. Simulated servers are fixed.
+ * T-089: a real server's target is made on every lookup from the write gate:
+ * connected only while the gate grants access, otherwise one that refuses
+ * every write and contacts nothing.
  */
 class CareTargets extends Map<string, WriteTarget> {
-  constructor(private readonly isReal: (id: string) => boolean) {
+  constructor(private readonly real: (id: string) => WriteTarget | undefined) {
     super();
   }
 
   override get(id: string): WriteTarget | undefined {
-    const known = super.get(id);
-    if (known !== undefined) return known;
-    if (!this.isReal(id)) return undefined;
-    const target = new SshWriteTarget(id);
-    super.set(id, target);
-    return target;
+    return super.get(id) ?? this.real(id);
   }
 }
 
-function careWiring(realServers: () => readonly CareServer[], care: CareOptions | undefined) {
+function careWiring(realServers: () => readonly CareServer[], realTarget: (id: string) => WriteTarget | undefined, care: CareOptions | undefined) {
   const initial = realServers();
-  const targets = new CareTargets((id) => realServers().some((s) => s.id === id));
+  const targets = new CareTargets(realTarget);
   const realIds = new Set(initial.map((s) => s.id));
   const realNames = new Set(initial.map((s) => s.name.toLowerCase()));
   const simulated: CareServer[] = [];
@@ -255,7 +278,8 @@ function careWiring(realServers: () => readonly CareServer[], care: CareOptions 
   const simulatedIds = new Set(simulated.map((s) => s.id));
   const servers = (): CareServer[] => {
     const real = realServers().filter((s) => !simulatedIds.has(s.id));
-    if (real.some((s) => s.writesEnabled)) throw new Error("writesEnabled must be false for real servers (ADR-014)");
+    // T-089 (ADR-021): only Sentani can ever be write-enabled; the gate already refuses any other name.
+    if (real.some((s) => s.writesEnabled && s.name.toLowerCase() !== "sentani")) throw new Error("only Sentani may be write-enabled (ADR-021)");
     return [...real, ...simulated];
   };
   return { servers, targets };
@@ -376,6 +400,29 @@ export async function buildServer(options: BuildServerOptions = {}) {
     controllerClock,
     ownerContext: ownerContextSource(options, fastify.log),
   });
+  // T-089: write access for a real server comes only from the controller's write gate (config/writes.json,
+  // Sentani only), re-checked on every call. hosts.json and the registry still only ever say false.
+  const writeGate = options.care?.writeGate;
+  writeGate?.useLog(fastify.log);
+  const writeAccess = (id: string, forWrites = true): WriteAccess | null => {
+    if (writeGate === undefined) return null;
+    const active = registryStore.listActive();
+    const row = active.find((s) => s.id === id);
+    return row === undefined ? null : writeGate.accessFor(row, active, forWrites);
+  };
+  // The target may read Sentani's ledger and installed versions even when writes.json is closed, so an
+  // operation already sent can be followed to its end. Every submit is still behind the write gate.
+  const realTarget = (id: string): WriteTarget | undefined => {
+    if (registryStore.get(id)?.disconnectedAt !== null) return undefined;
+    const access = writeAccess(id, false);
+    if (access === null) return new SshWriteTarget(id);
+    return new SshWriteTarget(id, access.hostKeyFingerprint, {
+      gateway: access.gateway,
+      inspect: access.inspect,
+      machineId: () => service.machineIdOf(id),
+      runner: options.care?.sshRunner,
+    });
+  };
   const care = careWiring(
     () =>
       registryHosts().map((h) => ({
@@ -383,13 +430,39 @@ export async function buildServer(options: BuildServerOptions = {}) {
         name: h.name,
         production: h.production,
         kind: "ssh" as const,
-        writesEnabled: h.writesEnabled,
+        writesEnabled: writeAccess(h.id) !== null,
         selectedServices: [...h.importantServices],
         ...(h.access === "ssh" ? { user: h.user } : {}),
       })),
+    realTarget,
     options.care,
   );
   const careStore = options.care?.store ?? new SqliteCareStore({ path: ":memory:" });
+  // T-089: the dispatcher moves approved operations through the target's ledger. The write gate is read
+  // on every step, so closing writes.json stops new dispatches at once; an operation that may already be
+  // on the target is only ever queried, never re-sent blindly (invariants 6-8).
+  const signer = writeGate?.signer() ?? null;
+  const installationId = writeGate?.installationId() ?? null;
+  const dispatcher =
+    writeGate !== undefined && signer !== null && installationId !== null
+      ? new Dispatcher({
+          store: careStore,
+          intents: options.care?.intents ?? new MemoryIntentStore(),
+          targets: care.targets,
+          writesEnabled: (id) => care.servers().some((s) => s.id === id && s.writesEnabled),
+          signer,
+          installationId,
+          workerId: `api-${process.pid}`,
+          now: options.care?.now ?? (() => new Date()),
+        })
+      : null;
+  if (writeGate !== undefined && dispatcher === null) fastify.log.warn("writes: no dispatcher (the signing key or test-bench.json is not ready); approvals stay queued");
+  const runDispatcher = options.care?.startDispatcher ?? (mode === "live" && options.startChecks !== false);
+  if (dispatcher !== null && runDispatcher) {
+    const stop = startDispatchLoop(dispatcher, { intervalMs: options.care?.dispatchIntervalMs, log: fastify.log });
+    fastify.addHook("onClose", async () => stop());
+  }
+  fastify.decorate("careDispatcher", dispatcher);
   // T-078: the care plan builder, shared with baseline setup plans.
   let carePlanner: ((request: PlanRequest) => Promise<{ plan: { id: string } } | null>) | null = null;
   await fastify.register(careRoutes, {

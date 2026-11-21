@@ -28,6 +28,7 @@ import {
 } from "@servrsit/domain";
 import type { CareStore, IntentStore, StoredOperation } from "@servrsit/store";
 import { Reconciler } from "./reconciler.js";
+import { SshWriteTarget } from "./ssh-write-target.js";
 import { TransportError, type RemoteRecord, type WriteTarget } from "./target.js";
 
 export interface DispatcherOptions {
@@ -142,8 +143,10 @@ export class Dispatcher {
     const issuedAt = this.firstAttempt(op);
     const attempted = issuedAt !== null;
 
-    // Gate, target and kind: refuse before anything is sent.
-    if (!this.o.writesEnabled(op.serverId) || target === undefined || target.kind !== op.targetKind || target.kind !== "simulated") {
+    // Gate, target and kind: refuse before anything is sent. A real server is written to only through a
+    // connected SshWriteTarget, which the API builds only where the controller's writes.json enables it (T-089).
+    const writable = target !== undefined && (target.kind === "simulated" || (target instanceof SshWriteTarget && target.connected));
+    if (!this.o.writesEnabled(op.serverId) || target === undefined || target.kind !== op.targetKind || !writable) {
       if (!attempted) {
         return this.transition(op, "cancelled_before_start", "cancelled", {
           code: "WRITES_DISABLED",

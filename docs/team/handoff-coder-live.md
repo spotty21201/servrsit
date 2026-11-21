@@ -2052,3 +2052,114 @@ pnpm -r test exit 0 (api 250, web 216, ai 156, ssh 61, store 28, domain 24, work
 ```
 
 **Not proven** (Sentani): dpkg's real confold behaviour and real `.dpkg-dist` creation under the transient unit.
+
+## T-089: real SSH write target for Sentani, packages only (branch `feat/coder/ssh-write-target`, from `integration/live-v1`)
+
+**Status:** built and merged. **Not closed.** Writes are still disabled everywhere: the shipped `apps/api/config/writes.json` says `"writesEnabled": false` for Sentani, and I did not change it. The Orchestrator flips it after the Tester's end-to-end fault-injection suite passes on Sentani and the founder agrees.
+
+### Where writes are enabled
+
+`apps/api/config/writes.json` is the only switch:
+
+```json
+{ "servers": { "sentani": { "writesEnabled": false } } }
+```
+
+- **Read on every use** (planning, approval, every dispatch step). It is re-read when the file's mtime, size or inode changes. Setting it back to `false` stops new dispatches at the next step.
+- **Sentani only.** The schema allows only the key `sentani`. Any other name, or a file that does not parse, closes the gate for every server. Nabire, Timika and Merauke are refused by name whatever the file says.
+- **Not reachable from the API or UI.** No route imports the gate or its path (test `API: no route can reach the write gate or its file`).
+- **Not set elsewhere.** `hosts.json` still accepts only `writesEnabled: false`, and the registry's `CHECK (writes_enabled = 0)` is unchanged. A real server's `writesEnabled` is computed from the gate (`apps/api/src/writes/write-gate.ts`), never stored.
+
+When the file says `true`, the gate grants access only if all of these hold:
+- the registry has exactly one connected server named Sentani;
+- that row has its own pinned known_hosts file pinning only Sentani's address (the T-088 `benchTarget` checks, now `gatewayTargetFromRegistry`);
+- the row has a confirmed host key, which the manifest is bound to;
+- the maintenance key, the signing key and `test-bench.json` exist (never created by the gate).
+
+### What was built
+
+**Domain (`packages/domain/src/plan.ts`):** `TransactionPreview.digestRule?: "installed-v1"`. With it, the plan's `previewDigest` is `digestOf({installed: {"name:arch": installed version}})` over exactly the plan's packages, sorted. That is the helper's `precondition_digest` for `apply.packages.v1`. Without it (simulated target), plans and digests are unchanged. New exports: `packagesPreconditionDigest`, `installedFromPreview`.
+
+**SSH (`packages/ssh`):**
+- **`preview.ts`:** a read-only script over stdin with the inspect key: `apt-get -s -o Debug::NoLocking=1 upgrade` and `dpkg-query -W -f '${Package} ${Architecture} ${Version} ${db:Status-Abbrev}\n'`. No package name is sent; filtering happens on the controller.
+  - `parseAptUpgrade` reads `Inst` lines, including `[all]` and multi-origin lines, and `Remv` lines. Any transaction line it cannot read makes the preview untrusted.
+  - `parseInstalled` keeps `ii` and held `hi` packages.
+  - `collectInstalledViaSsh` runs `dpkg-query` alone, for verification, so a broken apt cannot hide what is installed.
+- **`gateway.ts`:** `sendGatewayRequest`, moved from the T-087 bench client. The Tester's CLI calls the same function through `client.ts send`.
+
+**Worker:**
+- **`SshWriteTarget` (`apps/worker/src/ssh-write-target.ts`):**
+  - **Unconnected** (`new SshWriteTarget(id)`): refuses everything with WRITES_DISABLED and contacts nothing. This is what every real server gets unless the gate grants access.
+  - **Connected** (built only by the API from the gate):
+    - `previewPackages` uses the inspect key and the `installed-v1` rule. It returns null if apt and dpkg disagree on an installed version or the output cannot be read, and throws a `TransportError` when the server is unreachable.
+    - `submit` and `query` go to the gateway with the maintenance key. Replies are validated with zod. A missing, cut-short or malformed reply is a `TransportError`, so the Dispatcher queries the same id before anything else. An unreadable ledger (`HELPER_UNAVAILABLE` on query) counts as a malformed reply.
+    - Non-package manifests are refused locally (`UNSUPPORTED_OPERATION`), as is a manifest for another server id (`MISBOUND`). Restart, reboot and directory previews are null, so those plans are blocked `PLAN_UNAVAILABLE`.
+    - `identity()` returns the pinned host key plus the machine id from the latest health check (`FleetService.machineIdOf`).
+- **`RemoteRecord.report`** (from query only): the helper version, outcome, reason code, `restartNeeded` and `keptFiles`, each validated. The reconciler puts it on the `remote_finished` event as `helperReport`. The helper's evidence text is not copied. Success still needs the independent dpkg check.
+- **`RejectCode`** gains `INVALID_REQUEST` and `HELPER_UNAVAILABLE`.
+- **Dispatcher:** sends only to a simulated target or a connected `SshWriteTarget`, and only while `writesEnabled(serverId)` is true.
+
+**API:**
+- **`server.ts`:** a real server's target is made on every lookup:
+  - connected when the gate grants access;
+  - connected read-only when writes.json is closed but Sentani is otherwise ready, so an operation already sent can be followed and verified. Every submit is behind the write check;
+  - otherwise unconnected.
+- **Dispatcher wiring:** built with the persistent signer and the installation id from `test-bench.json`. A loop runs it in the API process every 5 s, one step at a time (`writes/dispatch-loop.ts`), in live mode only. Tests drive `app.careDispatcher` directly.
+- **`routes/care.ts`:** preview, the approval-time re-check and reconcile now depend on `writesEnabled`, not on the server being simulated. The approval re-check recomputes the `installed-v1` digest for the plan's packages.
+- **`index.ts`:** the care store is now persistent (`apps/api/.data/care.db`), and intent records are files (`apps/api/.data/intents`), so an operation survives an API restart. Before this, the live care store was in memory.
+
+### Proof that `previewDigest` equals the helper's rule (gate item 1 / 6.3 item 2)
+
+- **`target-helper/tests/make_vectors.mts`:** takes apt and dpkg text in Ubuntu 24.04 format, parses it with the controller's own `parseAptUpgrade` and `parseInstalled`, and builds a real-target plan and manifest with `buildPlan` and `buildManifest`. The packages are `wget:amd64`, `vim-common:all`, and `docker-ce` (excluded).
+- **`target-helper/tests/test_t089.py`:** the Python `precondition_digest(FakeSystem(installed), manifest)` equals the manifest's `preconditionDigest`, including `vim-common:all`. Packages outside the plan do not change the digest. A changed or removed planned package does change it.
+- **On real apt:** `RealSystem.installed` looks up `"vim-common:all"` with python-apt. On Merauke, read-only, `'vim-common:all' in apt.Cache()` is True and returns the installed version. The Tester's (a) run on Sentani (6.1) already submitted `:all` keys successfully.
+
+### Checks run
+
+```
+target-helper unittest: Ran 107 tests, OK (104 + 3 in test_t089.py)
+pnpm -r --workspace-concurrency=1 run test: exit 0 (api 257, web 216, ai 156, ssh 68, store 28, domain 26, worker 28, infra 9)
+typecheck: ai, contracts, domain, ssh, store, ui, api, web, worker all ok; web build ok
+Tester gates (1c9d5a7, 22 reviewed routes added): routes-401 7/7, auth 37/37,
+  care-loop 41/42 (CL-09a, known), zt01 12/13 (see below)
+key scan: AI key not in the diff; 0 private-key blocks
+```
+
+- **No test starts ssh.**
+  - `apps/worker/src/ssh-write-target.test.ts` (9 tests) and `apps/api/src/writes/writes.test.ts` (7 tests) use a fake runner that plays Sentani's inspect script and helper gateway, with signature check, ledger and the `installed-v1` precondition.
+  - **API end-to-end test:** the plan comes from the preview, approval returns 201, and the dispatcher drains to `succeeded` with `helperReport`. Only Sentani's address is ever named to ssh.
+  - **Gate tests:** closing writes.json after approval leaves the operation `cancelled_before_start` with nothing sent. With writes.json closed, Sentani and Nabire plans are `WRITES_DISABLED` with zero runner calls.
+
+### For the Tester
+
+- **ZT-01 `the SSH write target's source imports nothing that can start a process or open a connection`** now fails by design. `ssh-write-target.ts` imports `@servrsit/ssh` and `zod`. Please revise it to the new invariant. `worker.test.ts` has my version: no `child_process`, `net`, `tls`, `http`, `spawn` or `exec` in the file, and the only values imported from `@servrsit/ssh` are `collectInstalledViaSsh`, `collectPackagePreviewViaSsh` and `sendGatewayRequest`. I changed the matching invariant-12 test in `apps/worker/src/worker.test.ts` and renamed the other ("an ssh target the API did not connect").
+- **For the fault-injection suite on Sentani:**
+  - After the flip, the app plans, approves and dispatches through `/api/plans` and `/api/plans/:id/approvals`. The dispatcher loop runs in the API process (live mode).
+  - Events to watch: `dispatch_attempted`, `remote_accepted`, `remote_finished` (with `helperReport`), `verification_recorded`; `outcome_unknown` after a transport failure.
+  - Cases not yet covered live:
+    - a lost submit reply (kill ssh after send);
+    - an API restart mid-operation (care.db is now persistent);
+    - closing writes.json while an operation runs (read-only access should still settle it);
+    - a reboot that returns late;
+    - root-side ENOSPC;
+    - the `.dpkg-dist` case (6.3/7.2 gap).
+- **D-S1 is fixed:** `f04d43f`, merged as `abcd59a`. The CLI takes Sentani's address and its own pinned known_hosts from the registry, and refuses every other host. The 7.1 table still lists it as Open; please re-check.
+
+### Limitations
+
+- **Packages only.** Restart, reboot and directory plans for Sentani stay blocked `PLAN_UNAVAILABLE`.
+- **Locks are not visible in the preview.** `apt-get -s` takes no lock, so the helper's run reports `PACKAGE_LOCKED` instead.
+- **Holds:** apt keeps a held package back, so it never reaches a plan. The helper also refuses one (`PACKAGE_HELD`).
+- **Plans list no kept files in advance.** `keptOwnerFiles` stays empty because there is no target-side conffile preview. The helper keeps the files and reports them in `helperReport.keptFiles`.
+- **Origin labels over 64 characters** (three or more origins on one line) are treated as unknown, and the package is excluded.
+- **Web:** a real server's operation is `simulated: false`. Whether the plan and receipt screens are ready for a real approval is the Designer's and Orchestrator's call.
+- **Approval polling:** while the helper runs, every 5 s step queries the ledger and appends one `remote_progress` event (existing reconciler behaviour).
+
+### Decisions for the decision log (Orchestrator)
+
+1. **The write switch** is `apps/api/config/writes.json`, Sentani only, read on every use. It is not stored in the registry or hosts.json, which stay literal-false.
+2. **Read-only access stays available** to follow an operation already sent after writes.json is closed. No submit is possible on that path.
+3. **The care store and intent records persist** in `apps/api/.data`.
+4. **The `installed-v1` digest rule** applies only to real-target previews. Simulated plan digests are unchanged.
+
+**Next:** T-091 (needs the option 1 or 2 choice for the inspect forced command). Then the Orchestrator's flip of writes.json for the Tester's fault-injection suite.

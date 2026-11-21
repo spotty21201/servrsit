@@ -10,12 +10,21 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { createAssistant } from "@servrsit/ai";
-import { SqliteActivityStore, SqliteAuthStore, SqliteBaselineStore, SqliteFindingStore, SqliteServerStore, SqliteSettingsStore } from "@servrsit/store";
+import { FileIntentStore, SqliteActivityStore, SqliteAuthStore, SqliteBaselineStore, SqliteCareStore, SqliteFindingStore, SqliteServerStore, SqliteSettingsStore } from "@servrsit/store";
 import { loadAiRuntime } from "./ai-runtime.js";
 import { createAsyncLogStream } from "./log-stream.js";
 import { resolvePort } from "./port.js";
 import { buildServer, DEFAULT_AUTH_DB_PATH, describeAi } from "./server.js";
-import { DEFAULT_ACTIVITY_PATH, DEFAULT_BASELINES_PATH, DEFAULT_FINDINGS_PATH, DEFAULT_REGISTRY_PATH, DEFAULT_SETTINGS_PATH } from "./fleet/config.js";
+import {
+  DEFAULT_ACTIVITY_PATH,
+  DEFAULT_BASELINES_PATH,
+  DEFAULT_CARE_PATH,
+  DEFAULT_FINDINGS_PATH,
+  DEFAULT_INTENTS_DIR,
+  DEFAULT_REGISTRY_PATH,
+  DEFAULT_SETTINGS_PATH,
+} from "./fleet/config.js";
+import { WriteGate } from "./writes/write-gate.js";
 import { createShutdownHandler } from "./shutdown.js";
 
 const PORT = resolvePort();
@@ -41,6 +50,13 @@ async function start(): Promise<void> {
     logStream: createAsyncLogStream({ fd: 1 }),
     // T-053: owner auth records persist in apps/api/.data (gitignored, created 0600).
     auth: { store: new SqliteAuthStore({ path: process.env["SERVRSIT_AUTH_DB"] ?? DEFAULT_AUTH_DB_PATH }) },
+    // T-089: plans, approvals and operations outlive a restart; writes to a real server only where the
+    // controller's config/writes.json allows them (Sentani only, never set through the API or UI).
+    care: {
+      store: new SqliteCareStore({ path: process.env["SERVRSIT_CARE_DB"] ?? DEFAULT_CARE_PATH.pathname }),
+      intents: new FileIntentStore(process.env["SERVRSIT_INTENTS_DIR"] ?? DEFAULT_INTENTS_DIR.pathname),
+      writeGate: new WriteGate(),
+    },
   });
   for (const note of ai.notes) fastify.log[note.level](note.message);
 

@@ -4,6 +4,7 @@ import {
   assertTransition, buildManifest, buildPlan, canonicalJson, CanonicalizationError, createSigner,
   digestOf, isExpired, isSupportedOperation, PLAN_TTL_MS, PRODUCTION_ACK, PRODUCTION_ACKS, signManifest,
   TransitionError, verifyManifestSignature, verifyPlanDigest, type OpState, type TransactionPreview,
+  installedFromPreview, packagesPreconditionDigest,
 } from "./index.js";
 
 const NOW = new Date("2026-11-17T10:00:00.000Z");
@@ -310,4 +311,20 @@ test("T-092 (ADR-024): owner-modified files the update keeps are in the plan; no
 test("T-092: a package that would still prompt blocks the plan", () => {
   const p = plan({ preview: preview({ promptRisk: ["openssl:amd64"] }) });
   assert.deepEqual(p.blockers.map((b) => b.code), ["INTERACTIVE_PROMPT"]);
+});
+
+// ---- T-089: the helper's precondition rule for a real target ---------------
+
+test("T-089: with digestRule installed-v1 the plan's previewDigest is the helper's rule over exactly the planned packages", () => {
+  const outside = { name: "docker-ce", arch: "amd64", from: "5:27.3.1-1", to: "5:27.4.0-1", origin: "Docker CE:noble" };
+  const p = plan({ preview: preview({ digestRule: "installed-v1", upgrades: [...preview().upgrades, outside] }) });
+  assert.equal(p.preconditions.previewDigest, digestOf({ installed: { "libssl3t64:amd64": "3.0.13-0ubuntu3.4", "openssl:amd64": "3.0.13-0ubuntu3.4" } }));
+  assert.equal(p.preconditions.previewDigest, packagesPreconditionDigest(installedFromPreview(preview(), ["openssl:amd64", "libssl3t64:amd64"])));
+  assert.deepEqual(Object.keys(installedFromPreview(preview(), ["z:all", "a:amd64"])), ["a:amd64", "z:all"], "keys sorted, as the helper sorts them");
+  assert.equal(installedFromPreview(preview(), ["gone:amd64"])["gone:amd64"], null);
+});
+
+test("T-089: the simulated target keeps its own state digest (no rule), so existing plan digests are unchanged", () => {
+  assert.equal(plan().preconditions.previewDigest, "sha256:state1");
+  assert.equal(plan({ preview: preview({ digestRule: "installed-v1", upgrades: [] }) }).preconditions.previewDigest, "none");
 });
