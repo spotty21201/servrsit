@@ -44,6 +44,7 @@ class FakePackage:
         self.versions = {v: FakeVersion(v) for v in available}
         self.candidate = None
         self.marked = False
+        self._pkg = types.SimpleNamespace(selected_state=1)
 
     def mark_install(self, auto_fix=False, from_user=False):
         self.marked = True
@@ -96,7 +97,17 @@ class FakeConfig:
         self.values.append((key, value))
 
 
-FAKE_APT_PKG = types.SimpleNamespace(config=FakeConfig())
+FAKE_APT_PKG = types.SimpleNamespace(config=FakeConfig(), SELSTATE_HOLD=3, SELSTATE_INSTALL=1)
+
+
+class TestSystem(RealSystem):
+    """RealSystem with the lock check under test control (the real lock files need root)."""
+
+    def __init__(self, locks_free=True):
+        self.free = locks_free
+
+    def package_locks_free(self):
+        return self.free
 
 
 def install_fake_apt(cache_factory):
@@ -131,12 +142,13 @@ class ArchitectureAllTests(unittest.TestCase):
 
     def apply(self, cache, changes=CHANGES):
         with unittest.mock.patch.dict(sys.modules, install_fake_apt(lambda: cache)):
-            return RealSystem().apply_packages(changes)
+            return TestSystem().apply_packages(changes)
 
     def test_a_transaction_with_all_packages_is_applied(self):
         cache = sentani_like_cache()
-        ok, evidence = self.apply(cache)
+        ok, evidence, reason = self.apply(cache)
         self.assertTrue(ok, evidence)
+        self.assertIsNone(reason)
         self.assertEqual({p.fullname for p in cache.get_changes()}, {"vim:amd64", "vim-common:amd64", "vim-runtime:amd64"})
         self.assertEqual(cache.packages["vim-common:amd64"].installed.version, "2:9.1.0016-1ubuntu7.4")
 
@@ -147,9 +159,9 @@ class ArchitectureAllTests(unittest.TestCase):
     def test_any_extra_or_removed_package_still_refuses_the_whole_transaction(self):
         extra = FakePackage("libfoo:amd64", "1", ["2"])
         cache = sentani_like_cache(extra_changes=[extra])
-        ok, evidence = self.apply(cache)
+        ok, evidence, _reason = self.apply(cache)
         self.assertFalse(ok)
-        self.assertIn("would change other packages", evidence[0])
+        self.assertIn("it would also change libfoo:amd64", evidence[0], "D-S8: the difference is named")
         self.assertIsNone(cache.commit_env, "nothing was committed")
         cache2 = sentani_like_cache()
         cache2.delete_count = 1
@@ -158,7 +170,7 @@ class ArchitectureAllTests(unittest.TestCase):
     def test_unknown_or_duplicate_packages_are_refused(self):
         self.assertFalse(self.apply(sentani_like_cache(), [{"name": "nothere", "arch": "all", "from": "1", "to": "2"}])[0])
         dup = CHANGES + [{"name": "vim-common", "arch": "amd64", "from": "2:9.1.0016-1ubuntu7.3", "to": "2:9.1.0016-1ubuntu7.4"}]
-        ok, ev = self.apply(sentani_like_cache(), dup)
+        ok, ev, _r = self.apply(sentani_like_cache(), dup)
         self.assertFalse(ok)
         self.assertIn("twice", ev[0])
 
@@ -169,6 +181,88 @@ class ArchitectureAllTests(unittest.TestCase):
 
     def test_dpkg_gets_the_bare_name_for_an_all_package(self):
         self.assertEqual([dpkg_name(k) for k in ("vim-common:all", "vim:amd64")], ["vim-common", "vim:amd64"])
+
+
+class HeldAndLockedTests(unittest.TestCase):
+    """D-S8 (a held package gets a typed, correct reason) and D-S9 (a held lock gives PACKAGE_LOCKED)."""
+
+    def setUp(self):
+        FAKE_APT_PKG.config.values.clear()
+
+    def run_with(self, cache, system):
+        with unittest.mock.patch.dict(sys.modules, install_fake_apt(lambda: cache)):
+            return system.apply_packages(CHANGES)
+
+    def test_D_S8_a_held_package_is_refused_with_its_name_and_nothing_is_committed(self):
+        cache = sentani_like_cache()
+        cache.packages["vim-runtime:amd64"]._pkg.selected_state = FAKE_APT_PKG.SELSTATE_HOLD
+        ok, evidence, reason = self.run_with(cache, TestSystem())
+        self.assertEqual((ok, reason), (False, "PACKAGE_HELD"))
+        self.assertEqual(evidence, ["vim-runtime:all is held on this server; ServrSit does not override holds, nothing was changed"])
+        self.assertIsNone(cache.commit_env)
+        self.assertFalse(any(p.marked for p in cache.packages.values()))
+
+    def test_D_S8_a_package_apt_would_not_mark_is_named(self):
+        from servrsit_helper.adapters import describe_difference
+
+        self.assertEqual(describe_difference({"a:amd64", "b:amd64"}, {"a:amd64"}), "the transaction is not exactly the plan (apt would not change b:amd64); nothing was changed")
+        self.assertIn("would remove packages", describe_difference({"a:amd64"}, {"a:amd64"}))
+
+    def test_D_S9_a_held_lock_before_the_commit_is_PACKAGE_LOCKED(self):
+        cache = sentani_like_cache()
+        ok, evidence, reason = self.run_with(cache, TestSystem(locks_free=False))
+        self.assertEqual((ok, reason), (False, "PACKAGE_LOCKED"))
+        self.assertIn("nothing was changed", evidence[0])
+        self.assertIsNone(cache.commit_env)
+
+    def test_D_S9_a_lock_lost_to_another_program_during_the_commit_is_PACKAGE_LOCKED(self):
+        class LockFailedException(Exception):
+            pass
+
+        cache = sentani_like_cache()
+
+        def locked_commit():
+            raise LockFailedException("Failed to lock /var/lib/dpkg/lock-frontend: secret raw text")
+
+        cache.commit = locked_commit
+        ok, evidence, reason = self.run_with(cache, TestSystem())
+        self.assertEqual((ok, reason), (False, "PACKAGE_LOCKED"))
+        self.assertNotIn("secret raw text", " ".join(evidence), "library text stays out of the ledger")
+
+    def test_D_S9_other_commit_errors_still_propagate(self):
+        cache = sentani_like_cache()
+
+        def broken():
+            raise RuntimeError("disk full")
+
+        cache.commit = broken
+        with self.assertRaises(RuntimeError):
+            self.run_with(cache, TestSystem())
+
+    def test_D_S9_the_lock_check_sees_a_lock_another_process_holds(self):
+        import fcntl
+        from servrsit_helper.adapters import locks_free
+
+        with tempfile.TemporaryDirectory() as d:
+            lock = Path(d) / "lock-frontend"
+            lock.write_text("")
+            self.assertTrue(locks_free((str(lock), str(Path(d) / "missing"))))
+            r, w = os.pipe()
+            pid = os.fork()
+            if pid == 0:
+                fd = os.open(lock, os.O_RDWR)
+                fcntl.lockf(fd, fcntl.LOCK_EX)
+                os.write(w, b"x")
+                import time
+
+                time.sleep(2)
+                os._exit(0)
+            os.read(r, 1)
+            try:
+                self.assertFalse(locks_free((str(lock),)))
+            finally:
+                os.waitpid(pid, 0)
+            self.assertTrue(locks_free((str(lock),)))
 
 
 class CommitPolicyTests(unittest.TestCase):
@@ -183,7 +277,7 @@ class CommitPolicyTests(unittest.TestCase):
         cache = sentani_like_cache()
         try:
             with unittest.mock.patch.dict(sys.modules, install_fake_apt(lambda: cache)):
-                ok, evidence = RealSystem().apply_packages(CHANGES)
+                ok, evidence, _r = TestSystem().apply_packages(CHANGES)
             self.assertTrue(ok)
             self.assertEqual(cache.commit_env["NEEDRESTART_SUSPEND"], "1")
             self.assertEqual(cache.commit_env["NEEDRESTART_MODE"], "l")
@@ -262,6 +356,27 @@ class RunnerAndSubmitTests(unittest.TestCase):
         q = self.query()
         self.assertEqual(q["outcome"], "failed")
         self.assertFalse([c for c in self.env.system.calls if c[0] == "apply"])
+
+    def test_D_S9_a_locked_package_manager_ends_failed_with_PACKAGE_LOCKED_in_query(self):
+        self.env.system.locked = True
+        self.accept()
+        run(OP, self.env.config, self.env.system)
+        q = self.query()
+        self.assertEqual((q["outcome"], q["reasonCode"], q["record"]["state"]), ("failed", "PACKAGE_LOCKED", "finished"))
+        self.assertTrue(any("try again" in e for e in q["evidence"]))
+
+    def test_D_S8_a_held_package_is_refused_before_acceptance(self):
+        self.env.system.held = ["openssl:amd64"]
+        r = handle(self.env.request(self.env.manifest("apply.packages.v1", operationId=OP)), self.env.config, self.env.system)
+        self.assertEqual(r["code"], "PACKAGE_HELD")
+        self.assertIn("does not override holds", r["detail"])
+        self.assertFalse([c for c in self.env.system.calls if c[0] in ("launch", "apply")])
+
+    def test_D_S7_a_conffile_refusal_in_the_runner_is_typed(self):
+        self.accept()
+        self.env.system.changed_conffiles = ["/etc/x.conf"]
+        run(OP, self.env.config, self.env.system)
+        self.assertEqual(self.query()["reasonCode"], "CONFFILE_MODIFIED")
 
     def test_D_S7_a_half_configured_package_after_the_commit_is_not_success(self):
         self.env.system.audit = "The following packages are only half configured: vim"

@@ -15,7 +15,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from servrsit_helper.adapters import System
+from servrsit_helper.adapters import LOCKED_TEXT, System
 from servrsit_helper.canonical import canonical_json, digest_of
 from servrsit_helper.helper import Config
 
@@ -39,6 +39,8 @@ class FakeSystem(System):
         self.changed_conffiles: list[str] = []
         self.restart_needed: list[str] | None = []
         self.audit: str | None = None
+        self.held: list[str] = []
+        self.locked = False
 
     def host_key_fingerprints(self):
         return {HOST_KEY}
@@ -51,10 +53,18 @@ class FakeSystem(System):
 
     def apply_packages(self, changes):
         self.calls.append(("apply", tuple(c["name"] for c in changes)))
+        if self.locked:
+            return False, [LOCKED_TEXT], "PACKAGE_LOCKED"
         if self.apply_ok:
             for c in changes:
                 self.packages["%s:%s" % (c["name"], c["arch"])] = c["to"]
-        return self.apply_ok, ["fake apt"]
+        return self.apply_ok, ["fake apt"], None
+
+    def held_packages(self, keys):
+        return [k for k in keys if k in self.held]
+
+    def package_locks_free(self):
+        return not self.locked
 
     def modified_conffiles(self, keys):
         self.calls.append(("verify", tuple(keys)))

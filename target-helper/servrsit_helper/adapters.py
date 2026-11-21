@@ -43,6 +43,65 @@ COMMIT_ENV = {
 }
 DPKG_OPTIONS = ("--force-confdef", "--force-confold")
 
+# T-090 (D-S9): the locks apt and dpkg take. A process that holds one is using the package manager.
+DPKG_LOCKS = ("/var/lib/dpkg/lock-frontend", "/var/lib/dpkg/lock", "/var/cache/apt/archives/lock", "/var/lib/apt/lists/lock")
+
+#: Typed reasons for a package operation that ended without changing anything (Tech Spec 13).
+PACKAGE_HELD = "PACKAGE_HELD"
+PACKAGE_LOCKED = "PACKAGE_LOCKED"
+CONFFILE_MODIFIED = "CONFFILE_MODIFIED"
+LOCKED_TEXT = "another program is using the package manager (an apt or dpkg lock is held); nothing was changed, try again when it has finished"
+
+
+def held_reason(names: list[str]) -> str:
+    return "%s %s held on this server; ServrSit does not override holds, nothing was changed" % (", ".join(names[:10]), "is" if len(names) == 1 else "are")
+
+
+def locks_free(paths: tuple[str, ...] = DPKG_LOCKS) -> bool:
+    """True when no other process holds any of the package manager's locks.
+
+    The same fcntl write locks apt and dpkg use, taken without waiting and
+    released at once. A missing lock file is free. Anything else that
+    stops the check counts as locked (fail closed).
+    """
+    import fcntl
+
+    for path in paths:
+        try:
+            fd = os.open(path, os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC)
+        except FileNotFoundError:
+            continue
+        except OSError:
+            return False
+        try:
+            fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.lockf(fd, fcntl.LOCK_UN)
+        except OSError:
+            return False
+        finally:
+            os.close(fd)
+    return True
+
+
+def is_lock_error(error: BaseException) -> bool:
+    """python-apt reports a lock it cannot take as LockFailedException (or an apt_pkg error naming the lock)."""
+    if type(error).__name__ == "LockFailedException":
+        return True
+    text = str(error).lower()
+    return "lock" in text and ("could not get lock" in text or "unable to acquire" in text or "unable to lock" in text)
+
+
+def describe_difference(wanted: set, changed: set) -> str:
+    """D-S8: name what differs instead of a generic message."""
+    parts = []
+    extra = sorted(changed - wanted)
+    missing = sorted(wanted - changed)
+    if extra:
+        parts.append("it would also change %s" % ", ".join(extra[:10]))
+    if missing:
+        parts.append("apt would not change %s" % ", ".join(missing[:10]))
+    return "the transaction is not exactly the plan (%s); nothing was changed" % ("; ".join(parts) or "it would remove packages")
+
 _UNIT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9@_.:-]{0,95}\.service$")
 _CONFFILE = re.compile(r"^/etc/[A-Za-z0-9._@+/-]{1,250}$")
 
@@ -71,6 +130,12 @@ def resolve_transaction(cache, changes: list[dict]) -> tuple[dict | None, str | 
             return None, "%s appears twice in the transaction" % key
         resolved[pkg.fullname] = (key, pkg, c)
     return resolved, None
+
+
+def is_held(pkg, apt_pkg) -> bool:
+    """D-S8: the owner put the package on hold (`apt-mark hold`). ServrSit never overrides a hold."""
+    inner = getattr(pkg, "_pkg", None)
+    return inner is not None and getattr(inner, "selected_state", None) == apt_pkg.SELSTATE_HOLD
 
 
 def parse_needrestart(stdout: str) -> list[str]:
@@ -118,7 +183,9 @@ class System:
     def host_key_fingerprints(self) -> set[str]: raise NotImplementedError
     def boot_id(self) -> str: raise NotImplementedError
     def installed(self, keys: list[str]) -> dict[str, str | None]: raise NotImplementedError
-    def apply_packages(self, changes: list[dict]) -> tuple[bool, list[str]]: raise NotImplementedError
+    def apply_packages(self, changes: list[dict]) -> tuple[bool, list[str], str | None]: raise NotImplementedError
+    def held_packages(self, keys: list[str]) -> list[str] | None: raise NotImplementedError
+    def package_locks_free(self) -> bool: raise NotImplementedError
     def modified_conffiles(self, keys: list[str]) -> list[str] | None: raise NotImplementedError
     def services_needing_restart(self) -> list[str] | None: raise NotImplementedError
     def dpkg_audit(self) -> str | None: raise NotImplementedError
@@ -160,27 +227,32 @@ class RealSystem(System):
             out[key] = pkg.installed.version if pkg is not None and pkg.installed is not None else None
         return out
 
-    def apply_packages(self, changes: list[dict]) -> tuple[bool, list[str]]:
-        """Install exactly these versions from Ubuntu's archive, or nothing."""
+    def apply_packages(self, changes: list[dict]) -> tuple[bool, list[str], str | None]:
+        """Install exactly these versions from Ubuntu's archive, or nothing. Returns (ok, evidence, reason code)."""
         import apt
         import apt_pkg
 
         cache = apt.Cache()
         resolved, reason = resolve_transaction(cache, changes)
         if resolved is None:
-            return False, [reason]
+            return False, [reason], None
+        held = sorted(key for key, pkg, _c in resolved.values() if is_held(pkg, apt_pkg))
+        if held:
+            return False, [held_reason(held)], PACKAGE_HELD
         with cache.actiongroup():
             for key, pkg, c in resolved.values():
                 if pkg.installed is None or pkg.installed.version != c["from"]:
-                    return False, ["%s is not installed at %s" % (key, c["from"])]
+                    return False, ["%s is not installed at %s; nothing was changed" % (key, c["from"])], None
                 target = pkg.versions.get(c["to"])
                 if target is None or not any(o.origin == "Ubuntu" for o in target.origins):
-                    return False, ["%s %s is not available from Ubuntu's archive" % (key, c["to"])]
+                    return False, ["%s %s is not available from Ubuntu's archive; nothing was changed" % (key, c["to"])], None
                 pkg.candidate = target
                 pkg.mark_install(auto_fix=False, from_user=False)
         changed = {p.fullname for p in cache.get_changes()}
         if changed != set(resolved) or cache.delete_count > 0:
-            return False, ["the transaction would change other packages; nothing was changed"]
+            return False, [describe_difference(set(resolved), changed)], None
+        if not self.package_locks_free():
+            return False, [LOCKED_TEXT], PACKAGE_LOCKED
         for opt in DPKG_OPTIONS:
             apt_pkg.config.set("DPkg::Options::", opt)
         apt_pkg.config.set("Dpkg::Use-Pty", "0")
@@ -188,13 +260,27 @@ class RealSystem(System):
         os.environ.update(COMMIT_ENV)
         try:
             ok = cache.commit()
+        except Exception as e:  # noqa: BLE001 - only a lock failure becomes a typed result; anything else propagates
+            if is_lock_error(e):
+                return False, [LOCKED_TEXT], PACKAGE_LOCKED
+            raise
         finally:
             for k, v in saved.items():
                 if v is None:
                     os.environ.pop(k, None)
                 else:
                     os.environ[k] = v
-        return bool(ok), ["apt commit returned %s (needrestart suspended, no prompts, your changed configuration files kept)" % ("success" if ok else "failure")]
+        return bool(ok), ["apt commit returned %s (needrestart suspended, no prompts, your changed configuration files kept)" % ("success" if ok else "failure")], None
+
+    def held_packages(self, keys: list[str]) -> list[str] | None:
+        import apt
+        import apt_pkg
+
+        cache = apt.Cache()
+        return sorted(k for k in keys if k in cache and is_held(cache[k], apt_pkg))
+
+    def package_locks_free(self) -> bool:
+        return locks_free()
 
     def modified_conffiles(self, keys: list[str]) -> list[str] | None:
         # Names are schema-checked (start with a letter or digit), so none can look like an option.
@@ -282,10 +368,13 @@ def run_operation(system: System, manifest: dict, allowed_units: list[str]) -> d
         if changed_conf is None:
             return {"outcome": "failed", "exitCode": None, "evidence": ["the changed configuration files could not be checked; nothing was changed"]}
         if changed_conf:
-            return {"outcome": "failed", "exitCode": None, "restartNeeded": [],
+            return {"outcome": "failed", "exitCode": None, "restartNeeded": [], "reasonCode": CONFFILE_MODIFIED,
                     "evidence": ["you changed configuration files of these packages; nothing was changed: %s" % ", ".join(changed_conf[:10])]}
-        ok, ev = system.apply_packages(scope["packages"])
+        ok, ev, reason_code = system.apply_packages(scope["packages"])
         evidence += ev
+        if reason_code is not None:
+            # D-S8 / D-S9: refused before apt changed anything, with a typed reason.
+            return {"outcome": "failed", "exitCode": None, "restartNeeded": [], "reasonCode": reason_code, "evidence": evidence}
         expect = verification["expectInstalled"]
         found = system.installed(sorted(expect))
         matched = [k for k, v in expect.items() if found.get(k) == v]

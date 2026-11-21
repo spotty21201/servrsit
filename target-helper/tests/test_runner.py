@@ -38,7 +38,7 @@ class RunnerTests(unittest.TestCase):
 
     def test_exit_code_zero_is_not_success(self):
         self.accept("apply.packages.v1")
-        self.env.system.apply_packages = lambda changes: (True, ["fake apt said yes"])  # claims success, changes nothing
+        self.env.system.apply_packages = lambda changes: (True, ["fake apt said yes"], None)  # claims success, changes nothing
         run(OP, self.env.config, self.env.system)
         q = self.query()
         self.assertEqual((q["record"]["exitCode"], q["outcome"]), (0, "failed"))
