@@ -1,7 +1,7 @@
 # Test report — T-088 helper on Sentani, real Ubuntu (sentani-001)
 
 **Author:** Kiro Tester · **For:** Kiro Orchestrator · **Started:** 2026-11-21
-**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). F2 (held package) and F3 (lock) **final** (07:51 and 08:10 UTC). 3c **final** after the redo (first run 08:15 UTC landed before dpkg; redo 08:28 UTC landed 3 kills inside dpkg). Step 4 (reboot) **final** (08:30 to 08:32 UTC). Next: step 5 (disk) (mid-dpkg kill) applies the LLVM set, then steps 4 and 5. **Orchestrator decision (after step 2):** F2, F3 and 3c run on the CURRENT helper (`4101502`). Any result that touches needrestart or debconf is labelled **[PRE-FIX]**. Step 2 and a needrestart/conffile case are re-run after T-090 (fixes for D-S5 to D-S7) is installed.
+**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). F2 (held package) and F3 (lock) **final** (07:51 and 08:10 UTC). 3c **final** after the redo (first run 08:15 UTC landed before dpkg; redo 08:28 UTC landed 3 kills inside dpkg). Step 4 (reboot) **final** (08:30 to 08:32 UTC). Step 5 (disk) **final** (08:33 to 08:34 UTC). **All T-088 steps in this round are done**; see section 5 for what is still open (mid-dpkg kill) applies the LLVM set, then steps 4 and 5. **Orchestrator decision (after step 2):** F2, F3 and 3c run on the CURRENT helper (`4101502`). Any result that touches needrestart or debconf is labelled **[PRE-FIX]**. Step 2 and a needrestart/conffile case are re-run after T-090 (fixes for D-S5 to D-S7) is installed.
 **Authority:** ADR-021 (Sentani is disposable; fault injection allowed on Sentani only), ADR-022 (helper installed by the founder; T-088 rules), T-088
 **Target:** Sentani ONLY. Host `sentani` resolves to 100.119.231.102 (checked before every send). The pin comes from registry row `75e41a8a-6a97-4a06-8151-c0cb33ad0fc1`: its `known_hosts_file` holds only Sentani, with the owner-confirmed key `SHA256:j3nno/hlFOSktmjBlrxPO9oTE3qWFmITlKgKTIt+JrM` (confirmed 2026-11-21T05:44:58Z). Nothing was sent to Nabire, Timika or Merauke.
 **Helper on Sentani:** package `servrsit-helper-0.1.0.tar.gz`, sha256 `8f25e5a3…a6d0d6`. Rebuilding from integration/live-v1 `4101502` gives the identical checksum, so the installed code is `target-helper/` at `4101502`, which includes T-084.
@@ -253,6 +253,22 @@ Unkilled queries in the same window returned `running`.
 
 **Not proven:** "a reboot that returns late" from T-088 (delayed return or outcome unknown at window expiry). Sentani came back in about 55 s. That case needs a host that stays down, which a founder step could simulate (for example by holding the network down at boot). It is not in this round's instructions.
 
+### 5 — disk pressure as `spotty` [FINAL]
+
+**Filesystem (read-only, before):** `/`, `/home` and `/var/lib/servrsit` are all on `/dev/mapper/ubuntu--vg-ubuntu--lv`, ext4, block size 4096: 60,869,734 blocks in total, **59,069,500 free**, **56,318,498 available to non-root**. The difference, **2,751,002 blocks (about 11.3 GB, 4.5%)**, is ext4's root reserve, now measured rather than assumed.
+
+| Time (UTC) | Action (as spotty unless noted) | Result |
+|---|---|---|
+| 08:33:42 | `fallocate` `~spotty/servrsit-t088-fill/fill.bin`, everything available minus 64 MiB (230,613,450,752 bytes) | available to non-root: **67,055,616 bytes (16,371 blocks)**; free including the reserve: 2,767,373 blocks |
+| 08:33:45 | write 128 MiB as spotty | **fails, exit 1**, after 67,059,712 bytes, so non-root users are really out of space (the partial file was removed) |
+| 08:33:46 | helper query of the reboot op (gateway as `servrsit`, `sudo -n`, ledger read) | found, finished, succeeded |
+| 08:33:47 | helper `prepare.directories.v1` `~spotty/servrsit-t088-disk` (op **c816d225**, digest **696fcf964e58**) | accepted, then finished, exit 0, **`succeeded`**, "1 of 1 verified with the planned owner and mode"; the directory exists as spotty:spotty 755. Root's directory and ledger writes came from the reserve |
+| 08:33:54 | remove the fill file and directory | available back to 230,680,539,136 bytes (before: 230,680,567,808; the 28,672-byte difference is the new directory and logs). The test directory was then removed with `rmdir` |
+
+**Result:**
+- **Proven on Sentani:** filling the disk as a non-root user does not stop the helper. The gateway, sudo, ledger reads and writes, and a root directory creation all still work. The SSH logins for inspection (spotty) and maintenance (servrsit) still work too.
+- **NOT proven:** root-side out-of-space (ENOSPC) in the ledger or during dpkg. `spotty` cannot use the 11.3 GB reserve. Reaching that state needs root, for example a founder `fallocate` as root into the reserve. Reading the code, the helper has **no free-space check** before `apt` commits. An apply on a server with less free space than the unpacked packages need would fail inside dpkg, possibly leaving half-installed packages. I recommend a pre-commit check of free space against the transaction's download and installed size (python-apt's `cache.required_download` and `required_space`), refusing with a typed reason. This is untested, so it is listed as observation O-S2, not a defect.
+
 ### 3c redo — preparation
 
 - **Approved** by Orchestrator: the mid-dpkg kill matters for FR-17.
@@ -260,7 +276,6 @@ Unkilled queries in the same window returned `running`.
 - **Waiting** for "T-088 F4 done, apt exit 0".
 - **Script:** `tests/live/t088/t3c2.sh`.
 
-### 5 — not run yet
 
 - ~~**Step 2 is blocked**~~ (resolved by option B / F1, see step 2 above): there was no pending update that `apt-get upgrade` (the product's own observation) would install. Applying the 11 phased systemd packages would override Ubuntu's staged rollout, re-execute systemd, and restart resolved, timesyncd and udev. That is a founder decision. The options are in `docs/team/t088-founder-steps.md`; option B (downgrade 8 harmless packages, then install them back through the helper) is recommended.
 - **3c, the hold test and the lock test** depend on step 2's packages. Their founder steps are F1 to F3 in `docs/team/t088-founder-steps.md`.
@@ -290,7 +305,8 @@ Unkilled queries in the same window returned `running`.
 | Client kill inside dpkg's unpack window (3 kills, incl. an identical resubmit): no stop, no duplicate, query-first retry → `existing` | **Proven on Sentani** (3c redo) |
 | Reboot and return verification: new boot id, SSH back (both keys), query settles `succeeded`, identical retry → `existing` with no second reboot | **Proven on Sentani** (step 4) |
 | Delayed return or outcome unknown at window expiry | **NOT proven** (Sentani returned in ~55 s) |
-| Low disk | **NOT proven yet** (step 5); root-side ENOSPC is probably not reachable as spotty |
+| Non-root disk full (ext4 reserve intact): the helper keeps working (query, ledger, root directory creation) | **Proven on Sentani** (step 5) |
+| Root-side ENOSPC in the ledger or dpkg | **NOT proven** (needs root to fill the 11.3 GB reserve); no free-space check before commit (O-S2) |
 | Uninstall on the real server | **NOT tested** (not in this round's instructions) |
 | The controller's `previewDigest` (packages/domain plans) equals the helper's precondition rule for packages | **NOT proven.** My manifests use the helper's rule directly; this matters for T-089 |
 
@@ -325,3 +341,45 @@ eeafb796051fcf8e80cb3f668f318bb947ad2564e8648e6fa8e2b836c85599ea  f2.sh
 | D-S9 | Low | `target-helper/servrsit_helper/runner.py:34-36` (`except Exception` → "the adapter stopped with an error (%s)") together with `adapters.py` `apply_packages()` (`cache.commit()` with no lock handling) | A lock held by another process gives a generic `failed` with `exitCode: null` and "check the server before trying again". There is no typed reason, and nothing tells the owner or controller to wait and retry. Fix: catch the lock failure in the adapter (or check `apt_pkg.get_lock()` on both lock files before `commit()`), end with a typed `PACKAGE_LOCKED` reason (Tech Spec §11), and state that nothing changed. | F3 run above (op 7da4237d) | Coder |
 
 No other helper defect was found in steps 1, 2, F2, F3 and 3a/3b.
+
+## 5. Summary for the Orchestrator (end of this round)
+
+**Done on Sentani (helper `4101502`), all Sentani-only:**
+- Step 1: rejections, replay and digest mismatch.
+- Steps 3a/3b: client kills before and after acceptance.
+- Step 2: an exact package transaction, verified by dpkg.
+- F2: a held package.
+- F3: an external lock.
+- 3c: client kills during the transaction and inside dpkg's window.
+- Step 4: reboot and return.
+- Step 5: non-root disk pressure.
+
+No step produced a duplicate operation, a second transaction or a second reboot. No step left a package half-installed (`dpkg --audit` clean). Nothing was sent to Nabire, Timika or Merauke.
+
+**Open defects:**
+
+| ID | Severity | Owner | Status |
+|---|---|---|---|
+| D-S1 | Medium | Coder | open (CLI default pin) |
+| D-S2 | Low | Orchestrator | fixed in the pattern for `f4.sh`; `f1.sh` unchanged (already run) |
+| D-S3 | Low / High on a real server | Orchestrator | open (founder scripts writable by the inspect account) |
+| D-S4 | Info | Orchestrator | open |
+| D-S5 | High | Coder | in T-090 |
+| D-S6 | High | Coder | in T-090; needs a live case afterwards |
+| D-S7 | Medium | Coder | in T-090; needs a conffile case afterwards |
+| D-S8 | Low | Coder | open |
+| D-S9 | Low | Coder | queued |
+
+**Observations:**
+- **O-S1:** the planner should block held packages before approval (T-089).
+- **O-S2:** no free-space check before commit.
+- **O-S3:** `packagekit.service` is started by apt's hook during a helper transaction, which the approval does not mention. [PRE-FIX]
+
+**Still to do (not in this round's instructions, or waiting on fixes):**
+- After T-090 is installed: re-run step 2 with `Architecture: all` labels, and run the needrestart case (a library used by a running service) and a conffile/debconf case.
+- A reboot that returns late (outcome unknown at window expiry).
+- Root-side ENOSPC (needs a founder step).
+- Uninstall on the real server.
+- Whether the controller's `previewDigest` matches the helper's precondition rule (T-089).
+
+**Gate decision for T-089:** the transport, signature, ledger, retry, lock, hold, reboot and disconnect mechanics **pass** on real Ubuntu. Writes through the app should **not** be enabled until D-S5 and D-S6 are fixed and re-verified on Sentani. D-S5 makes most real updates fail. D-S6 can restart services without their own approval (invariant 5).
