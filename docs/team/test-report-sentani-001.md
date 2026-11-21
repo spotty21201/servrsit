@@ -415,4 +415,62 @@ No step produced a duplicate operation, a second transaction or a second reboot.
 - **Effect on the plan:** none. The edit to `/etc/wgetrc` is kept through the redo, because the downgrade uses `--force-confold` and `dpkg --verify` compares against the installed version. `t090.sh` cannot run on a wrong state: each `scope()` asserts that exactly the expected packages are pending, from a fresh `apt-get -s upgrade`, and stops otherwise.
 - **Recommendation:** end the founder's real downgrade with a version read-back instead of relying on the exit code:
   `dpkg-query -W -f='${Package} ${Version}\n' vim vim-common vim-runtime vim-tiny xxd libaio1t64 wget`
-- **Status:** ON HOLD. Nothing sent to Sentani since the 0.2.0 pre-checks. The Orchestrator is redoing steps 1-2 with the founder.
+- **Status:** resolved by founder attempt 2 (see 6.1).
+
+### 6.1 Results on 0.2.0 (2026-11-21, 09:21 to 09:31 UTC)
+
+**Founder attempt 2 (verified by the Orchestrator):**
+- all 7 packages at the old versions, `dpkg --audit` clean, no holds;
+- the `/etc/wgetrc` owner edit present (`dpkg --verify` shows `??5?????? c /etc/wgetrc`, md5 `e5cca7a09bcf…`);
+- needrestart restarted `multipathd` during the founder's own downgrade, as intended: the old PID 402 shut down and the new **MainPID 4794** started at 09:16:35 (its journal);
+- apt history: one downgrade transaction, 09:16:28 to 09:16:34, `Requested-By: spotty`.
+
+**Step 4 by the founder:** hold on `vim-common`, then the python lock for 240 s ("lock started 09:26"). I detected both phases read-only: the hold at 09:21:25 (`apt-mark showhold`), and the lock at 09:25:53 (`/proc/locks`, pid 7111 on both dpkg lock files, no hold).
+
+| Case | Time | Op | Digest | Scope | Reply / ledger | Independent check (as spotty) |
+|---|---|---|---|---|---|---|
+| (d1) held (D-S8) | 09:21:46 | f9a50722 | e27dc1d7cb68 | vim set, planned versions, `vim-common`/`vim-runtime` labelled `all` | **rejected `PACKAGE_HELD`**: "vim-common:all is held on this server; ServrSit does not override holds, nothing was changed". Not accepted; no unit | hold still present at 09:21:51; no op unit since 09:20 apart from those below |
+| (d2) lock (D-S9) | 09:25:54 | ba79290d | 6bf57fbc9338 | vim set | accepted, then finished, exit null, **`failed`, `reasonCode: PACKAGE_LOCKED`**: "another program is using the package manager (an apt or dpkg lock is held); nothing was changed, try again when it has finished", `restartNeeded: []` | unit 09:25:57 to 09:25:59; no apt history entry; versions unchanged |
+| (a) `Architecture: all` (D-S5) | 09:30:09 | c14a1397 | 24f7183a500c | from a fresh `apt-get -s upgrade`: `vim:amd64`, **`vim-common:all`**, `vim-tiny:amd64`, **`vim-runtime:all`**, `xxd:amd64`, `…ubuntu7` → `…ubuntu7.20` | finished, exit 0, **`succeeded`**: "apt commit returned success (needrestart suspended, no prompts, your changed configuration files kept)", "5 of 5 packages at the planned version", "no service needs a restart" | dpkg: all 5 at `…ubuntu7.20`, `ii`; apt history: **one** transaction 09:30:15 to 09:30:20 with the 5 upgrades; unit journal: "packages have been installed but needrestart is suspended" |
+| (b) needrestart (D-S6) | 09:30:37 | 260b2813 | 1621f342bc4a | `libaio1t64:amd64` `0.3.113-6build1` → `…6build1.1` | finished, exit 0, **`succeeded`**, **`restartNeeded: ["multipathd.service"]`**, evidence "services that need a restart (not restarted; needs a separate restart approval): multipathd.service" | **multipathd MainPID 4794 and ActiveEnterTimestampMonotonic 2704821641 (09:16:35) unchanged** before and after; the multipathd journal shows no stop or start after 09:16:35; unit journal: "needrestart is suspended"; apt history: one transaction 09:30:46 |
+| (c) changed configuration file (D-S7) **[OLD BEHAVIOUR, superseded by ADR-024]** | 09:31 | 34d6ff01 | 0bdad63a595a | `wget:amd64` `1.21.4-1ubuntu4` → `…ubuntu4.5` | **rejected `CONFFILE_MODIFIED`**: "configuration files you changed: /etc/wgetrc". Not accepted | `/etc/wgetrc` md5 still `e5cca7a09bcf…` (owner edit kept); `wget` still `1.21.4-1ubuntu4`; no `/etc/wgetrc.dpkg-dist`; no apt or dpkg process left (nothing hanging); `apt-get -s upgrade` still offers `wget` |
+
+**After all runs:**
+- `dpkg --audit` is clean (exit 0), and exactly 3 `servrsit-op-*` units started since 09:20 (d2, a, b).
+- All running services kept their PID and start time from before (a) to after (c). The one exception is **`packagekit.service`, started** (D-Bus activation by apt's hook) during (a)/(b). This is O-S3 and is still present in 0.2.0.
+- The `/etc/wgetrc` edit is **kept in place** for the 0.3.0 re-run of (c), as instructed. Founder step 5 (remove the edit) is **not** needed.
+
+**Script note:** my first run stopped at (d1) by design. While `vim-common` was held, `apt-get -s upgrade` kept back `vim-common` and the packages that depend on it, so only `xxd` showed as pending, and the scope check refused. (d1) was then submitted with the planned versions verified before the hold, which is what a controller would send for an already-approved plan. `t090.sh` now takes the scope before the hold.
+
+### 6.2 Status of the 0.1.0 defects on 0.2.0
+
+| ID | Status | Evidence |
+|---|---|---|
+| D-S5 | **Closed, verified on Sentani** | (a): `all` packages labelled as apt prints them, 5 of 5 |
+| D-S6 | **Closed, verified on Sentani** | (b): library update, service not restarted (PID and start time unchanged), reported in `restartNeeded` |
+| D-S7 | **Partly closed.** The noninteractive environment, confold option and `dpkg --audit` check are in place (no prompt, nothing hung). The conffile **policy** follows ADR-024: 0.2.0's refusal is the old behaviour, and 0.3.0 (T-092) must update and keep the owner's file. **Re-run (c) on 0.3.0** | (c) |
+| D-S8 | **Closed, verified on Sentani** | (d1): `PACKAGE_HELD`, names the package, before acceptance |
+| D-S9 | **Closed, verified on Sentani** | (d2): `PACKAGE_LOCKED`, typed, nothing changed |
+| O-S3 | Open | `packagekit.service` is still started by apt's hook during a helper commit |
+
+### 6.3 Gate verdict for T-089
+
+**GO, with limits, for building T-089 and running its end-to-end fault-injection suite on Sentani only** (`writesEnabled` on Sentani only, set in controller config).
+
+The helper's mechanics now pass on real Ubuntu for:
+- signature, binding and expiry;
+- replay and digest mismatch;
+- the atomic ledger;
+- query-before-retry after client kills, including inside dpkg;
+- exact package transactions, including `Architecture: all`;
+- held packages and package-manager locks, refused with typed reasons;
+- no service restart inside a package approval, with services needing a restart reported;
+- reboot, return and no second reboot;
+- non-root disk pressure.
+
+**NO-GO for any other server, and T-089 must not be closed,** until:
+1. (c) passes on **0.3.0** under ADR-024: `wget` updated, the owner's `/etc/wgetrc` kept, `.dpkg-dist` reported if one is shipped, and evidence that lists both.
+2. T-089 proves that the controller's `previewDigest` equals the helper's precondition rule for packages (not proven here).
+3. D-S1 (CLI default pin) and D-S3 (inspect key is a full shell; T-091) are resolved, because they affect how far the write path can be trusted.
+
+Still untested on a real server: a reboot that returns late (outcome unknown), root-side ENOSPC, and uninstall.

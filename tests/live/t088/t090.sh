@@ -39,8 +39,10 @@ wait_for() {  # $1 = description, $2 = shell test on $L (dpkglock probe output);
 $H probe pre090 2>/dev/null | tee "$S/pre.txt"
 
 # (d1) held
-wait_for "hold on vim-common seen" 'echo "$L" | grep -q "^holds=.*vim-common"'
+# While vim-common is held, apt keeps back vim-common and the packages that depend on it, so the scope is the PLANNED set
+# (observed before the hold), not apt's current offer. This is what a controller would send for an approved plan.
 scope "$S/vim.json" $VIM
+wait_for "hold on vim-common seen" 'echo "$L" | grep -q "^holds=.*vim-common"'
 $H manifest apply "$S/d1.json" "pkgs=$S/vim.json" "plan=t090-d1" 2>/dev/null
 $H submit "$S/d1.json" 2>/dev/null | p "  (d1) submit while held"
 
