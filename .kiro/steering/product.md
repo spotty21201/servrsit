@@ -39,7 +39,8 @@ A cloud-accessible, AI-assisted caretaker for a small fleet of Ubuntu servers (2
 
 ## Founder's real servers
 
-- **Sentani, Nabire, Timika** — real production machines. No fault injection. No live maintenance until disposable-target gates pass and the specific work is explicitly authorized.
+- **Sentani** — reinstalled as the disposable test server (ADR-021); fault injection allowed there only.
+- **Nabire, Timika** (and Merauke, the dev host) — real machines. No fault injection. No live maintenance until disposable-target gates pass and the specific work is explicitly authorized.
 
 ## Product principles (from PRD §4)
 

@@ -18,7 +18,7 @@ These cannot be overridden by any agent, convenience argument, or implementation
 8. **Unknown outcome blocks conflicting writes.** Lease expiry is not proof of completion.
 9. **Verify actual postconditions.** Exit code zero alone is insufficient evidence.
 10. **Preserve independent access and recovery routes.** ServrSit's disconnect must not leave the owner locked out.
-11. **No fault injection on Sentani, Nabire, Timika or any other real workload machine.**
+11. **No fault injection on Nabire, Timika, Merauke or any other real workload machine.** Sentani is the founder-designated disposable test server (ADR-021) and is the only real host where fault injection is allowed.
 12. **Do not install the helper or perform live maintenance until the disposable-target gates pass and the specific live work is authorized.**
 13. **Never hide a failed or unavailable check behind a healthy green state.**
 14. **Demo data, mocked integrations, unrun checks, and live evidence must remain clearly distinguishable at all times.**

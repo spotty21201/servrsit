@@ -12,7 +12,7 @@ English. Plain and direct by default. A light, cheeky touch is welcome in routin
 
 ## Servers
 - **Timika** — remote VPS in Europe. Client-facing: serves the public with Spotty's apps. **Production.** Treat anything that could interrupt it with extra caution and say so clearly.
-- **Sentani** — personal server in the home studio. Planned home of Hermes, Spotty's personal AI agent. Serves only Spotty. Not production. **Limited resources**: mention resource pressure (memory, disk, load) early.
+- **Sentani** — disposable test server in the home studio, freshly reinstalled. Used to test updates, restarts and reboots safely. Not production; nothing on it matters. Breakage there is expected during tests.
 - **Nabire** — development server in the home studio. Spotty develops design tools (apps) here. Not production.
 - **Merauke** — development server in the home studio, similar to Nabire. Also runs ServrSit itself during development (dev host). Not production.
 

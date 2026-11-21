@@ -36,7 +36,7 @@
       "port": 22,
       "user": "spotty",
       "identityFile": "~/.ssh/servrsit/id_ed25519_sentani",
-      "role": "Personal server (Hermes), limited resources",
+      "role": "Disposable test server",
       "production": false,
       "importantServices": [],
       "collect": true

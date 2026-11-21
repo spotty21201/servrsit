@@ -288,6 +288,17 @@ Decisions requiring founder input before proceeding are marked **[BLOCKED: FOUND
 - **Before KMS:** check whether KMS supports an Edwards-curve key in the chosen region. If it does, staying on Ed25519 is possible. If not, use RSA-PSS as the spec says.
 - **A compromised controller can still sign** (Tech Spec §8.2). Approval, operation limits and audit remain the other controls.
 
+## ADR-021 — Sentani becomes the disposable test server
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-21 |
+| **Status** | [FOUNDER DECISION] |
+
+**Decision:** Sentani was reinstalled by the founder as a disposable test server (founder confirmed: disposable, backed up, fine if it breaks). It replaces the separate disposable VM for T-010..T-014 and fault injection (Tech Spec 20.2). Hermes is no longer planned on it for now.
+
+**Consequences:** Invariant 11 now excludes Sentani from the no-fault-injection list; Nabire, Timika and Merauke stay protected. Sentani's old pinned host key and ServrSit key are void: re-verify the new fingerprint with the founder and reinstall the ServrSit key before any login. Writes on Sentani stay off until the helper is bootstrapped by the founder and the Tester signs off the disposable-target gates; enabling them is a separate recorded step. If the founder restores the backup, host identity may change again and must be re-verified.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
