@@ -322,6 +322,19 @@ The founder ran the reviewed bootstrap (dry run reviewed by Orchestrator first).
 
 **Not yet passed:** D-S5, D-S6 (needrestart restarts services automatically: breaks invariant 5), D-S7 (debconf/conffile policy), plus D-S8, D-S9 and T-091. T-089 (app write path for Sentani) starts only after T-090 lands, the founder reinstalls the helper, and Tester re-runs step 2 plus a needrestart and a conffile case.
 
+## ADR-024 — Owner-modified configuration files: update and keep the owner's file
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-21 |
+| **Status** | [FOUNDER DECISION] |
+
+**Decision:** When a package in an approved update has a configuration file the owner changed, ServrSit still updates the package and keeps the owner's file (dpkg `--force-confdef --force-confold`). The package's new default is left beside it (`.dpkg-dist`). The plan shows, before approval, which owner-modified files will be kept; the result lists every kept file and every `.dpkg-dist` created, as a follow-up the owner can review. The update is refused at planning only if it would still need an interactive answer (for example a debconf question with no safe default). Replaces helper 0.2.0's refuse-whole behaviour (`CONFFILE_MODIFIED`).
+
+**Why:** refusing would block routine and security updates for commonly customised packages (nginx, openssh, etc.), which defeats the product's purpose. Keeping the owner's file is Ubuntu's standard non-interactive behaviour.
+
+**Caveat:** a kept old file can be incompatible with a new package version; the result must say "your file was kept; the new default is at X" and selected-service verification still runs (invariant 9).
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
