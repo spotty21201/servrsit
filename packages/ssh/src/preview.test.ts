@@ -70,7 +70,7 @@ test("the preview script is read-only: simulated apt, dpkg-query, nothing else, 
     "$T apt-get -s -o Debug::NoLocking=1 upgrade",
     "$T dpkg-query -W -f '${Package} ${Architecture} ${Version} ${db:Status-Abbrev}\\n'",
   ]);
-  const script = buildCollectorScript(NONCE, PREVIEW_SECTIONS);
+  const script = buildCollectorScript(PREVIEW_SECTIONS);
   for (const re of [/\bsudo\b/, /\bsu\b/, /apt-get\s+(?!-s\b)/, /\bdpkg\s/, /\brm\b/, /\$\(|`/, /\|/, /apt(-get)? update/]) {
     assert.equal(re.test(script), false, `script must not match ${re}`);
   }
@@ -97,8 +97,8 @@ test("over SSH: the fixed script on stdin, the inspect key, the pinned file; res
   const r = await collectPackagePreviewViaSsh({ host: "198.51.100.7", port: 22, user: "servrsit", identityFile: "/keys/inspect" }, { knownHostsFile: kh }, { runner, nonce: () => NONCE, checkResolution: async () => undefined });
   assert.equal(r.ok, true);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0]!.stdin, buildCollectorScript(NONCE, PREVIEW_SECTIONS));
-  assert.deepEqual(calls[0]!.args.slice(-4), ["--", "198.51.100.7", "sh", "-s"]);
+  assert.equal(calls[0]!.stdin, buildCollectorScript(PREVIEW_SECTIONS));
+  assert.deepEqual(calls[0]!.args.slice(-4), ["198.51.100.7", "sh", "-s", NONCE]);
   assert.ok(calls[0]!.args.includes(`UserKnownHostsFile=${kh}`));
   if (r.ok) {
     assert.equal(r.preview.upgrades.length, 3);
@@ -138,6 +138,6 @@ test("verification reads installed versions only: dpkg-query alone, so a broken 
   };
   const r = await collectInstalledViaSsh({ host: "198.51.100.7", port: 22, user: "servrsit" }, { knownHostsFile: pinned() }, { runner, nonce: () => NONCE, checkResolution: async () => undefined });
   assert.equal(r.ok && r.installed.installed["wget:amd64"], "1.21.4-1ubuntu4");
-  assert.equal(calls[0]!.stdin, buildCollectorScript(NONCE, INSTALLED_SECTIONS));
+  assert.equal(calls[0]!.stdin, buildCollectorScript(INSTALLED_SECTIONS));
   assert.doesNotMatch(calls[0]!.stdin, /apt-get/);
 });

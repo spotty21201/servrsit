@@ -35,12 +35,11 @@ test("hostile output cannot fake a classification: only the rules after sudo's o
 });
 
 test("the script runs exactly `sudo -n -l`, nothing as root, no prompt, and nothing else", () => {
-  const script = buildPrivilegeScript(NONCE);
+  const script = buildPrivilegeScript();
   const sudoCalls = script.match(/\bsudo\b[^;\n]*/g) ?? [];
   assert.deepEqual(sudoCalls.filter((c) => !c.startsWith("sudo >")), ["sudo -n -l 2>&1 </dev/null"]);
   assert.doesNotMatch(script, /sudo -n true|sudo -S|sudo -v|sudo -i|sudo -s\b|\bsu\b|pkexec|doas/);
   assert.doesNotMatch(script, /\$\(|`|\|/);
-  assert.throws(() => buildPrivilegeScript("bad"));
 });
 
 test("over SSH: an unpinned host is never contacted; the output itself is never returned", async () => {

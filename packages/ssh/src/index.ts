@@ -29,7 +29,7 @@ export {
   sanitizeText,
   stripEscapeSequences,
 } from "./sanitize.js";
-export { buildCollectorScript, isValidNonce, REMOTE_COMMAND } from "./script.js";
+export { buildCollectorScript, isValidNonce, NONCE_CASE_PATTERN, REMOTE_COMMAND, remoteCommand } from "./script.js";
 export { COLLECTOR_SECTIONS } from "./sections.js";
 export {
   buildObservation,
@@ -64,3 +64,4 @@ export { collectInstalledViaSsh, collectPackagePreviewViaSsh, INSTALLED_SECTIONS
 export type { InstalledPackages, InstalledResult, PackagePreview, PreviewChange, PreviewDeps, PreviewResult } from "./preview.js";
 export { GATEWAY_TIMEOUT_MS, MAX_GATEWAY_REPLY_BYTES, sendGatewayRequest } from "./gateway.js";
 export type { GatewayReply, GatewayTarget } from "./gateway.js";
+export { INSPECT_SCRIPTS, inspectForcedCommand, inspectKeyOptions, inspectScriptDigest, inspectScriptDigests, MAX_INSPECT_SCRIPT_BYTES } from "./inspect-access.js";

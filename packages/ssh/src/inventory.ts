@@ -16,7 +16,7 @@ import { randomBytes } from "node:crypto";
 import { splitSections, type RawSection } from "./parse.js";
 import { spawnRunner, type CommandRunner } from "./runner.js";
 import { sanitizeLines } from "./sanitize.js";
-import { buildCollectorScript } from "./script.js";
+import { buildCollectorScript, isValidNonce } from "./script.js";
 import type { CollectorSection } from "./sections.js";
 import {
   FAILURE_MESSAGES,
@@ -159,10 +159,11 @@ export interface InventoryDeps {
 async function run(file: string, args: readonly string[], source: "ssh" | "local", deps: InventoryDeps): Promise<InventoryResult> {
   const now = deps.now ?? (() => new Date());
   const nonce = (deps.nonce ?? (() => randomBytes(16).toString("hex")))();
+  if (!isValidNonce(nonce)) throw new Error("collector nonce must be 32 lowercase hex characters");
   const result = await (deps.runner ?? spawnRunner)({
     file,
-    args,
-    stdin: buildCollectorScript(nonce, INVENTORY_SECTIONS),
+    args: [...args, nonce],
+    stdin: buildCollectorScript(INVENTORY_SECTIONS),
     timeoutMs: INVENTORY_BUDGET_MS,
     maxStdoutBytes: INVENTORY_LIMITS.maxTotalOutputBytes,
     maxStderrBytes: 8 * 1024,

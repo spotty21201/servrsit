@@ -142,7 +142,7 @@ function fakeSentani(trusted: Record<string, string>) {
       }));
     }
     calls.inspect++;
-    const nonce = /@@BEGIN ([0-9a-f]{32})/.exec(r.stdin)?.[1] ?? "";
+    const nonce = r.args.at(-1) ?? ""; // T-091: `sh -s <nonce>`
     let out = "";
     for (const s of [...r.stdin.matchAll(/^section (\w+) /gm)].map((m) => m[1]!)) {
       const body =

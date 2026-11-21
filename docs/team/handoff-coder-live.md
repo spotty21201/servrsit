@@ -2163,3 +2163,73 @@ key scan: AI key not in the diff; 0 private-key blocks
 4. **The `installed-v1` digest rule** applies only to real-target previews. Simulated plan digests are unchanged.
 
 **Next:** T-091 (needs the option 1 or 2 choice for the inspect forced command). Then the Orchestrator's flip of writes.json for the Tester's fault-injection suite.
+
+## T-091 and D-S1: forced-command inspect key, verified root install step (branch `feat/coder/inspect-forced-command`, from `integration/live-v1`)
+
+`writes.json` is unchanged (`writesEnabled: false`). Helper code is unchanged: the package is still `604f3fce…21540e2`.
+
+### D-S1 (helper CLI pin): already fixed
+
+Fixed in `f04d43f`, merged as `abcd59a`, and present on live-v1. `tests/live/helper-cli/cli.mts` never reads `SERVRSIT_KNOWN_HOSTS` or `apps/api/.data/known_hosts`. It takes Sentani's address and its own known_hosts file from the registry row (`benchTarget`). `SENTANI_HOST` must equal the registered address. Nabire, Timika and Merauke are refused by name, as is a pin file that pins any other host. This covers both (a) and (b) of the report. The Tester's 7.1 table still lists D-S1 as open, so it needs the Tester's re-check.
+
+### T-091 (a): the inspect key runs only the reviewed scripts
+
+I used option 1 (the recommended one). The forced command is written into the key line, so nothing is installed on the server.
+
+- **New key lines** (`registry.issueAccessKey`) are `restrict,from="<controller>",command="exec /bin/sh -c '…'" ssh-ed25519 … servrsit-<name>`, about 1 KB. The forced command (`packages/ssh/src/inspect-access.ts`):
+  1. accepts only the request `sh -s <32 lowercase hex>`; anything else exits 2 and runs nothing;
+  2. reads at most 256 KiB of script from stdin;
+  3. runs it with `sh -s <nonce>` only if its SHA-256 is one of the five digests in the line: the health, inventory, privilege, preview and installed scripts. Otherwise it exits 3 and runs nothing.
+
+  It hands everything to `/bin/sh`, so the owner's login shell does not matter.
+- **The scripts no longer contain the nonce.** It is their argument (`sh -s <nonce>`), so the text is the same on every run and can be checked by digest. Each script checks `$1` is 32 hex again. A key line without a forced command (every server registered before T-091) sees the same `sh -s <nonce>` and keeps working. That means Nabire and Timika need no change, and servers can be switched one at a time.
+- **Existing servers:** `cd apps/api && node_modules/.bin/tsx src/servers/inspect-key-line.ts Sentani` prints the replacement line from the key already issued (public text only; it connects to nothing). The owner replaces the line ending with `servrsit-sentani` in `~spotty/.ssh/authorized_keys`. The registry still stores the old line. Removal instructions match by the comment, so they are unaffected.
+- **Contracts:** `AccessKey.authorizedKeysLine` and the disconnect result's `authorizedKeysLine` max length went from 800 to 2048. This is the only schema change, and it only loosens the limit. Designer: the connect screen shows a much longer line.
+- **When an inspect script changes, every forced-command key line must be replaced.** A server keeps refusing the new script (exit 3, seen as a failed check, never as healthy) until its owner replaces the line. A test lists the five scripts, so a change is visible in review.
+
+### T-091 (b): the root install step trusts nothing in the owner's home
+
+- **`target-helper/packaging/root_step.py`** (run by `scripts/sentani-helper-install.sh` on Merauke) writes `root-step.sh` into the copy folder. That file holds the SHA-256 of every other file, the source folder and the bootstrap arguments.
+- **The script prints one command per action** (dry run, install, uninstall). The `dry-run.sh` and `install.sh` wrappers in the home folder are gone. Each command:
+  ```
+  sudo sh -c 'D=$(mktemp -d /root/servrsit-install.XXXXXX) && install -m 600 /home/spotty/servrsit-helper-<v>/root-step.sh "$D"/ && echo "<sha256>  $D/root-step.sh" | sha256sum -c --quiet && sh "$D"/root-step.sh dry-run|install|uninstall'
+  ```
+  So root copies `root-step.sh` into a fresh 0700 directory and checks it against the value printed on Merauke before running it.
+- **`root-step.sh` then:**
+  - copies every named file into the same directory (0600, root-owned), refusing a missing file or a symlink;
+  - checks each copy with `sha256sum --check --strict`;
+  - only then runs `bootstrap.sh` or `uninstall.sh` from the copies;
+  - refuses to run from anywhere but `/root/servrsit-install.*`.
+- **Trade-off:** each command is about 330 characters and must be pasted as one line. The old short wrappers existed because long pastes split in the founder's terminal, but they were exactly the D-S3 pattern.
+
+### Checks run
+
+```
+pnpm -r --workspace-concurrency=1 run test: exit 0 (api 259, web 216, ai 156, ssh 78, store 28, domain 26, worker 28, infra 9)
+target-helper unittest: Ran 114 tests, OK (107 + 7 in test_t091.py)
+typecheck: all 9 ok; web build ok
+Tester gates (1c9d5a7 + 22 routes): routes-401 7/7, auth 37/37, care-loop 41/42 (CL-09a, known),
+  zt01 12/13 (the T-089 import check, waiting for the Tester's revision; unchanged by T-091)
+scripts/sentani-helper-install.sh --no-copy: builds, makes root-step.sh, prints the three commands; package sha256 unchanged
+```
+
+- **`packages/ssh/src/inspect-access.test.ts`** runs the forced command with this machine's `/bin/sh` and `/bin/bash`, exactly as sshd hands it over:
+  - the reviewed `installed` script (dpkg-query) runs;
+  - ten malformed requests run nothing (exit 2);
+  - a changed, appended, unknown, empty, extended or oversized script runs nothing (exit 3), checked with a marker file that must never appear;
+  - `ssh-keygen -l` parses the full authorized_keys line with OpenSSH's own parser (a throwaway key in a temporary directory).
+- **`target-helper/tests/test_t091.py`** runs the printed command without sudo (`id` stubbed to 0) on a fake stage:
+  - matching files run from the root copy only, with a 0700 directory and 0600 files;
+  - changing any of five files stops everything before bootstrap runs;
+  - a changed `root-step.sh` never runs;
+  - a symlinked or missing file stops everything;
+  - running `root-step.sh` directly from the home folder is refused;
+  - bad inputs are refused when the step is made.
+- **No ssh connection** was made, and nothing ran on any server.
+
+### Not proven live
+
+- **The forced command under sshd on Sentani:** it needs the founder to replace Sentani's line. After that, a health check, the first check's privilege probe, the inventory and the T-089 preview must all still succeed. A plain shell must be refused, for example `ssh -i <inspect key> spotty@sentani id` gives "this key only runs the reviewed ServrSit checks".
+- **The root step on real Ubuntu with sudo:** it runs at the next helper install.
+
+**Next:** the founder replaces Sentani's inspect line, and the Tester checks it on Sentani and re-checks D-S1. Then the Orchestrator flips writes.json for the fault-injection suite.
