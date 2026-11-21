@@ -1,7 +1,7 @@
 # Test report — T-088 helper on Sentani, real Ubuntu (sentani-001)
 
 **Author:** Kiro Tester · **For:** Kiro Orchestrator · **Started:** 2026-11-21
-**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). Next: F2 (hold) test, then F3 (lock) test, both on the LLVM set, then 3c (mid-dpkg kill) applies the LLVM set. Then steps 4 and 5.
+**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). F2 (held package) **final** (07:51 UTC). Next: F3 (lock), then 3c (mid-dpkg kill) applies the LLVM set, then steps 4 and 5. **Orchestrator decision (after step 2):** F2, F3 and 3c run on the CURRENT helper (`4101502`). Any result that touches needrestart or debconf is labelled **[PRE-FIX]**. Step 2 and a needrestart/conffile case are re-run after T-090 (fixes for D-S5 to D-S7) is installed.
 **Authority:** ADR-021 (Sentani is disposable; fault injection allowed on Sentani only), ADR-022 (helper installed by the founder; T-088 rules), T-088
 **Target:** Sentani ONLY. Host `sentani` resolves to 100.119.231.102 (checked before every send). The pin comes from registry row `75e41a8a-6a97-4a06-8151-c0cb33ad0fc1`: its `known_hosts_file` holds only Sentani, with the owner-confirmed key `SHA256:j3nno/hlFOSktmjBlrxPO9oTE3qWFmITlKgKTIt+JrM` (confirmed 2026-11-21T05:44:58Z). Nothing was sent to Nabire, Timika or Merauke.
 **Helper on Sentani:** package `servrsit-helper-0.1.0.tar.gz`, sha256 `8f25e5a3…a6d0d6`. Rebuilding from integration/live-v1 `4101502` gives the identical checksum, so the installed code is `target-helper/` at `4101502`, which includes T-084.
@@ -127,7 +127,20 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 
 **Unattended-upgrades:** next run 2026-11-22 06:14 UTC. The vim set is already done. The LLVM set is in `noble-updates` only, which Ubuntu's default unattended-upgrades configuration does not install. The package steps should finish well before then.
 
-### 3c, F2, F3, 4, 5 — not run yet
+### F2 — held package [FINAL] (no commit happened, so needrestart and debconf were not involved; not pre-fix sensitive)
+
+**Founder:** `f2.sh` held `libclang1-18`. I saw the hold read-only at **07:51:40** (`apt-mark showhold` as spotty) and submitted right away, inside the 10-minute window. `apt-get -s upgrade` at that moment: 2 to upgrade, `libclang1-18` kept back.
+
+| Time | Op | Digest | Scope | Ledger / outcome | Independent check |
+|---|---|---|---|---|---|
+| 07:51:45 | 86a9751a | b421be87d58c | LLVM set (3, `amd64`, from the 07:50 observation): `libllvm18`, `libclang-cpp18`, `libclang1-18` `1:18.1.3-1` → `1:18.1.3-1ubuntu1` | accepted, then finished, **exit 1, `failed`**: "the transaction would change other packages; nothing was changed", "0 of 3 packages at the planned version" | dpkg: all 3 still at `1:18.1.3-1` (`libclang1-18` in state `hi`, hold + installed); no dpkg.log entry after 07:39:32; one `servrsit-op-86a9751a…` unit, 07:51:47 to 07:51:50 |
+
+**Result:**
+- **Proven on Sentani:** a transaction that contains a held package is **refused whole**. The other two packages were not applied either, and nothing changed. That meets the steering rule that hold overrides are unsupported.
+- **Defect D-S8:** the reason in the evidence is wrong. The ledger says "would change other packages", and neither the owner nor the controller can tell that the hold was the cause.
+- **Observation (product side, T-089):** the refusal comes only **after** approval and acceptance. The controller's planner already sees holds in `apt-get -s upgrade` ("kept back"), so it should block a held package at plan time, before asking for approval.
+
+### 3c, F3, 4, 5 — not run yet
 
 - ~~**Step 2 is blocked**~~ (resolved by option B / F1, see step 2 above): there was no pending update that `apt-get upgrade` (the product's own observation) would install. Applying the 11 phased systemd packages would override Ubuntu's staged rollout, re-execute systemd, and restart resolved, timesyncd and udev. That is a founder decision. The options are in `docs/team/t088-founder-steps.md`; option B (downgrade 8 harmless packages, then install them back through the helper) is recommended.
 - **3c, the hold test and the lock test** depend on step 2's packages. Their founder steps are F1 to F3 in `docs/team/t088-founder-steps.md`.
@@ -151,7 +164,8 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 | needrestart runs inside the helper's transient unit, in automatic mode | **Proven on Sentani** (journal + config) |
 | A package update does not restart services | **Proven only when no service loads the upgraded files** (vim). Where a running service uses an upgraded library, it would be restarted automatically (D-S6) |
 | A debconf question or conffile prompt with no terminal | **NOT proven** (none occurred; D-S7) |
-| External lock, held package, dpkg interruption | **NOT proven yet** (F3, F2, 3c) |
+| Held package: whole transaction refused, nothing changed | **Proven on Sentani** (F2); the evidence text is wrong (D-S8) |
+| External lock, dpkg interruption | **NOT proven yet** (F3, 3c) |
 | Reboot and return verification (boot id, SSH, query settles) | **NOT proven yet** (step 4) |
 | Low disk | **NOT proven yet** (step 5); root-side ENOSPC is probably not reachable as spotty |
 | Uninstall on the real server | **NOT tested** (not in this round's instructions) |
@@ -183,4 +197,6 @@ eeafb796051fcf8e80cb3f668f318bb947ad2564e8648e6fa8e2b836c85599ea  f2.sh
 | D-S6 | **High** (invariant 5) | `target-helper/servrsit_helper/adapters.py` `RealSystem.apply_packages()` (`cache.commit()` runs dpkg and apt's hooks in the runner's environment; nothing sets `NEEDRESTART_MODE`/`NEEDRESTART_SUSPEND`) | Ubuntu's needrestart apt hook runs after every helper transaction, in its Ubuntu default mode `'a'` (automatic). When an approved package update replaces a library used by a running service (for example libssl, used by sshd and nginx), needrestart restarts that service **inside a package-only approval**. That breaks invariant 5 (package, service-restart and reboot approvals are separate) and Tech Spec §8.1 (`restart.service.v1` needs its own approval). The run still reports the operation as package-only. Not triggered in 2b (vim). Fix options: run the commit with `NEEDRESTART_MODE=l` (list only), and record needrestart's "services that need restarting" list as evidence so the controller can propose separate `restart.service.v1` plans; or `NEEDRESTART_SUSPEND=1` plus the helper's own check. | Read-only config and journal evidence above. To prove it live: a package step that upgrades a library a running service uses. I propose a later step (founder downgrade of one such library), with your approval, because it would restart a service on Sentani | Coder |
 | D-S7 | Medium | Same place: `cache.commit()` with stdin closed, no `DEBIAN_FRONTEND`, no dpkg `--force-confdef`/`--force-confold` | Under the transient unit, debconf falls back to its Teletype frontend with no stdin, and dpkg has no conffile policy. An update that asks a debconf question, or that changes a conffile the owner modified, would read end-of-file at the prompt. The usual result is a failed or half-configured package (`iF`/`iU`) in the middle of an approved transaction, instead of a clean refusal or the documented default. Fix: set `DEBIAN_FRONTEND=noninteractive` and `Dpkg::Options::=--force-confdef,--force-confold` (keep the owner's file; record the `.dpkg-dist`), and verify `dpkg --audit` is clean after the commit. Not triggered in 2b. | Journal of `servrsit-op-24793587…` (07:39:28, 07:39:33) | Coder |
 
-No other helper defect was found in steps 1, 2 and 3a/3b.
+| D-S8 | Low | `adapters.py` `RealSystem.apply_packages()`: `mark_install(auto_fix=False, from_user=False)` silently does not mark a held package, and the generic "would change other packages" message is returned | A held package in the scope causes a correct refusal with a wrong explanation. Fix: check `pkg.selected_state == apt_pkg.SELSTATE_HOLD` (or `dpkg --get-selections`) for each package first and refuse with a typed reason (for example "libclang1-18 is held on this server; ServrSit does not override holds"). Also compare the marked set and name the actual difference when it is not a hold. | F2 run above (op 86a9751a) | Coder |
+
+No other helper defect was found in steps 1, 2, F2 and 3a/3b.

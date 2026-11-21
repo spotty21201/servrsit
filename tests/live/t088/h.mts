@@ -82,6 +82,8 @@ const PROBES: Record<string, string> = {
   nrmode: "LC_ALL=C; export LC_ALL\necho ---conf-restart-lines; grep -n 'restart' /etc/needrestart/needrestart.conf; echo ---conf.d; ls -la /etc/needrestart/conf.d/ 2>&1; grep -Hn 'restart\\|kernelhints\\|ucodehint' /etc/needrestart/conf.d/*.conf 2>/dev/null; echo ---hook; cat /etc/apt/apt.conf.d/99needrestart; echo ---hookscript; ls -l /usr/lib/needrestart/apt-pinvoke 2>&1; grep -v '^#' /usr/lib/needrestart/apt-pinvoke 2>/dev/null | head -30; echo ---groups; id",
   unitjournal: "LC_ALL=C; export LC_ALL\nfor u in servrsit-op-24793587-e656-4a31-86fd-01a49b28d45e servrsit-op-254d3315-fddb-4534-81b9-97cf23fd5953; do echo \"=== $u\"; journalctl --no-pager -o short-iso -u \"$u.service\" 2>&1 | tail -n 80; done; echo ---needrestart-anywhere; journalctl --no-pager -o short-iso --since '2026-11-21 07:38:00' --until '2026-11-21 07:41:00' 2>&1 | grep -i -E 'needrestart|restart|Stopping|Stopped|Starting' | head -40",
   nrconf: "LC_ALL=C; export LC_ALL\nsed -n '27,60p' /etc/needrestart/needrestart.conf; echo ---pinvoke-tail; sed -n '30,60p' /usr/lib/needrestart/apt-pinvoke; echo ---env; grep -rn 'NEEDRESTART\\|DEBIAN_FRONTEND' /etc/environment /etc/apt/apt.conf.d/ 2>/dev/null | head",
+  // read-only: is a POSIX lock held on dpkg's lock files? (/proc/locks matched by inode)
+  dpkglock: "LC_ALL=C; export LC_ALL\nfor f in /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock; do i=$(stat -c %i \"$f\"); n=$(grep -c \":$i \" /proc/locks); echo \"$f inode=$i locks=$n $(grep \":$i \" /proc/locks | awk '{print \"pid=\"$5}' | tr '\\n' ' ')\"; done; echo holds=$(apt-mark showhold | tr '\\n' ' ')",
   holds: "LC_ALL=C; export LC_ALL\napt-mark showhold; echo ---; systemctl list-timers 'apt-daily*' --no-legend --all",
 };
 
