@@ -1,7 +1,7 @@
 # Test report — T-088 helper on Sentani, real Ubuntu (sentani-001)
 
 **Author:** Kiro Tester · **For:** Kiro Orchestrator · **Started:** 2026-11-21
-**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). F2 (held package) **final** (07:51 UTC). Next: F3 (lock), then 3c (mid-dpkg kill) applies the LLVM set, then steps 4 and 5. **Orchestrator decision (after step 2):** F2, F3 and 3c run on the CURRENT helper (`4101502`). Any result that touches needrestart or debconf is labelled **[PRE-FIX]**. Step 2 and a needrestart/conffile case are re-run after T-090 (fixes for D-S5 to D-S7) is installed.
+**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). F2 (held package) and F3 (lock) **final** (07:51 and 08:10 UTC). Next: 3c (mid-dpkg kill) applies the LLVM set, then steps 4 and 5. **Orchestrator decision (after step 2):** F2, F3 and 3c run on the CURRENT helper (`4101502`). Any result that touches needrestart or debconf is labelled **[PRE-FIX]**. Step 2 and a needrestart/conffile case are re-run after T-090 (fixes for D-S5 to D-S7) is installed.
 **Authority:** ADR-021 (Sentani is disposable; fault injection allowed on Sentani only), ADR-022 (helper installed by the founder; T-088 rules), T-088
 **Target:** Sentani ONLY. Host `sentani` resolves to 100.119.231.102 (checked before every send). The pin comes from registry row `75e41a8a-6a97-4a06-8151-c0cb33ad0fc1`: its `known_hosts_file` holds only Sentani, with the owner-confirmed key `SHA256:j3nno/hlFOSktmjBlrxPO9oTE3qWFmITlKgKTIt+JrM` (confirmed 2026-11-21T05:44:58Z). Nothing was sent to Nabire, Timika or Merauke.
 **Helper on Sentani:** package `servrsit-helper-0.1.0.tar.gz`, sha256 `8f25e5a3…a6d0d6`. Rebuilding from integration/live-v1 `4101502` gives the identical checksum, so the installed code is `target-helper/` at `4101502`, which includes T-084.
@@ -140,7 +140,23 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 - **Defect D-S8:** the reason in the evidence is wrong. The ledger says "would change other packages", and neither the owner nor the controller can tell that the hold was the cause.
 - **Observation (product side, T-089):** the refusal comes only **after** approval and acceptance. The controller's planner already sees holds in `apt-get -s upgrade` ("kept back"), so it should block a held package at plan time, before asking for approval.
 
-### 3c, F3, 4, 5 — not run yet
+### F3 — package-manager lock held by another process [FINAL] (no commit happened, so needrestart and debconf were not involved; not pre-fix sensitive)
+
+**Founder:** `f3.sh` held the lock for 300 s. Confirmed read-only at **08:10:32** before submitting:
+- `/proc/locks` held a POSIX lock on **both** `/var/lib/dpkg/lock-frontend` (inode 1704268) and `/var/lib/dpkg/lock` (inode 1704267), by pid **10850**;
+- `ps` shows pid 10850 is `python3 -c import apt_pkg … pkgsystem_lock() …`, started by `sudo sh ~spotty/servrsit-t088/f3.sh`;
+- `apt-mark showhold` was empty, so the F2 hold was gone and did not affect this test;
+- `apt-get -s upgrade` showed 3 to upgrade (the LLVM set).
+
+| Time | Op | Digest | Scope | Ledger / outcome | Independent check |
+|---|---|---|---|---|---|
+| 08:10:38 | 7da4237d | 844c2cfb4aa9 | LLVM set (3, `amd64`), same scope as F2 | accepted, then finished, exit `null`, **`failed`**: "the adapter stopped with an error (Error); check the server before trying again" | journal: unit started 08:10:40 and exited `status=1/FAILURE` at 08:10:42; at 08:10:47 pid 10850 still held both locks; dpkg: all 3 still at `1:18.1.3-1`, `ii`; no dpkg.log entry at 08:xx |
+
+**Result:**
+- **Proven on Sentani:** when another process holds the package-manager lock, the helper does not wait, does not take the lock, and changes nothing. The operation ends in a final `failed` record, so the server is not left blocked.
+- **Defect D-S9:** the cause is not reported. `Error` is python-apt's generic `apt_pkg.Error`; the lock is the only difference from the successful 2b run, so it is the cause by inference. The helper correctly keeps the raw library text out of the ledger, but the owner gets no typed reason. Tech Spec §11 defines `PACKAGE_LOCKED` for this.
+
+### 3c, 4, 5 — not run yet
 
 - ~~**Step 2 is blocked**~~ (resolved by option B / F1, see step 2 above): there was no pending update that `apt-get upgrade` (the product's own observation) would install. Applying the 11 phased systemd packages would override Ubuntu's staged rollout, re-execute systemd, and restart resolved, timesyncd and udev. That is a founder decision. The options are in `docs/team/t088-founder-steps.md`; option B (downgrade 8 harmless packages, then install them back through the helper) is recommended.
 - **3c, the hold test and the lock test** depend on step 2's packages. Their founder steps are F1 to F3 in `docs/team/t088-founder-steps.md`.
@@ -165,7 +181,8 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 | A package update does not restart services | **Proven only when no service loads the upgraded files** (vim). Where a running service uses an upgraded library, it would be restarted automatically (D-S6) |
 | A debconf question or conffile prompt with no terminal | **NOT proven** (none occurred; D-S7) |
 | Held package: whole transaction refused, nothing changed | **Proven on Sentani** (F2); the evidence text is wrong (D-S8) |
-| External lock, dpkg interruption | **NOT proven yet** (F3, 3c) |
+| External package-manager lock: refused, nothing changed, record final | **Proven on Sentani** (F3); no typed reason (D-S9) |
+| dpkg interruption | **NOT proven yet** (3c) |
 | Reboot and return verification (boot id, SSH, query settles) | **NOT proven yet** (step 4) |
 | Low disk | **NOT proven yet** (step 5); root-side ENOSPC is probably not reachable as spotty |
 | Uninstall on the real server | **NOT tested** (not in this round's instructions) |
@@ -199,4 +216,6 @@ eeafb796051fcf8e80cb3f668f318bb947ad2564e8648e6fa8e2b836c85599ea  f2.sh
 
 | D-S8 | Low | `adapters.py` `RealSystem.apply_packages()`: `mark_install(auto_fix=False, from_user=False)` silently does not mark a held package, and the generic "would change other packages" message is returned | A held package in the scope causes a correct refusal with a wrong explanation. Fix: check `pkg.selected_state == apt_pkg.SELSTATE_HOLD` (or `dpkg --get-selections`) for each package first and refuse with a typed reason (for example "libclang1-18 is held on this server; ServrSit does not override holds"). Also compare the marked set and name the actual difference when it is not a hold. | F2 run above (op 86a9751a) | Coder |
 
-No other helper defect was found in steps 1, 2, F2 and 3a/3b.
+| D-S9 | Low | `target-helper/servrsit_helper/runner.py:34-36` (`except Exception` → "the adapter stopped with an error (%s)") together with `adapters.py` `apply_packages()` (`cache.commit()` with no lock handling) | A lock held by another process gives a generic `failed` with `exitCode: null` and "check the server before trying again". There is no typed reason, and nothing tells the owner or controller to wait and retry. Fix: catch the lock failure in the adapter (or check `apt_pkg.get_lock()` on both lock files before `commit()`), end with a typed `PACKAGE_LOCKED` reason (Tech Spec §11), and state that nothing changed. | F3 run above (op 7da4237d) | Coder |
+
+No other helper defect was found in steps 1, 2, F2, F3 and 3a/3b.

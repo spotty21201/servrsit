@@ -84,6 +84,7 @@ const PROBES: Record<string, string> = {
   nrconf: "LC_ALL=C; export LC_ALL\nsed -n '27,60p' /etc/needrestart/needrestart.conf; echo ---pinvoke-tail; sed -n '30,60p' /usr/lib/needrestart/apt-pinvoke; echo ---env; grep -rn 'NEEDRESTART\\|DEBIAN_FRONTEND' /etc/environment /etc/apt/apt.conf.d/ 2>/dev/null | head",
   // read-only: is a POSIX lock held on dpkg's lock files? (/proc/locks matched by inode)
   dpkglock: "LC_ALL=C; export LC_ALL\nfor f in /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock; do i=$(stat -c %i \"$f\"); n=$(grep -c \":$i \" /proc/locks); echo \"$f inode=$i locks=$n $(grep \":$i \" /proc/locks | awk '{print \"pid=\"$5}' | tr '\\n' ' ')\"; done; echo holds=$(apt-mark showhold | tr '\\n' ' ')",
+  unitf3: "LC_ALL=C; export LC_ALL\njournalctl --no-pager -o short-iso -u servrsit-op-7da4237d-28de-4ef2-a83a-3009507aa68f.service 2>&1 | tail -n 30",
   holds: "LC_ALL=C; export LC_ALL\napt-mark showhold; echo ---; systemctl list-timers 'apt-daily*' --no-legend --all",
 };
 
