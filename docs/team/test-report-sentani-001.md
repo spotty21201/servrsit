@@ -1,7 +1,7 @@
 # Test report — T-088 helper on Sentani, real Ubuntu (sentani-001)
 
 **Author:** Kiro Tester · **For:** Kiro Orchestrator · **Started:** 2026-11-21
-**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). F2 (held package) and F3 (lock) **final** (07:51 and 08:10 UTC). 3c **PARTIAL** (08:15 to 08:19 UTC): the kills landed during the running operation but **before** dpkg started. A redo for the dpkg window needs one more founder downgrade (F4). Next: 3c redo (mid-dpkg kill) applies the LLVM set, then steps 4 and 5. **Orchestrator decision (after step 2):** F2, F3 and 3c run on the CURRENT helper (`4101502`). Any result that touches needrestart or debconf is labelled **[PRE-FIX]**. Step 2 and a needrestart/conffile case are re-run after T-090 (fixes for D-S5 to D-S7) is installed.
+**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). F2 (held package) and F3 (lock) **final** (07:51 and 08:10 UTC). 3c **final** after the redo (first run 08:15 UTC landed before dpkg; redo 08:28 UTC landed 3 kills inside dpkg). Next (mid-dpkg kill) applies the LLVM set, then steps 4 and 5. **Orchestrator decision (after step 2):** F2, F3 and 3c run on the CURRENT helper (`4101502`). Any result that touches needrestart or debconf is labelled **[PRE-FIX]**. Step 2 and a needrestart/conffile case are re-run after T-090 (fixes for D-S5 to D-S7) is installed.
 **Authority:** ADR-021 (Sentani is disposable; fault injection allowed on Sentani only), ADR-022 (helper installed by the founder; T-088 rules), T-088
 **Target:** Sentani ONLY. Host `sentani` resolves to 100.119.231.102 (checked before every send). The pin comes from registry row `75e41a8a-6a97-4a06-8151-c0cb33ad0fc1`: its `known_hosts_file` holds only Sentani, with the owner-confirmed key `SHA256:j3nno/hlFOSktmjBlrxPO9oTE3qWFmITlKgKTIt+JrM` (confirmed 2026-11-21T05:44:58Z). Nothing was sent to Nabire, Timika or Merauke.
 **Helper on Sentani:** package `servrsit-helper-0.1.0.tar.gz`, sha256 `8f25e5a3…a6d0d6`. Rebuilding from integration/live-v1 `4101502` gives the identical checksum, so the installed code is `target-helper/` at `4101502`, which includes T-084.
@@ -194,6 +194,38 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 - **NOT proven:** a client kill **inside dpkg's ~5-second unpack/configure window**. The transient unit does not depend on the SSH session, as the kills at 08:18:20 to 08:18:23 already show, so I don't expect a different result. But the instruction asked for mid-dpkg, and it was not achieved.
 - **Proposed redo:** a founder step F4 downgrades the LLVM set again, the same as F1 for those 3 packages. Then a revised script fires a killed query and a killed identical resubmit **every second** from acceptance until the ledger says finished, so several kills must land inside the dpkg window. dpkg.log timestamps then confirm which ones did.
 
+### 3c redo — client kills inside dpkg's unpack window [FINAL] (needrestart lines are **[PRE-FIX]**)
+
+**Founder F4** (`f4.sh`): exit 0. The 3 LLVM packages were downgraded to `1:18.1.3-1`. The founder's output also said "libfwupd2 libgusb2 no longer required". That is an apt autoremove hint only: those packages were not touched, and they are not in any manifest.
+
+**Precondition (read-only, 08:28:2x):** no lock in `/proc/locks`, no hold, and `apt-get -s upgrade` showed exactly the 3 LLVM packages `1:18.1.3-1` → `1:18.1.3-1ubuntu1`, all from Ubuntu origins. The script refuses to continue otherwise.
+
+**Run (`tests/live/t088/t3c2.sh`):**
+- **Submit:** 08:28:34, op **199982cc**, digest **3180d35c5292**, accepted.
+- **Kills:** from acceptance until the ledger said finished, a background loop fired every second a query with the local ssh client SIGKILLed at 400 to 700 ms, and every 4th tick also an identical resubmit, killed the same way. 12 kills in total (9 queries, 3 resubmits), 08:28:37.2 to 08:28:49.2.
+- **Retry after finish:** a query of the same id first gave finished, exit 0, **succeeded** ("3 of 3 packages at the planned version"). Then the identical resubmit gave **`existing`**.
+
+**dpkg window** (unit journal, `short-precise`, and dpkg.log): `dpkg-preconfigure` 08:28:38.713, `startup archives unpack` 08:28:38/39, `libllvm18` unpack 08:28:40.167 to 08:28:41.851, last configure and `libc-bin` trigger 08:28:42.65 and finished before 08:28:43.
+
+**Kills inside the window.** Kill times are computed from the local run log. Sentani's clock and the controller's agree to about 1 s, and each margin below is larger than that.
+
+| Client started | SIGKILL at | Kind | Killed after | Reply | Where dpkg was |
+|---|---|---|---|---|---|
+| 08:28:39.710 | **08:28:40.202** | identical resubmit | 492 ms | none | unpacking `libllvm18` (08:28:40.167 to 41.851) |
+| 08:28:39.721 | **08:28:40.212** | query | 491 ms | none | unpacking `libllvm18` |
+| 08:28:40.721 | **08:28:41.309** | query | 588 ms | none | unpacking `libllvm18` |
+
+Unkilled queries in the same window returned `running`.
+
+**Independent verification (as spotty):**
+- **Journal:** `servrsit-op-199982cc…` **started once** (08:28:36.06), deactivated successfully 08:28:48.78, 11.7 s CPU.
+- **dpkg.log:** **one** unpack/configure sequence, each of the 3 packages upgraded once, plus the `libc-bin` trigger.
+- **apt history:** **one** transaction, 08:28:38 to 08:28:42, `Upgrade:` the 3 packages.
+- **dpkg:** all 3 at `1:18.1.3-1ubuntu1`, `ii`. `dpkg --audit` is clean (exit 0). `apt-get -s upgrade`: 0 to upgrade.
+- **[PRE-FIX] services:** all running services unchanged (PID and start time). needrestart said "No services need to be restarted" at 08:28:44. As before, no service loads LLVM, so this is not evidence about D-S6.
+
+**Result:** **proven on Sentani** for FR-17. Killing the local ssh client while dpkg is unpacking, three times and including an identical resubmit, neither stops nor duplicates the transaction. The transient unit finishes on its own, and the query-first retry finds the single operation and returns `existing` for the identical manifest.
+
 ### 3c redo — preparation
 
 - **Approved** by Orchestrator: the mid-dpkg kill matters for FR-17.
@@ -228,7 +260,7 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 | Held package: whole transaction refused, nothing changed | **Proven on Sentani** (F2); the evidence text is wrong (D-S8) |
 | External package-manager lock: refused, nothing changed, record final | **Proven on Sentani** (F3); no typed reason (D-S9) |
 | Client kill during a running package transaction (download phase): no stop, no duplicate, query-first retry → `existing` | **Proven on Sentani** (3c) |
-| Client kill inside dpkg's unpack/configure window | **NOT proven** (3c missed the 5-second window; redo proposed) |
+| Client kill inside dpkg's unpack window (3 kills, incl. an identical resubmit): no stop, no duplicate, query-first retry → `existing` | **Proven on Sentani** (3c redo) |
 | Reboot and return verification (boot id, SSH, query settles) | **NOT proven yet** (step 4) |
 | Low disk | **NOT proven yet** (step 5); root-side ENOSPC is probably not reachable as spotty |
 | Uninstall on the real server | **NOT tested** (not in this round's instructions) |
