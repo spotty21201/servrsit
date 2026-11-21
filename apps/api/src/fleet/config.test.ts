@@ -63,7 +63,8 @@ test("T-050: roles and production flags are the founder's (ADR-015)", async () =
     {
       Timika: ["Client-facing VPS (Europe)", true],
       Nabire: ["Development server", false],
-      Sentani: ["Personal server (Hermes), limited resources", false],
+      // ADR-021: Sentani is now the disposable test server.
+      Sentani: ["Disposable test server", false],
       Merauke: ["Development server (dev host)", false],
     },
   );

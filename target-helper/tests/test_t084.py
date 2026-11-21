@@ -259,3 +259,56 @@ class PackageAndUninstallTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FromOptionTests(unittest.TestCase):
+    """T-087: --from restricts the maintenance key to ServrSit's own address."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        out = subprocess.run(["sh", str(PKG / "build.sh"), str(base / "dist")], capture_output=True, text=True, check=True)
+        self.package = Path(out.stdout.strip())
+        import hashlib
+
+        self.sha = hashlib.sha256(self.package.read_bytes()).hexdigest()
+        self.root = base / "root"
+        (self.root / "etc").mkdir(parents=True)
+        (self.root / "etc" / "os-release").write_text('VERSION_ID="24.04"\n')
+        self.trust = base / "trust.json"
+        self.trust.write_text('{"keys": {}}')
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_bootstrap(self, *extra):
+        return subprocess.run(
+            ["sh", str(PKG / "bootstrap.sh"), "--package", str(self.package), "--sha256", self.sha, "--installation-id", "servrsit-merauke-founder-1",
+             "--trust", str(self.trust), "--account", "servrsit", "--create-account", "--home-user", "spotty", "--install-deps",
+             "--authorized-key", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixture servrsit-maintenance-sentani", "--dry-run", *extra],
+            capture_output=True, text=True, env={**os.environ, "SERVRSIT_ROOT": str(self.root)},
+        )
+
+    def test_the_key_line_carries_from_and_the_forced_command(self):
+        r = self.run_bootstrap("--from", "100.104.220.8")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('restrict,from="100.104.220.8",command="/usr/lib/servrsit/bin/servrsit-gateway" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixture servrsit-maintenance-sentani', r.stdout)
+        self.assertIn('"homeUser":"spotty","restartableUnits":[]', r.stdout)
+
+    def test_from_refuses_lists_wildcards_quotes_and_line_breaks(self):
+        for bad in ("100.104.220.8,0.0.0.0/0", "*", '1.2.3.4"', "1.2.3.4\n5.6.7.8", "!10.0.0.1", ""):
+            with self.subTest(bad=bad):
+                r = self.run_bootstrap("--from", bad)
+                if bad == "":
+                    self.assertIn('restrict,command=', r.stdout)  # empty means no from=
+                else:
+                    self.assertNotEqual(r.returncode, 0)
+
+    def test_removal_matches_lines_with_or_without_from(self):
+        home = Path(self.tmp.name) / "home"
+        (home / DOT).mkdir(parents=True, mode=0o700)
+        ak = home / DOT / "authorized_keys"
+        ak.write_text("owner-key\n" + 'restrict,from="100.104.220.8",command="/usr/lib/servrsit/bin/servrsit-gateway" ssh-ed25519 AAAA x\n')
+        r = subprocess.run(["sh", str(PKG / "account-remove-key.sh"), str(home)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(ak.read_text(), "owner-key\n")

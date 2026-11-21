@@ -1891,3 +1891,43 @@ typecheck: all 9 TS packages exit 0
 ```
 
 **Still NOT PROVEN** (as in T-083): APT, systemd and `systemd-run`, restart, reboot, real root ownership, `sudo`, sshd's `restrict`, and running bootstrap or uninstall for real. That includes `runuser` itself and the planted-link case done as root. This all belongs to T-012 on a disposable VM.
+
+## T-087: Sentani test bench prep (branch `feat/coder/sentani-bench`, from `integration/live-v1`; ADR-020, ADR-021)
+
+**Not done by me:** no SSH, scp or install to Sentani or any other server; nothing ran as root. `writesEnabled` is unchanged, and `SshWriteTarget` is unchanged (it still refuses every write). No private key was printed, logged or committed: every test makes keys in temporary directories, and every printout shows public keys only.
+
+| # | What |
+|---|---|
+| 1 | **Persistent manifest signing key** (`apps/api/src/helper-bench/keys.ts`): Ed25519 PKCS#8 in `apps/api/.data/helper/manifest-signing-ed25519.pem`, 0600 in a 0700 directory, gitignored, made once. A file readable by group or others is refused. Key id `ctrl-<16 hex>`. The domain gains `signerFromPrivateKeyPem()`. `trust.json` is exported with the public key only. ADR-020 is updated. |
+| 2 | **Dedicated maintenance key** for Sentani, separate from the inspect key: `apps/api/.data/helper/sentani/id_ed25519`, made once by `ssh-keygen`, comment `servrsit-maintenance-sentani`. The fixed installation id `servrsit-merauke-founder-1` is in `apps/api/config/test-bench.json` (committed; it holds no secret), with account `servrsit`, home user `spotty` and from `100.104.220.8`. |
+| 3 | **Package and SHA-256** built by `packaging/build.sh` into `target-helper/dist/sentani/servrsit-helper-0.1.0/` (gitignored). It is reproducible. |
+| 4 | **`bootstrap.sh --from <address>`** gives the key line `restrict,from="100.104.220.8",command="/usr/lib/servrsit/bin/servrsit-gateway" ssh-ed25519 …`. It refuses lists, wildcards, quotes and line breaks. Removal (`account-remove-key.sh`, `uninstall.sh`) matches any line with the gateway forced command, with or without `from=`. The dry run now also prints `helper.json`. |
+| 5 | **`scripts/sentani-helper-install.sh`**, for the founder, run on Merauke as themselves. It builds the package, makes the keys once and shows only public ones, lists every file with size and SHA-256 prefix, and stops if any `PRIVATE KEY` text is in the copy folder. It asks before copying, copies with `scp -r` to `spotty@sentani:`, and then **prints** the dry-run and real `sudo sh bootstrap.sh …` commands and the uninstall command. It never runs anything on Sentani. Options: `--yes`, and `--no-copy` (show and print only). |
+| 6 | **Tester CLI** `tests/live/helper-cli/cli.mts`, with its logic in `apps/api/src/helper-bench/client.ts`. Commands: `trust`, `sign <manifest>` (prints only), `submit <manifest>`, `send-raw <request>`, `query <operationId>`. It uses existing keys only and never makes new ones. It refuses an unpinned host before running ssh. It uses the hardened ssh argv with the maintenance key as `servrsit@<Sentani address from hosts.json>`, sends the request on stdin, and gives a bounded JSON reply. Sentani only. |
+
+**Also fixed:** a stale test on `integration/live-v1`. ADR-021 (`9fdf08d`) changed Sentani's role to "Disposable test server", but `config.test.ts` still expected the old role.
+
+**Checks:**
+
+```
+pnpm -r --workspace-concurrency=1 run test   exit 0 (api 248, web 215, ai 156, ssh 61, store 28, domain 22, worker 19, infra 9, target-helper 69 unittest)
+typecheck: all 9 TS packages exit 0; web build ok
+Tester @1c9d5a7: zt01 13/13 (with the reviewed route list), care-loop 41/42 (CL-09a, known), routes-401 7/7, auth 37/37
+bash scripts/sentani-helper-install.sh --no-copy   (keys in a temporary dir via SERVRSIT_HELPER_KEYS_DIR) rc=0
+  second run: "using the existing manifest signing key", same key id
+printed dry-run command, run against a fake root (SERVRSIT_ROOT, non-root): rc=0, wrote nothing
+  key line: restrict,from="100.104.220.8",command="/usr/lib/servrsit/bin/servrsit-gateway" ssh-ed25519 … servrsit-maintenance-sentani
+  sudoers rule from the package: servrsit ALL=(root) NOPASSWD: /usr/lib/servrsit/bin/servrsit-helper ""
+the Python helper's verifier accepts a manifest signed with the persistent key and refuses a tampered one
+```
+
+**For the founder, before T-088:**
+
+- **Run the script from the founder's tree** (`/projects/servrsit`). The keys belong in that tree's `apps/api/.data/helper`.
+- **Sentani's host key** must be pinned again for the CLI (ADR-021).
+- **Tailscale SSH** (T-086) must be off on Sentani, or the maintenance key cannot reach sshd.
+
+**For the Tester:**
+
+- **SSH command after install:** sshd's forced command ignores the remote command; the CLI still sends the collector's fixed `sh -s`.
+- **ZT-01:** the reviewed-route list is unchanged by T-087. There are no new API routes.

@@ -167,7 +167,7 @@ class ScriptTests(unittest.TestCase):
         self.assertIn("/etc/sudoers.d/servrsit", r.stdout)
         self.assertIn("kept the ledger", r.stdout)
         self.assertNotIn("userdel", r.stdout)
-        self.assertIn('restrict,command="/usr/lib/servrsit/bin/servrsit-gateway"', r.stdout)
+        self.assertIn('command="/usr/lib/servrsit/bin/servrsit-gateway"', r.stdout)  # T-087: matches lines with or without from=
 
 
 if __name__ == "__main__":

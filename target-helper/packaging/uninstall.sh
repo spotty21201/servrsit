@@ -71,9 +71,9 @@ if [ "$DRY_RUN" -eq 0 ]; then
   step "verified: the sudoers rule is gone"
 fi
 
-LINE_PREFIX='restrict,command="/usr/lib/servrsit/bin/servrsit-gateway" '
+LINE_PREFIX='command="/usr/lib/servrsit/bin/servrsit-gateway"'
 if [ "$DRY_RUN" -eq 1 ]; then
-  step "would run as $ACCOUNT: account-remove-key.sh, removing lines starting with: $LINE_PREFIX"
+  step "would run as $ACCOUNT: account-remove-key.sh, removing lines containing: $LINE_PREFIX"
 elif HOMEDIR=$(getent passwd "$ACCOUNT" | cut -d: -f6) && [ -n "$HOMEDIR" ] && [ -d "$HOMEDIR" ]; then
   [ -f "$HERE/account-remove-key.sh" ] || die "account-remove-key.sh is missing next to this script"
   runuser -u "$ACCOUNT" -- /bin/sh -s -- "$HOMEDIR" < "$HERE/account-remove-key.sh" || die "the key line could not be removed as $ACCOUNT; check ~$ACCOUNT/.ssh/authorized_keys yourself"

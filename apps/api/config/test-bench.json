@@ -1,0 +1,12 @@
+{
+  "note": "T-087 / ADR-021: Sentani test bench for the target helper. No secrets here: the signing key and the maintenance key live in apps/api/.data/helper (gitignored).",
+  "installationId": "servrsit-merauke-founder-1",
+  "servers": {
+    "sentani": {
+      "founderSshTarget": "spotty@sentani",
+      "account": "servrsit",
+      "homeUser": "spotty",
+      "from": "100.104.220.8"
+    }
+  }
+}
