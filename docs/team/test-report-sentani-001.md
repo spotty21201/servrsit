@@ -1,7 +1,7 @@
 # Test report — T-088 helper on Sentani, real Ubuntu (sentani-001)
 
 **Author:** Kiro Tester · **For:** Kiro Orchestrator · **Started:** 2026-11-21
-**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). F2 (held package) and F3 (lock) **final** (07:51 and 08:10 UTC). Next: 3c (mid-dpkg kill) applies the LLVM set, then steps 4 and 5. **Orchestrator decision (after step 2):** F2, F3 and 3c run on the CURRENT helper (`4101502`). Any result that touches needrestart or debconf is labelled **[PRE-FIX]**. Step 2 and a needrestart/conffile case are re-run after T-090 (fixes for D-S5 to D-S7) is installed.
+**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). F2 (held package) and F3 (lock) **final** (07:51 and 08:10 UTC). 3c **PARTIAL** (08:15 to 08:19 UTC): the kills landed during the running operation but **before** dpkg started. A redo for the dpkg window needs one more founder downgrade (F4). Next: 3c redo (mid-dpkg kill) applies the LLVM set, then steps 4 and 5. **Orchestrator decision (after step 2):** F2, F3 and 3c run on the CURRENT helper (`4101502`). Any result that touches needrestart or debconf is labelled **[PRE-FIX]**. Step 2 and a needrestart/conffile case are re-run after T-090 (fixes for D-S5 to D-S7) is installed.
 **Authority:** ADR-021 (Sentani is disposable; fault injection allowed on Sentani only), ADR-022 (helper installed by the founder; T-088 rules), T-088
 **Target:** Sentani ONLY. Host `sentani` resolves to 100.119.231.102 (checked before every send). The pin comes from registry row `75e41a8a-6a97-4a06-8151-c0cb33ad0fc1`: its `known_hosts_file` holds only Sentani, with the owner-confirmed key `SHA256:j3nno/hlFOSktmjBlrxPO9oTE3qWFmITlKgKTIt+JrM` (confirmed 2026-11-21T05:44:58Z). Nothing was sent to Nabire, Timika or Merauke.
 **Helper on Sentani:** package `servrsit-helper-0.1.0.tar.gz`, sha256 `8f25e5a3…a6d0d6`. Rebuilding from integration/live-v1 `4101502` gives the identical checksum, so the installed code is `target-helper/` at `4101502`, which includes T-084.
@@ -156,7 +156,45 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 - **Proven on Sentani:** when another process holds the package-manager lock, the helper does not wait, does not take the lock, and changes nothing. The operation ends in a final `failed` record, so the server is not left blocked.
 - **Defect D-S9:** the cause is not reported. `Error` is python-apt's generic `apt_pkg.Error`; the lock is the only difference from the successful 2b run, so it is the cause by inference. The helper correctly keeps the raw library text out of the ledger, but the owner gets no typed reason. Tech Spec §11 defines `PACKAGE_LOCKED` for this.
 
-### 3c, 4, 5 — not run yet
+### 3c — client kills during a running package transaction [PARTIAL] (needrestart lines are **[PRE-FIX]**)
+
+**Precondition (read-only, 08:15:34):** `/proc/locks` showed no lock on either dpkg lock file, `apt-mark showhold` was empty, and `apt-get -s upgrade` showed the 3 LLVM packages pending.
+
+**Script:** `tests/live/t088/t3c.sh`. One submit. When a `dpkg` process appeared on Sentani, it would run (a) a query with the client killed before the reply, (b) a query with stdin held open, then killed, and (c) an identical resubmit killed at 400 ms. Then the correct retry: (d) query the same id first, (e) resubmit the identical manifest.
+
+| Time (UTC) | Action | Op | Digest | Reply |
+|---|---|---|---|---|
+| 08:15:40 | submit LLVM set (3, `amd64`) | 7f8cccc8 | e446a9d5b061 | accepted |
+| 08:15:42 to 08:18:20 | waited for a `dpkg` process (90 probes) | | | **none seen**; the script printed "the kills below are NOT mid-dpkg" |
+| 08:18:20 | (a) query, client SIGKILL at 305 ms | 7f8cccc8 | | no reply (killed) |
+| 08:18:21 | (b) query, stdin held, client SIGKILL at 1,504 ms | 7f8cccc8 | | no reply (killed) |
+| 08:18:23 | (c) identical resubmit, client SIGKILL at 404 ms | 7f8cccc8 | e446a9d5b061 | no reply (killed) |
+| 08:18:24 | (d) retry rule: query the same id first | 7f8cccc8 | e446a9d5b061 | found, `running`, outcome null |
+| 08:18:25 | (e) identical resubmit | 7f8cccc8 | e446a9d5b061 | **`existing`**, `running` |
+| 08:18:56 | final query | 7f8cccc8 | e446a9d5b061 | finished, exit 0, **`succeeded`**: "apt commit returned success", "3 of 3 packages at the planned version" |
+
+**Where the kills landed (unit journal and dpkg.log):**
+- The unit started at 08:15:42.
+- `dpkg-preconfigure` ran at 08:18:42 and `startup archives unpack` at **08:18:43**.
+- The last configure (`libc-bin` trigger) finished at **08:18:48**, and the unit deactivated at 08:18:54 (15.0 s CPU).
+- So the kills (08:18:20 to 08:18:23) and the retries (08:18:24 to 08:18:25) all fell in the ~3-minute **download/preparation phase**, about 20 s before dpkg began. dpkg itself lasted ~5 s.
+- The detection loop missed the start because each probe takes ~1.8 s over SSH and the loop stopped at 08:18:20.
+
+**Independent verification (as spotty):**
+- **dpkg:** `libllvm18`, `libclang-cpp18` and `libclang1-18` at `1:18.1.3-1ubuntu1`, all `ii`. `dpkg --audit` is clean (exit 0, no output).
+- **dpkg.log:** **one** unpack/configure sequence, 08:18:43 to 08:18:48. Each package is upgraded once, and the only other entry is the `libc-bin` trigger.
+- **apt history:** **one** transaction, 08:18:43 to 08:18:48, `Upgrade:` the 3 packages.
+- **Journal:** `servrsit-op-7f8cccc8…` started **once**.
+- **`apt-get -s upgrade` afterwards:** 0 to upgrade (only the 11 phased packages remain).
+- **[PRE-FIX] needrestart** ran inside the unit at 08:18:49: "No services need to be restarted". No running service loads LLVM, so this says nothing about D-S6.
+- **[PRE-FIX] services:** none of the 22 services running before changed PID or start time. One service was **added**: `packagekit.service` (PID 18115, started inside the transaction window). That is D-Bus activation, apt's `20packagekit` hook notifying PackageKit, not a restart. The owner's approval does not mention it.
+
+**Result:**
+- **Proven on Sentani:** killing the local ssh client, three ways, while an accepted package transaction is running (download phase) does not stop or duplicate it. The correct retry (query first, then the identical manifest) returns `running` and then `existing`, and exactly one transaction happens.
+- **NOT proven:** a client kill **inside dpkg's ~5-second unpack/configure window**. The transient unit does not depend on the SSH session, as the kills at 08:18:20 to 08:18:23 already show, so I don't expect a different result. But the instruction asked for mid-dpkg, and it was not achieved.
+- **Proposed redo:** a founder step F4 downgrades the LLVM set again, the same as F1 for those 3 packages. Then a revised script fires a killed query and a killed identical resubmit **every second** from acceptance until the ledger says finished, so several kills must land inside the dpkg window. dpkg.log timestamps then confirm which ones did.
+
+### 4, 5 — not run yet
 
 - ~~**Step 2 is blocked**~~ (resolved by option B / F1, see step 2 above): there was no pending update that `apt-get upgrade` (the product's own observation) would install. Applying the 11 phased systemd packages would override Ubuntu's staged rollout, re-execute systemd, and restart resolved, timesyncd and udev. That is a founder decision. The options are in `docs/team/t088-founder-steps.md`; option B (downgrade 8 harmless packages, then install them back through the helper) is recommended.
 - **3c, the hold test and the lock test** depend on step 2's packages. Their founder steps are F1 to F3 in `docs/team/t088-founder-steps.md`.
@@ -182,7 +220,8 @@ Each case used its own `prepare.directories.v1` operation. The retry rule: query
 | A debconf question or conffile prompt with no terminal | **NOT proven** (none occurred; D-S7) |
 | Held package: whole transaction refused, nothing changed | **Proven on Sentani** (F2); the evidence text is wrong (D-S8) |
 | External package-manager lock: refused, nothing changed, record final | **Proven on Sentani** (F3); no typed reason (D-S9) |
-| dpkg interruption | **NOT proven yet** (3c) |
+| Client kill during a running package transaction (download phase): no stop, no duplicate, query-first retry → `existing` | **Proven on Sentani** (3c) |
+| Client kill inside dpkg's unpack/configure window | **NOT proven** (3c missed the 5-second window; redo proposed) |
 | Reboot and return verification (boot id, SSH, query settles) | **NOT proven yet** (step 4) |
 | Low disk | **NOT proven yet** (step 5); root-side ENOSPC is probably not reachable as spotty |
 | Uninstall on the real server | **NOT tested** (not in this round's instructions) |

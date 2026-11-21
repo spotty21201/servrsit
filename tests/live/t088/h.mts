@@ -85,6 +85,7 @@ const PROBES: Record<string, string> = {
   // read-only: is a POSIX lock held on dpkg's lock files? (/proc/locks matched by inode)
   dpkglock: "LC_ALL=C; export LC_ALL\nfor f in /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock; do i=$(stat -c %i \"$f\"); n=$(grep -c \":$i \" /proc/locks); echo \"$f inode=$i locks=$n $(grep \":$i \" /proc/locks | awk '{print \"pid=\"$5}' | tr '\\n' ' ')\"; done; echo holds=$(apt-mark showhold | tr '\\n' ' ')",
   unitf3: "LC_ALL=C; export LC_ALL\njournalctl --no-pager -o short-iso -u servrsit-op-7da4237d-28de-4ef2-a83a-3009507aa68f.service 2>&1 | tail -n 30",
+  unit3c: "LC_ALL=C; export LC_ALL\nU=servrsit-op-$(cat /dev/stdin 2>/dev/null | head -c 0)7f8cccc8-b8ce-4792-bdd4-bec61a251239.service; journalctl --no-pager -o short-iso -u $U 2>&1 | grep -vE 'debconf' | tail -n 40; echo ---dpkglog; grep -E '^2026-11-21 08:1' /var/log/dpkg.log; echo ---history; sed -n '/Start-Date: 2026-11-21  08:1/,/End-Date/p' /var/log/apt/history.log; echo ---audit; dpkg --audit; echo audit-exit=$?; echo ---archives; ls -l --time-style=+%H:%M:%S /var/cache/apt/archives/*llvm18* /var/cache/apt/archives/*clang*18* 2>&1",
   holds: "LC_ALL=C; export LC_ALL\napt-mark showhold; echo ---; systemctl list-timers 'apt-daily*' --no-legend --all",
 };
 
