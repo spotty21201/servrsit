@@ -1931,3 +1931,29 @@ the Python helper's verifier accepts a manifest signed with the persistent key a
 
 - **SSH command after install:** sshd's forced command ignores the remote command; the CLI still sends the collector's fixed `sh -s`.
 - **ZT-01:** the reviewed-route list is unchanged by T-087. There are no new API routes.
+
+## T-088 fix: helper CLI pins Sentani only (branch `feat/coder/helper-cli-pin`, merged into `integration/live-v1`)
+
+**Problem (Tester):** `tests/live/helper-cli` defaulted to the shared `apps/api/.data/known_hosts`. That file pins Sentani's old, void key, and Timika and Nabire too.
+
+**Fix** (`benchTarget()` in `apps/api/src/helper-bench/client.ts`):
+
+- **Where the target comes from:** the address and the pinned `known_hosts` file now come from Sentani's connected row in the server registry. That is `apps/api/.data/servers.db`, or `SERVRSIT_REGISTRY_DB` if set. The row's file is the per-server file registration wrote after the owner confirmed the new fingerprint.
+- **Never used:** the shared `known_hosts` file, and the `SERVRSIT_KNOWN_HOSTS` override, which is removed.
+- **Refused:**
+  - Nabire, Timika and Merauke, outright.
+  - Any name other than Sentani.
+  - No connected row, or more than one connected row.
+  - A row with no file of its own (an imported row uses the shared file).
+  - A file that is a symlink, is empty, or pins any host other than the row's address.
+  - A `SENTANI_HOST` that differs from the registered address.
+
+**Live registry, read only** (SQLite `mode=ro`; I only counted rows and lines, nothing was printed from the key line): the connected Sentani row is the `registration` row, and its file has 1 line, for the registered address only. The old imported Sentani row is disconnected.
+
+**Checks:**
+
+```
+api tests 250/250 (2 new bench tests); tsc --noEmit exit 0
+```
+
+ssh was never run.

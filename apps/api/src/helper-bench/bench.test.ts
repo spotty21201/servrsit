@@ -105,3 +105,47 @@ test("describe gives public facts only", () => {
   const d = describe(manifest(), signer);
   assert.deepEqual(Object.keys(d).sort(), ["canonicalBytes", "digest", "keyId"]);
 });
+
+test("T-088 fix: the target comes from the named server's registry row and its own known_hosts; others are refused", async () => {
+  const { SqliteServerStore } = await import("@servrsit/store");
+  const { benchTarget } = await import("./client.js");
+  const dir = tmp();
+  const db = join(dir, "servers.db");
+  const own = join(dir, "sentani_known_hosts");
+  writeFileSync(own, "100.101.102.103 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureNew\n");
+  const store = new SqliteServerStore({ path: db });
+  const row = (id: string, name: string, address: string, knownHostsFile: string | null) => ({
+    id, source: "registration" as const, access: "ssh" as const, name, role: null, productionStatus: "no" as const, address, port: 22, user: "spotty",
+    identityFile: "/x/id", knownHostsFile, importantServices: [], collect: true, collectDisabledReason: null, hostKey: null, accessKey: null, createdAt: "2026-11-21T00:00:00.000Z",
+  });
+  store.register(row("00000000-0000-4000-8000-00000000aa01", "Sentani", "100.101.102.103", own), "d1", "o", new Date());
+  store.register(row("00000000-0000-4000-8000-00000000aa02", "Timika", "100.101.102.104", null), "d2", "o", new Date());
+  store.close();
+
+  const t = benchTarget("Sentani", db, "servrsit", "/k/id");
+  assert.deepEqual(t, { host: "100.101.102.103", account: "servrsit", identityFile: "/k/id", knownHostsFile: own });
+  for (const name of ["Nabire", "Timika", "Merauke", "merauke"]) assert.throws(() => benchTarget(name, db, "servrsit", "/k/id"), /protected/, name);
+  assert.throws(() => benchTarget("Other", db, "servrsit", "/k/id"), /not a test-bench server/);
+  assert.throws(() => benchTarget("Sentani", db, "servrsit", "/k/id", "100.101.102.104"), /not Sentani's registered address/);
+
+  writeFileSync(own, "100.101.102.103 ssh-ed25519 AAAA1\n100.101.102.104 ssh-ed25519 AAAA2\n");
+  assert.throws(() => benchTarget("Sentani", db, "servrsit", "/k/id"), /pins something other than/);
+  writeFileSync(own, "100.101.102.103,100.101.102.104 ssh-ed25519 AAAA1\n");
+  assert.throws(() => benchTarget("Sentani", db, "servrsit", "/k/id"), /pins something other than/);
+  writeFileSync(own, "");
+  assert.throws(() => benchTarget("Sentani", db, "servrsit", "/k/id"), /pins nothing/);
+});
+
+test("T-088 fix: an imported Sentani row (shared known_hosts) is refused", async () => {
+  const { SqliteServerStore } = await import("@servrsit/store");
+  const { benchTarget } = await import("./client.js");
+  const db = join(tmp(), "servers.db");
+  const store = new SqliteServerStore({ path: db });
+  store.importOnce([{
+    id: "33333333-3333-4333-a333-333333333333", source: "import", access: "ssh", name: "Sentani", role: null, productionStatus: "no", address: "100.101.102.103", port: 22,
+    user: "spotty", identityFile: "/x/id", knownHostsFile: null, importantServices: [], collect: true, collectDisabledReason: null, hostKey: null, accessKey: null, createdAt: "2026-11-21T00:00:00.000Z",
+  }], new Date());
+  store.close();
+  assert.throws(() => benchTarget("Sentani", db, "servrsit", "/k/id"), /no own pinned known_hosts/);
+  assert.throws(() => benchTarget("Sentani", join(tmp(), "missing.db"), "servrsit", "/k/id"), /registry does not exist/);
+});

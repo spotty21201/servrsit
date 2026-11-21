@@ -15,9 +15,12 @@
  * installation id (apps/api/config/test-bench.json) and Sentani's host key
  * fingerprint.
  *
- * Options (environment):
- *   SERVRSIT_KNOWN_HOSTS  pinned known_hosts file (default apps/api/.data/known_hosts). An unpinned host is refused.
- *   SENTANI_HOST          address to connect to (default: Sentani's address in apps/api/config/hosts.json)
+ * Where it connects (T-088 fix): Sentani's address and its OWN pinned
+ * known_hosts file come from Sentani's row in the server registry
+ * (apps/api/.data/servers.db, or SERVRSIT_REGISTRY_DB). The shared
+ * apps/api/.data/known_hosts is never used. Any other server is refused, and
+ * Nabire, Timika and Merauke are refused outright.
+ *   SENTANI_HOST   optional; must equal the registered address, or the CLI stops
  *
  * It prints the helper's JSON reply and public facts only. Private keys are
  * never printed. The app is not involved: writes stay disabled.
@@ -26,7 +29,7 @@
 import { readFileSync } from "node:fs";
 import { DEFAULT_HELPER_DIR, loadOrCreateMaintenanceKey, loadOrCreateSigningKey, trustJson } from "../../../apps/api/src/helper-bench/keys.ts";
 import { loadBench } from "../../../apps/api/src/helper-bench/prepare.ts";
-import { addressOf, describe, queryRequest, send, submitRequest } from "../../../apps/api/src/helper-bench/client.ts";
+import { benchTarget, describe, queryRequest, send, submitRequest } from "../../../apps/api/src/helper-bench/client.ts";
 
 const SERVER = "sentani";
 const API = new URL("../../../apps/api/", import.meta.url).pathname;
@@ -35,12 +38,13 @@ function target() {
   const bench = loadBench();
   const s = bench.servers[SERVER];
   if (s === undefined) throw new Error("no sentani entry in test-bench.json");
-  return {
-    host: process.env["SENTANI_HOST"] ?? addressOf("Sentani", `${API}config/hosts.json`),
-    account: s.account,
-    identityFile: loadOrCreateMaintenanceKey(SERVER, DEFAULT_HELPER_DIR, false).privateKeyPath,
-    knownHostsFile: process.env["SERVRSIT_KNOWN_HOSTS"] ?? `${API}.data/known_hosts`,
-  };
+  return benchTarget(
+    "Sentani",
+    process.env["SERVRSIT_REGISTRY_DB"] ?? `${API}.data/servers.db`,
+    s.account,
+    loadOrCreateMaintenanceKey(SERVER, DEFAULT_HELPER_DIR, false).privateKeyPath,
+    process.env["SENTANI_HOST"],
+  );
 }
 
 async function main(): Promise<number> {
