@@ -335,6 +335,15 @@ The founder ran the reviewed bootstrap (dry run reviewed by Orchestrator first).
 
 **Caveat:** a kept old file can be incompatible with a new package version; the result must say "your file was kept; the new default is at X" and selected-service verification still runs (invariant 9).
 
+## ADR-025 — `.dpkg-dist` reporting accepted on code review and fake-root tests for the Sentani phase
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-21 |
+| **Status** | [AGENT DECISION] |
+
+T-088 condition 3: the live wget case kept the owner's file but created no `.dpkg-dist` (the package default did not change), so the reporting path was not exercised live. Accepted as tested by code review and fake-root tests for Sentani only. A live `.dpkg-dist` case is required before writes are enabled on any other server.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
