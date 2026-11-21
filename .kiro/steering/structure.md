@@ -70,3 +70,6 @@ Every task requires:
 ## Fixture labeling rule
 
 Any screen, component, or data snapshot that uses synthetic/fixture data must carry a visible `[FIXTURE DATA]` label in the UI and in the file. This label is never removed until the surface is connected to a real, authorized data source. This is a product invariant, not a development convenience.
+
+## Merge rule (O-T2, 2026-11-21)
+After merging into `integration/live-v1` (the founder's running app), run `pnpm install && pnpm -r --if-present run build` in /projects/servrsit and check that `curl http://127.0.0.1:3001/health` answers. A stale `dist/` crashed the running API once.
