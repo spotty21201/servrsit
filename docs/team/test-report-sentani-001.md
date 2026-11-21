@@ -1,7 +1,7 @@
 # Test report — T-088 helper on Sentani, real Ubuntu (sentani-001)
 
 **Author:** Kiro Tester · **For:** Kiro Orchestrator · **Started:** 2026-11-21
-**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). F2 (held package) and F3 (lock) **final** (07:51 and 08:10 UTC). 3c **final** after the redo (first run 08:15 UTC landed before dpkg; redo 08:28 UTC landed 3 kills inside dpkg). Next (mid-dpkg kill) applies the LLVM set, then steps 4 and 5. **Orchestrator decision (after step 2):** F2, F3 and 3c run on the CURRENT helper (`4101502`). Any result that touches needrestart or debconf is labelled **[PRE-FIX]**. Step 2 and a needrestart/conffile case are re-run after T-090 (fixes for D-S5 to D-S7) is installed.
+**Status:** steps P, 1 and 3a/3b **final** (runs 07:03 to 07:05 UTC, commit `cf2a16b`). Step 2 **final** (07:38 to 07:40 UTC). F2 (held package) and F3 (lock) **final** (07:51 and 08:10 UTC). 3c **final** after the redo (first run 08:15 UTC landed before dpkg; redo 08:28 UTC landed 3 kills inside dpkg). Step 4 (reboot) **final** (08:30 to 08:32 UTC). Next: step 5 (disk) (mid-dpkg kill) applies the LLVM set, then steps 4 and 5. **Orchestrator decision (after step 2):** F2, F3 and 3c run on the CURRENT helper (`4101502`). Any result that touches needrestart or debconf is labelled **[PRE-FIX]**. Step 2 and a needrestart/conffile case are re-run after T-090 (fixes for D-S5 to D-S7) is installed.
 **Authority:** ADR-021 (Sentani is disposable; fault injection allowed on Sentani only), ADR-022 (helper installed by the founder; T-088 rules), T-088
 **Target:** Sentani ONLY. Host `sentani` resolves to 100.119.231.102 (checked before every send). The pin comes from registry row `75e41a8a-6a97-4a06-8151-c0cb33ad0fc1`: its `known_hosts_file` holds only Sentani, with the owner-confirmed key `SHA256:j3nno/hlFOSktmjBlrxPO9oTE3qWFmITlKgKTIt+JrM` (confirmed 2026-11-21T05:44:58Z). Nothing was sent to Nabire, Timika or Merauke.
 **Helper on Sentani:** package `servrsit-helper-0.1.0.tar.gz`, sha256 `8f25e5a3…a6d0d6`. Rebuilding from integration/live-v1 `4101502` gives the identical checksum, so the installed code is `target-helper/` at `4101502`, which includes T-084.
@@ -226,6 +226,33 @@ Unkilled queries in the same window returned `running`.
 
 **Result:** **proven on Sentani** for FR-17. Killing the local ssh client while dpkg is unpacking, three times and including an identical resubmit, neither stops nor duplicates the transaction. The transient unit finishes on its own, and the query-first retry finds the single operation and returns `existing` for the identical manifest.
 
+### 4 — reboot with return verification [FINAL]
+
+**Precondition (read-only, 08:30:47):** no dpkg lock, no hold, no unfinished operation (every earlier op finished). Boot id **`c456de4b-ff23-44e7-9ed0-78a1da95a498`**, up since 05:22:32. 23 services running. **Script:** `tests/live/t088/t4.sh`.
+
+| Time (UTC) | Event | Evidence |
+|---|---|---|
+| 08:30:49 | submit `reboot.host.v1`, previousBootId `c456de4b…`, op **82fbde1e**, digest **6d64794d43de** | accepted |
+| 08:30:50.86 | `servrsit-op-82fbde1e…` started; deactivated 08:30:51.09 (runner ran `systemctl reboot`) | journal of the previous boot (`-b -1`) |
+| 08:30:53 | last journal entry of boot `c456de4b…` | `journalctl --list-boots` |
+| 08:31:01 | SSH as spotty first fails | harness |
+| 08:31:30 / 08:31:34 | new boot: `uptime -s` 08:31:30, first journal entry 08:31:34, boot id **`2374c423-ef52-4028-b846-cff771e6fe64`** | `base` probe, `--list-boots` |
+| 08:31:44 | SSH as spotty back, new boot id (about 55 s after submit; window 10 min) | harness |
+| 08:31:46 | helper query as `servrsit` (gateway): finished, exit 0, **`succeeded`**: "reboot requested (exit status 0); waiting for a new boot id", "the server came back with a new boot id" | reply |
+| 08:31:4x | **identical reboot manifest submitted again** | **`existing`**, finished; **no second reboot** |
+| 08:32:09 | 20 s later: still boot `2374c423…` (boot list shows exactly one new boot) | `--list-boots` |
+
+**After the return (as spotty):**
+- `systemctl --failed` is empty. `tailscaled` and `ssh` are active, and the helper answered queries as `servrsit` (gateway, sudoers and ledger all working after the reboot).
+- 20 services running. The 3 that were running before and not after are `fwupd`, `packagekit` and `upower`. All three are on-demand D-Bus services, none enabled at boot (`packagekit` had been activated by apt's hook in 3c).
+- Disk unchanged (230.7 GB available).
+
+**Result:**
+- **Proven on Sentani:** the reboot runs once. The old and new boot ids are recorded, SSH comes back for both the inspect key and the maintenance key, and the helper settles the operation `succeeded` only when it sees a new boot id.
+- **Also proven:** a retry of the identical manifest after the reboot returns `existing` and **does not reboot again** (invariant 7). The ledger's `existing` check runs before the precondition check, which would otherwise fail on the changed boot id.
+
+**Not proven:** "a reboot that returns late" from T-088 (delayed return or outcome unknown at window expiry). Sentani came back in about 55 s. That case needs a host that stays down, which a founder step could simulate (for example by holding the network down at boot). It is not in this round's instructions.
+
 ### 3c redo — preparation
 
 - **Approved** by Orchestrator: the mid-dpkg kill matters for FR-17.
@@ -233,7 +260,7 @@ Unkilled queries in the same window returned `running`.
 - **Waiting** for "T-088 F4 done, apt exit 0".
 - **Script:** `tests/live/t088/t3c2.sh`.
 
-### 4, 5 — not run yet
+### 5 — not run yet
 
 - ~~**Step 2 is blocked**~~ (resolved by option B / F1, see step 2 above): there was no pending update that `apt-get upgrade` (the product's own observation) would install. Applying the 11 phased systemd packages would override Ubuntu's staged rollout, re-execute systemd, and restart resolved, timesyncd and udev. That is a founder decision. The options are in `docs/team/t088-founder-steps.md`; option B (downgrade 8 harmless packages, then install them back through the helper) is recommended.
 - **3c, the hold test and the lock test** depend on step 2's packages. Their founder steps are F1 to F3 in `docs/team/t088-founder-steps.md`.
@@ -261,7 +288,8 @@ Unkilled queries in the same window returned `running`.
 | External package-manager lock: refused, nothing changed, record final | **Proven on Sentani** (F3); no typed reason (D-S9) |
 | Client kill during a running package transaction (download phase): no stop, no duplicate, query-first retry → `existing` | **Proven on Sentani** (3c) |
 | Client kill inside dpkg's unpack window (3 kills, incl. an identical resubmit): no stop, no duplicate, query-first retry → `existing` | **Proven on Sentani** (3c redo) |
-| Reboot and return verification (boot id, SSH, query settles) | **NOT proven yet** (step 4) |
+| Reboot and return verification: new boot id, SSH back (both keys), query settles `succeeded`, identical retry → `existing` with no second reboot | **Proven on Sentani** (step 4) |
+| Delayed return or outcome unknown at window expiry | **NOT proven** (Sentani returned in ~55 s) |
 | Low disk | **NOT proven yet** (step 5); root-side ENOSPC is probably not reachable as spotty |
 | Uninstall on the real server | **NOT tested** (not in this round's instructions) |
 | The controller's `previewDigest` (packages/domain plans) equals the helper's precondition rule for packages | **NOT proven.** My manifests use the helper's rule directly; this matters for T-089 |
