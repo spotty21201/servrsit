@@ -311,6 +311,17 @@ The founder ran the reviewed bootstrap (dry run reviewed by Orchestrator first).
 
 **T-088 rules:** Sentani only (ADR-021). Requests go only through the gateway with manifests signed by the controller key via tests/live/helper-cli. ServrSit's app write path stays disabled (T-089). Steps that need root on Sentani beyond the helper (external apt activity, apt-mark hold, network changes) are batched as short founder commands; agents never get the founder's sudo password. Disk pressure may be simulated as `spotty` with files under the home directory, removed afterwards. Every run is recorded with the manifest digest and ledger result.
 
+## ADR-023 — Disposable-target gates on Sentani: passed for mechanics, open for three helper fixes
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-21 |
+| **Status** | [AGENT DECISION] |
+
+**Evidence:** /projects/servrsit-tester/docs/team/test-report-sentani-001.md (T-088). Proven on real Ubuntu 24.04 (Sentani): rejection of forged/expired/replayed/misbound/unsupported requests; exact package transaction applied and independently verified; inexact, held-package and locked transactions refused whole with nothing changed; client kills during download and inside dpkg unpack never stop or duplicate the operation and the query-first retry returns the existing record; reboot with new boot id, SSH back, no second reboot on retry; helper works with a full user disk.
+
+**Not yet passed:** D-S5, D-S6 (needrestart restarts services automatically: breaks invariant 5), D-S7 (debconf/conffile policy), plus D-S8, D-S9 and T-091. T-089 (app write path for Sentani) starts only after T-090 lands, the founder reinstalls the helper, and Tester re-runs step 2 plus a needrestart and a conffile case.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
