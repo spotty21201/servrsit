@@ -62,6 +62,26 @@ This takes the same lock that `apt` and `dpkg` take, holds it for 5 minutes, and
 
 ---
 
+---
+
+## F4 — downgrade the LLVM set once more (only if the Orchestrator approves the 3c redo)
+
+**When:** only after the Orchestrator confirms the 3c redo. Same as F1, for the 3 LLVM packages only. First the simulation; check that it shows `3 downgraded` and `0 to remove`:
+
+```
+sudo apt-get -s install --allow-downgrades libllvm18=1:18.1.3-1 libclang-cpp18=1:18.1.3-1 libclang1-18=1:18.1.3-1 | tail -n 3
+```
+
+If it does, run the real command, and check its exit status. **Don't pipe it**: a pipe hides an apt failure (D-S2).
+
+```
+sudo apt-get install -y --allow-downgrades libllvm18=1:18.1.3-1 libclang-cpp18=1:18.1.3-1 libclang1-18=1:18.1.3-1; echo "apt exit $?"
+```
+
+Tell the Tester **"T-088 F4 done, apt exit 0"**.
+
+---
+
 ## What the Tester does without you (for your information)
 
 - Package installs: only through the helper, with manifests signed by ServrSit's key.
