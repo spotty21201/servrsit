@@ -344,6 +344,15 @@ The founder ran the reviewed bootstrap (dry run reviewed by Orchestrator first).
 
 T-088 condition 3: the live wget case kept the owner's file but created no `.dpkg-dist` (the package default did not change), so the reporting path was not exercised live. Accepted as tested by code review and fake-root tests for Sentani only. A live `.dpkg-dist` case is required before writes are enabled on any other server.
 
+## ADR-026 — Writes enabled on Sentani only
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-21 |
+| **Status** | [FOUNDER DECISION] ("Yes enable Sentani") |
+
+`apps/api/config/writes.json`: `sentani.writesEnabled = true`. Package updates only (restart, reboot, directories stay refused by T-089). Basis: ADR-021 (disposable), T-088 final verdict GO for Sentani only, ADR-025. Nabire, Timika and Merauke remain write-disabled; writes.json cannot name them. Revert by setting the flag to false and restarting the API.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
