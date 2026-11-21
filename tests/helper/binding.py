@@ -46,8 +46,9 @@ if BOUND:
         HELPER_COMMIT, HELPER_DIRTY = "unknown", ""
     import inspect as _inspect
     T090 = "held_packages" in dict(_inspect.getmembers(System))
+    T092 = "prompt_risk" in dict(_inspect.getmembers(System))
 else:  # pragma: no cover
-    T090 = False
+    T090 = T092 = False
     System = object  # type: ignore[assignment,misc]
     HELPER_COMMIT, HELPER_DIRTY = "", ""
 
@@ -189,6 +190,9 @@ class RecordingSystem(System):  # type: ignore[misc,valid-type]
     def dpkg_audit(self):
         return None
 
+    def prompt_risk(self, keys):  # T-092 (0.3.0)
+        return sorted(k for k in keys if k in self.target.prompting)
+
     def service_state(self, unit: str) -> dict | None:
         s = self.target.services.get(unit)
         return None if s is None else dict(s)
@@ -243,6 +247,7 @@ class FakeTarget:
     locked: bool = False
     modified_conf: tuple = ()
     need_restart: tuple = ()
+    prompting: tuple = ()
 
     @property
     def root(self) -> Path:
