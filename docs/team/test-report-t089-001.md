@@ -5,7 +5,7 @@
 **Code under test:** `integration/live-v1` at **`fd4bc03`** (includes T-089 `b4927c9`, T-092 helper 0.3.0, ADR-026 `fa83b7b`, and T-091 `b8e86ba`)
 **Target:** Sentani only. Helper 0.3.0 per the last verification (to be re-confirmed at the start of the main run).
 
-## Status: PARTIAL. (1), (2), (4) and (5) PASS (§3, Addendum B). (3) waits for founder round R2.
+## Status: (1) to (5) PASS. (3) was run as the FAST variant (Addendum D). Gate verdict in Addendum D §3.
 
 | # | Requirement | Status |
 |---|---|---|
@@ -13,7 +13,7 @@
 | (5) | restart, reboot and directory plans still refused | **PASS**, including at approval, for Sentani and a protected server (§3.2) |
 | (1) | controller `previewDigest` equals the helper's package precondition rule | **PASS** (Addendum B) |
 | (2) | plan → approve → dispatch → helper → independent verification → `succeeded`, with operation record and Activity entry | **PASS** (Addendum B), one defect on pre-approval disclosure (D-T2) |
-| (3) | lost ack, client kill, API restart mid-operation reconcile to the same op, no duplicate | **NOT YET RUN** (§5.4) |
+| (3) | lost ack, client kill, API restart mid-operation reconcile to the same op, no duplicate | **PASS, fast variant** (Addendum D); the download-window variant was not run |
 
 > ## ⚠ Founder's API on :3001 is DOWN (found 11:41 UTC, still down at 11:52)
 > **Cause (read-only diagnosis, not touched by me):** `integration/live-v1` moved to `fd4bc03` (the T-091 merge, commits `38ba435` and `fd4bc03`) after the founder's API had started at 11:30:43. `apps/api/src/servers/registry.ts` now imports `inspectKeyOptions` from `@servrsit/ssh`, but `packages/ssh/dist` in the founder's checkout was built at **11:30:32**, before the merge, and does not export it. The founder's `tsx watch` restarted its child on the source change, and the child crashes at import with `SyntaxError: The requested module '@servrsit/ssh' does not provide an export named 'inspectKeyOptions'`. The watcher process is still running; the API child is not, and `curl` to :3001 is refused.
@@ -261,3 +261,81 @@ Plan `eac19992…` v1: 6 packages, `blockers: []`, `approvable: true`, no acknow
 - **A bug found and fixed:** the pid of the detected child was a string, and `process.kill()` needs a number. A real run would have crashed at the first kill. It is fixed and tested on a harmless child.
 
 **What I need:** the founder runs `sudo apt-get clean` and checks that `ls /var/cache/apt/archives/*.deb` says "No such file or directory". That removes only cached `.deb` files, and apt re-downloads them on demand.
+
+---
+
+## Addendum D: scenario (3), lost ack and API crash, through the app (13:35 UTC)
+
+**Variant: FAST.** Sentani's apt cache still held all six LLVM `.deb` files (6 cached, autoclean off), so the helper's operation took about 13 seconds, not the 3-minute download of the slow variant. The Orchestrator directed me to run anyway, since R2 was in place and the founder was waiting. My script therefore crashed the API **right after the lost ack**, the moment the app knows nothing about the outcome, instead of waiting for the app to re-find the operation first. I label what that does and does not prove in §2.
+
+### 1. What happened (one operation, my own instance, 13:35:09 to 13:35:38)
+
+R2 as the founder left it, checked read-only just before: `libllvm18`, `libclang-cpp18`, `libclang1-18` at `1:18.1.3-1`; exactly those 3 pending; no lock; no hold. Plan `b81aeb3a…` v1, `approvable: true`; the controller's `previewDigest` again equals my independent computation (`sha256:3b7cabad84e0…`).
+
+| Time (UTC) | Event | Source |
+|---|---|---|
+| 13:35:09.564 | approve → operation **`0fd8fc23-ff43-49bc-bf9e-0eae63966011`**, `queued` | app |
+| 13:35:12.767 | `dispatch_attempted`, manifest digest `sha256:7e065dc0…3ad49`, `retry: false` | app |
+| 13:35:12.802 | my script sees the API's gateway `ssh` client (pid 230834) | my watcher |
+| **13:35:13.803** | **LOST ACK: SIGKILL of that client during the submit** | me |
+| 13:35:13.809 | the app records `transport_error {during: "submit"}`; state stays `queued` | app |
+| 13:35:15 | the helper's unit `servrsit-op-0fd8fc23…` **starts** (about 1.2 s *after* the client was killed) | Sentani journal |
+| **13:35:15.345** | **API CRASH: SIGKILL of the API process (pid 230639).** The app's last state was `queued`, with 3 events recorded and no `remote_accepted` | me |
+| 13:35:16 | my own gateway query while the API is down: **found, `running`, digest `sha256:7e065dc0fec0`**, the same digest | helper |
+| about 13:35:20 | API restarted (new process); the app **reconciles on its own** | app |
+| **13:35:20.962** | **`remote_accepted {how: "reconciled-before-retry", remoteState: "running"}`**: it asked the helper about the same id before sending anything | app |
+| 13:35:26.756 | `remote_progress` (running) | app |
+| 13:35:28 | the helper's unit finishes (12.1 s CPU) | Sentani journal |
+| 13:35:32.529 | `remote_finished` (exit 0, helper 0.3.0, `succeeded`, `restartNeeded: []`, `keptFiles: []`) | app |
+| 13:35:38.098 | `verification_recorded`: **3 verified, 0 not verified**; state **`succeeded`** | app |
+
+### 2. What it shows
+
+- **Lost ack:** the client was killed during the submit, but the request had already reached the sshd gateway, and the helper accepted it **after** the client had died. This matches the T-088 helper-level result (3a(ii)): disconnection is no evidence that a command stopped.
+- **The harshest crash point:** the API died holding a `dispatch_attempted` and a `transport_error`, with no idea whether the manifest had arrived. After the restart it did not resubmit. It queried the same remote id first (`reconciled-before-retry`, invariant 7), found it `running`, and followed it to the end.
+- **The API was down while the helper was working:** it restarted at about 13:35:20, and the helper was still running until 13:35:28. So the recovery happened with the operation in flight on Sentani, not only after it finished.
+- **No duplicate:** see §3 for the independent evidence.
+
+**Not shown by this variant (honest limits):**
+1. A crash during a **long** helper download, as the slow variant would give. The recovery logic is the same, but the helper's run state differs.
+2. A client kill that lands **before** the request is delivered, so that the app must resubmit the identical manifest (`retry: true`). Here the request was delivered. That path is covered at the helper level (T-088 3a(i)) and by the worker's own tests, but was **not exercised through the app** on a real server.
+3. A second lost ack on the retry (my script's second-kill branch was not needed).
+
+### 3. Pass criteria, checked independently as `spotty` (not through the app or the helper)
+
+| Criterion | Result |
+|---|---|
+| One operation id | the app, the helper's ledger and the journal all use `0fd8fc23-ff43-49bc-bf9e-0eae63966011`; the helper's record is single |
+| One `servrsit-op` unit for this id | **1** `Started` line in the journal |
+| One apt transaction | **1**: 13:35:18 to 13:35:23, `Upgrade:` exactly the 3 LLVM packages |
+| `dpkg --audit` | **clean** (exit 0, no output) |
+| Packages | **3 of 3** at `1:18.1.3-1ubuntu1`, state `ii` |
+| No second dispatch | **1** `dispatch_attempted` event, `retry: false` |
+| Same manifest digest throughout | **one** digest in every app event, and the helper's record carries the same `sha256:7e065dc0…` |
+| Helper ledger, queried by the same id | `finished`, exit 0, `succeeded`; evidence "3 of 3 packages at the planned version", "no service needs a restart" |
+| Activity entry | 1: "Update packages", `succeeded` |
+| Pending afterwards | none: `apt-get -s upgrade` shows 0 to upgrade (only the 11 phased systemd packages remain) |
+| Services | no running service changed PID or start time. Only `packagekit.service` differs: it is D-Bus-activated by apt's hook (O-S3, still present on helper 0.3.0), not a restart by the update |
+
+**`strace`:** instance 1 started 3 inspect-key and 2 gateway `ssh` clients, and instance 2 started 3 gateway and 2 inspect-key ones. All went to Sentani. None went to any other server.
+
+### 4. Gate verdict for T-089 (Sentani only)
+
+**All five conditions of the Orchestrator's brief are met on real Ubuntu, on the build the founder runs (`fd4bc03`):**
+1. The controller's `previewDigest` equals the helper's precondition rule (equal, and the helper accepted it).
+2. Plan → approve → dispatch → helper → independent verification → `succeeded`, with the operation record and an Activity entry, and an idempotent replay of the approval.
+3. A lost ack, a client kill and an API crash mid-operation reconcile to the same operation, with no duplicate.
+4. Nabire, Timika and Merauke are blocked `WRITES_DISABLED`, including at approval, with zero `ssh` to them.
+5. Restart, reboot and directory plans are still refused, including at approval.
+
+**GO to close T-089 for Sentani.** The decision to close is the Orchestrator's.
+
+**Still NO-GO for any other server.** Open items:
+- **D-T2** (Low): the plan does not list kept owner files before approval on a real target.
+- **O-T1** (Low): approving a blocked restart, reboot or directories plan returns `PLAN_CHANGED`, not `PLAN_BLOCKED`.
+- **O-S3**: `packagekit` is started by apt's hook.
+- **D-S1** (the CLI's default known-hosts pin).
+- **T-091:** the forced-command inspect line is merged but **not applied on Sentani**, so the inspect key there is still a full shell. It must be applied and re-verified before any real server follows.
+- **Not tested on a real server:** the slow-window variant above, a reboot that returns late, root-side out-of-space, and uninstall.
+
+**State left behind:** my instance is stopped. Sentani has **no pending Ubuntu updates** (R3 will leave one). The owner's `/etc/wgetrc` edit is intact. The apt cache still holds its 22 `.deb` files, which is harmless.

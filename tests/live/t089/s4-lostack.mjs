@@ -18,7 +18,9 @@ if (!Object.entries(R2).every(([k, ver]) => v0[k] === ver)) { log("STOP: R2 not 
 const cached = Number(audit0.split("---cachedllvm")[1]?.trim());
 if (cached > 0 && process.env.ALLOW_FAST !== "1") { log(`STOP: ${cached} LLVM .deb files are still in apt's cache; the operation would finish in ~10 s. Ask the founder for: sudo apt-get clean`); process.exit(6); }
 const lock = probe("dpkglock"); if (/locks=[1-9]/.test(lock) || !/holds=\s*$/m.test(lock)) { log("STOP: lock or hold present: " + lock.trim()); process.exit(7); }
-log(`pre-flight ok: LLVM set at the older versions, ${cached} LLVM debs cached, no lock, no hold`);
+const FAST = cached > 0;   // only reachable with ALLOW_FAST=1: the operation finishes in ~10 s, so the API is crashed right after the lost ack
+log(`pre-flight ok: LLVM set at the older versions, ${cached} LLVM debs cached, no lock, no hold. VARIANT: ${FAST ? "FAST (cache not cleaned; the helper finishes in ~10 s; the API is crashed right after the lost ack, before it learns the outcome)" : "SLOW (download window)"}`);
+summary.variant = FAST ? "fast" : "slow";
 const servicesBefore = probe("services");
 const unitsBefore = (probe("opunits").match(/Started servrsit-op-[0-9a-f-]+/g) ?? []).length;
 
@@ -69,6 +71,7 @@ for (let n = 1; n <= 2; n++) {
   const at = killPid(c.pid);
   kills.push({ n, pid: c.pid, seenAt: c.seenAt, killedAt: at });
   log(`${rel()} LOST ACK #${n}: SIGKILL of the API's gateway ssh client pid ${c.pid} (seen ${c.seenAt.slice(11, 23)}, killed ${at?.slice(11, 23)})`);
+  if (FAST) break;
   await sleep(2500);
   const h = helperQuery(opId);
   log(`${rel()} my own gateway query of that id: ${JSON.stringify({ found: h.found, state: h.record?.state, digest: h.record?.manifestDigest?.slice(0, 19) })}`);
@@ -79,16 +82,28 @@ for (let n = 1; n <= 2; n++) {
 }
 summary.kills = kills;
 
-// ---- let the app re-find it, then crash the whole API while the helper is still working
-let j = null;
-for (let i = 0; i < 45; i++) { j = await pump(); if (j && j.events.some((e) => /remote_accepted|remote_progress/.test(e.type))) break; await sleep(1000); }
-const h2 = helperQuery(opId);
-log(`${rel()} before the API crash, helper says: ${JSON.stringify({ found: h2.found, state: h2.record?.state, outcome: h2.outcome })}; the app says state=${lastState}`);
-summary.helperBeforeCrash = h2; summary.appStateBeforeCrash = lastState; summary.eventsBeforeCrash = j?.events ?? [];
-if (h2.record?.state === "finished") log(`${rel()} NOTE: the helper had already finished; the API crash below is not mid-download (window missed)`);
+// ---- crash the whole API
+let j = null, h2 = null;
+if (!FAST) {
+  // slow variant: let the app re-find the operation first, then crash it while the helper is still downloading
+  for (let i = 0; i < 45; i++) { j = await pump(); if (j && j.events.some((e) => /remote_accepted|remote_progress/.test(e.type))) break; await sleep(1000); }
+  h2 = helperQuery(opId);
+  log(`${rel()} before the API crash, helper says: ${JSON.stringify({ found: h2.found, state: h2.record?.state, outcome: h2.outcome })}; the app says state=${lastState}`);
+  summary.helperBeforeCrash = h2; summary.appStateBeforeCrash = lastState; summary.eventsBeforeCrash = j?.events ?? [];
+  if (h2.record?.state === "finished") log(`${rel()} NOTE: the helper had already finished; the API crash below is not mid-download (window missed)`);
+} else {
+  // fast variant: crash 1.5 s after the lost ack, while the helper's ~10 s operation is in flight and before the app knows the outcome
+  await sleep(1500);
+  j = await pump(); summary.appStateBeforeCrash = lastState; summary.eventsBeforeCrash = j?.events ?? [];
+}
 const crashed = killApiHard();
-log(`${rel()} API CRASH: SIGKILL of the API process pid ${crashed} (apiPid at start ${apiPid1})`);
-summary.crash = { pid: crashed, at: new Date().toISOString(), helperState: h2.record?.state };
+log(`${rel()} API CRASH: SIGKILL of the API process pid ${crashed} (apiPid at start ${apiPid1}); the app's last state: ${lastState}; events it had recorded: ${seen}`);
+summary.crash = { pid: crashed, at: new Date().toISOString() };
+if (FAST) {
+  h2 = helperQuery(opId);   // my own gateway query while the API is down
+  log(`${rel()} while the API is down, helper says: ${JSON.stringify({ found: h2.found, state: h2.record?.state, outcome: h2.outcome, digest: h2.record?.manifestDigest?.slice(0, 19) })}`);
+  summary.helperAfterCrash = h2;
+}
 for (let i = 0; i < 40 && listeningPid() !== null; i++) await sleep(250);
 await sleep(3000);
 const tag2 = "r" + Date.now().toString(36).slice(-4);

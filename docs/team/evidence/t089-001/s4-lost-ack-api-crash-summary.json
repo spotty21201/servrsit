@@ -1,0 +1,211 @@
+{
+ "startedAt": "2026-11-21T13:34:33.541Z",
+ "tags": [
+  "k9dii",
+  "raadl"
+ ],
+ "variant": "fast",
+ "opId": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+ "planId": "b81aeb3a-cfee-4718-8aa0-67299674d6d4",
+ "kills": [
+  {
+   "n": 1,
+   "pid": 230834,
+   "seenAt": "2026-11-21T13:35:12.802Z",
+   "killedAt": "2026-11-21T13:35:13.803Z"
+  }
+ ],
+ "appStateBeforeCrash": "queued",
+ "crash": {
+  "pid": 230639,
+  "at": "2026-11-21T13:35:15.345Z"
+ },
+ "helperAfterCrash": {
+  "found": true,
+  "helperVersion": "0.3.0",
+  "record": {
+   "operationId": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+   "manifestDigest": "sha256:7e065dc0fec0a8d0e004a9860cd7d1dfc503d159371a7e10e1b28d1b84e3ad49",
+   "state": "running",
+   "exitCode": null
+  },
+  "outcome": null,
+  "restartNeeded": [],
+  "reasonCode": null,
+  "keptFiles": [],
+  "evidence": []
+ },
+ "operation": {
+  "id": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+  "approvalId": "10fa867e-24c3-4bc2-99b7-6461c2c72957",
+  "planId": "b81aeb3a-cfee-4718-8aa0-67299674d6d4",
+  "planVersion": 1,
+  "serverId": "75e41a8a-6a97-4a06-8151-c0cb33ad0fc1",
+  "operation": "apply.packages.v1",
+  "targetKind": "ssh",
+  "state": "succeeded",
+  "stopRequested": false,
+  "remoteOperationId": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+  "createdAt": "2026-11-21T13:35:09.564Z",
+  "updatedAt": "2026-11-21T13:35:38.098Z",
+  "simulated": false
+ },
+ "events": [
+  {
+   "operationId": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+   "seq": 1,
+   "type": "created",
+   "at": "2026-11-21T13:35:09.564Z",
+   "actor": "owner:tester",
+   "fromState": null,
+   "toState": "queued",
+   "payload": {
+    "approvalId": "10fa867e-24c3-4bc2-99b7-6461c2c72957",
+    "planDigest": "sha256:dd114c368e485a205c096653bc9486534121591369210d3ce7b0678afca76269"
+   }
+  },
+  {
+   "operationId": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+   "seq": 2,
+   "type": "dispatch_attempted",
+   "at": "2026-11-21T13:35:12.767Z",
+   "actor": "worker:api-230639",
+   "fromState": null,
+   "toState": null,
+   "payload": {
+    "issuedAt": "2026-11-21T13:35:12.765Z",
+    "manifestDigest": "sha256:7e065dc0fec0a8d0e004a9860cd7d1dfc503d159371a7e10e1b28d1b84e3ad49",
+    "retry": false
+   }
+  },
+  {
+   "operationId": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+   "seq": 3,
+   "type": "transport_error",
+   "at": "2026-11-21T13:35:13.809Z",
+   "actor": "worker:api-230639",
+   "fromState": null,
+   "toState": null,
+   "payload": {
+    "during": "submit"
+   }
+  },
+  {
+   "operationId": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+   "seq": 4,
+   "type": "remote_accepted",
+   "at": "2026-11-21T13:35:20.962Z",
+   "actor": "worker:api-230882",
+   "fromState": "queued",
+   "toState": "running",
+   "payload": {
+    "how": "reconciled-before-retry",
+    "remoteState": "running"
+   }
+  },
+  {
+   "operationId": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+   "seq": 5,
+   "type": "remote_progress",
+   "at": "2026-11-21T13:35:26.756Z",
+   "actor": "worker:api-230882",
+   "fromState": null,
+   "toState": null,
+   "payload": {
+    "remoteState": "running"
+   }
+  },
+  {
+   "operationId": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+   "seq": 6,
+   "type": "remote_finished",
+   "at": "2026-11-21T13:35:32.529Z",
+   "actor": "worker:api-230882",
+   "fromState": "running",
+   "toState": "verifying",
+   "payload": {
+    "remoteState": "finished",
+    "exitCode": 0,
+    "helperReport": {
+     "helperVersion": "0.3.0",
+     "outcome": "succeeded",
+     "reasonCode": null,
+     "restartNeeded": [],
+     "keptFiles": []
+    }
+   }
+  },
+  {
+   "operationId": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+   "seq": 7,
+   "type": "verification_recorded",
+   "at": "2026-11-21T13:35:38.098Z",
+   "actor": "worker:api-230882",
+   "fromState": "verifying",
+   "toState": "succeeded",
+   "payload": {
+    "verified": [
+     "libclang-cpp18:amd64",
+     "libclang1-18:amd64",
+     "libllvm18:amd64"
+    ],
+    "notVerified": [],
+    "exitCode": 0
+   }
+  }
+ ],
+ "ledger": {
+  "found": true,
+  "helperVersion": "0.3.0",
+  "record": {
+   "operationId": "0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+   "manifestDigest": "sha256:7e065dc0fec0a8d0e004a9860cd7d1dfc503d159371a7e10e1b28d1b84e3ad49",
+   "state": "finished",
+   "exitCode": 0
+  },
+  "outcome": "succeeded",
+  "restartNeeded": [],
+  "reasonCode": null,
+  "keptFiles": [],
+  "evidence": [
+   "apt commit returned success (needrestart suspended, no prompts, your changed configuration files kept)",
+   "3 of 3 packages at the planned version",
+   "no service needs a restart"
+  ]
+ },
+ "matched": 3,
+ "units": 1,
+ "unitsBeforeRun": 1,
+ "dispatches": 1,
+ "digests": [
+  "sha256:7e065dc0fec0a8d0e004a9860cd7d1dfc503d159371a7e10e1b28d1b84e3ad49"
+ ],
+ "activity": [
+  {
+   "id": "op-0fd8fc23-ff43-49bc-bf9e-0eae63966011",
+   "type": "operation",
+   "at": "2026-11-21T13:35:38.098Z",
+   "serverId": "75e41a8a-6a97-4a06-8151-c0cb33ad0fc1",
+   "serverName": "Sentani",
+   "production": false,
+   "simulated": false,
+   "title": "Update packages",
+   "result": "succeeded",
+   "summary": "Finished, and the result was verified.",
+   "href": "/operations/0fd8fc23-ff43-49bc-bf9e-0eae63966011"
+  }
+ ],
+ "servicesChanged": [
+  "MainPID=24507 Id=packagekit.service ActiveEnterTimestampMonotonic=18232542318 "
+ ],
+ "strace": {
+  "k9dii": {
+   "-l spotty -> sentani": 3,
+   "-l servrsit -> sentani": 2
+  },
+  "raadl": {
+   "-l servrsit -> sentani": 3,
+   "-l spotty -> sentani": 2
+  }
+ }
+}
