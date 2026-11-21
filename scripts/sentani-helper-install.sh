@@ -79,6 +79,11 @@ echo "== 3. Files that will be copied to $TARGET:$NAME/"
 echo "   trust.json holds ONLY the public key $KEY_ID."
 echo "   The package checksum is $SHA"
 
+CMD_EARLY="sh bootstrap.sh --package $NAME.tar.gz --sha256 $SHA --installation-id $INSTALLATION_ID --trust trust.json --account $ACCOUNT --create-account --home-user $HOME_USER --install-deps --from $FROM --authorized-key \"$PUBLIC_LINE\""
+# Short wrappers so the founder never has to paste a long line (pastes split in the founder's terminal).
+printf '#!/bin/sh\n# ServrSit helper: DRY RUN (changes nothing). Run: sudo sh dry-run.sh\nset -eu\ncd "$(dirname "$0")"\n%s --dry-run\n' "$CMD_EARLY" > "$STAGE/dry-run.sh"
+printf '#!/bin/sh\n# ServrSit helper: REAL INSTALL. Run: sudo sh install.sh\nset -eu\ncd "$(dirname "$0")"\n%s\n' "$CMD_EARLY" > "$STAGE/install.sh"
+
 if [ "$COPY" -eq 1 ]; then
   if [ "$YES" -ne 1 ]; then
     printf '\nCopy these files to %s now? [y/N] ' "$TARGET"
@@ -97,6 +102,8 @@ fi
 CMD="sh bootstrap.sh --package $NAME.tar.gz --sha256 $SHA --installation-id $INSTALLATION_ID --trust trust.json --account $ACCOUNT --create-account --home-user $HOME_USER --install-deps --from $FROM --authorized-key \"$PUBLIC_LINE\""
 echo
 echo "== 5. On $SERVER, run these yourself (log in as $TARGET; nothing has been installed yet)"
+echo
+echo "   Short version (recommended):  cd ~/$NAME   then   sudo sh dry-run.sh   then   sudo sh install.sh"
 echo
 echo "   First, the dry run (prints every step, changes nothing):"
 echo
