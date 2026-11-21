@@ -278,8 +278,12 @@ export async function careRoutes(fastify: FastifyInstance, o: CareRouteOptions):
     // exists is an idempotent replay (the state has moved on because it ran).
     const target = o.targets.get(server.id);
     const replay = o.store.hasApproval(plan.id, parsed.data.planVersion);
-    if (!replay && server.writesEnabled && target !== undefined) {
-      const latest = o.store.getPlan(plan.id);
+    // O-T1: a blocked plan is refused by the store with its own blockers (PLAN_BLOCKED); the target is not
+    // asked, so a kind it cannot preview does not turn that refusal into PLAN_CHANGED.
+    const latestPlan = o.store.getPlan(plan.id);
+    const blocked = latestPlan !== null && latestPlan.version === parsed.data.planVersion && latestPlan.blockers.length > 0;
+    if (!replay && !blocked && server.writesEnabled && target !== undefined) {
+      const latest = latestPlan;
       let current: string | null = null;
       try {
         current = latest === null ? null : await currentDigest(latest, target);

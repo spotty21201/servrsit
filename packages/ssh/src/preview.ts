@@ -29,9 +29,25 @@ import {
   type SshTarget,
 } from "./transport.js";
 
+/**
+ * D-T2 (ADR-024): the two conffile sections let the plan show, before approval, which of the
+ * owner's configuration files the update will keep. Same rule as the helper's `dpkg --verify`:
+ * a conffile whose MD5 differs from the one dpkg recorded. Read-only: dpkg's own records, then
+ * `md5sum` of each listed conffile under /etc that this account can read. Only hashes leave the
+ * server, never file contents, and no package or path is sent to it.
+ */
+export const CONFFILE_SECTIONS: readonly CollectorSection[] = [
+  { name: "conffiles", command: "$T dpkg-query -W -f '@${Package}:${Architecture}\\n${Conffiles}\\n'" },
+  {
+    name: "conffilesums",
+    command: String.raw`$T sh -c 'dpkg-query -W -f "\${Conffiles}\n" | while read -r p s x; do case $p in /etc/*) if [ -f "$p" ] && [ -r "$p" ]; then md5sum -- "$p"; fi ;; esac; done; exit 0'`,
+  },
+];
+
 export const PREVIEW_SECTIONS: readonly CollectorSection[] = [
   { name: "aptsim", command: "$T apt-get -s -o Debug::NoLocking=1 upgrade" },
   { name: "installed", command: "$T dpkg-query -W -f '${Package} ${Architecture} ${Version} ${db:Status-Abbrev}\\n'" },
+  ...CONFFILE_SECTIONS,
 ];
 /** Verification reads installed versions only. */
 export const INSTALLED_SECTIONS: readonly CollectorSection[] = PREVIEW_SECTIONS.filter((s) => s.name === "installed");
@@ -107,8 +123,62 @@ export function parseInstalled(text: string): InstalledPackages {
   return { installed, held: held.sort() };
 }
 
+const CONFFILE_PATH_FORM = /^\/etc\/[A-Za-z0-9._@+/-]{1,250}$/;
+const CONFFILE_PATH = { test: (p: string) => CONFFILE_PATH_FORM.test(p) && !p.split("/").some((seg) => seg === ".." || seg === ".") };
+const MD5 = /^[0-9a-f]{32}$/;
+
+/** One configuration file the owner changed (its MD5 differs from dpkg's record). */
+export interface ChangedConffile {
+  /** "name:arch" of the package it belongs to. */
+  readonly package: string;
+  readonly path: string;
+}
+
+/**
+ * `dpkg-query -W -f '@${Package}:${Architecture}\n${Conffiles}\n'` -> "name:arch" -> [{path, md5}].
+ * Obsolete conffiles and ones dpkg has not installed yet ("newconffile") are left out.
+ */
+export function parseConffiles(text: string): Record<string, Array<{ path: string; md5: string }>> {
+  const out: Record<string, Array<{ path: string; md5: string }>> = {};
+  let current: string | null = null;
+  for (const raw of sanitizeLines(text)) {
+    if (raw.startsWith("@")) {
+      const [name, arch, ...rest] = raw.slice(1).split(":");
+      current = rest.length === 0 && name !== undefined && arch !== undefined && PACKAGE.test(name) && ARCH.test(arch) ? `${name}:${arch}` : null;
+      continue;
+    }
+    const [path, md5, flag, ...rest] = raw.trim().split(/\s+/);
+    if (current === null || path === undefined || md5 === undefined || rest.length > 0 || flag !== undefined) continue;
+    if (!CONFFILE_PATH.test(path) || !MD5.test(md5)) continue;
+    (out[current] ??= []).push({ path, md5 });
+  }
+  return out;
+}
+
+/** `md5sum` lines "<md5>  <path>" -> path -> md5. Escaped names (leading backslash) are not read. */
+export function parseMd5sums(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of sanitizeLines(text)) {
+    const m = /^([0-9a-f]{32}) {2}(\S+)$/.exec(line);
+    if (m !== null && CONFFILE_PATH.test(m[2]!)) out[m[2]!] = m[1]!;
+  }
+  return out;
+}
+
+/** Conffiles whose current MD5 differs from dpkg's record. A file this account cannot read is not claimed either way. */
+export function changedConffiles(conffiles: Record<string, Array<{ path: string; md5: string }>>, sums: Record<string, string>): ChangedConffile[] {
+  const out: ChangedConffile[] = [];
+  for (const [pkg, files] of Object.entries(conffiles)) {
+    for (const f of files) {
+      const now = sums[f.path];
+      if (now !== undefined && now !== f.md5) out.push({ package: pkg, path: f.path });
+    }
+  }
+  return out.sort((a, b) => a.path.localeCompare(b.path) || a.package.localeCompare(b.package));
+}
+
 export type PreviewResult =
-  | { readonly ok: true; readonly preview: PackagePreview; readonly installed: InstalledPackages }
+  | { readonly ok: true; readonly preview: PackagePreview; readonly installed: InstalledPackages; readonly changedConffiles: readonly ChangedConffile[] }
   | { readonly ok: false; readonly code: FailureCode; readonly message: string };
 
 export interface PreviewDeps {
@@ -172,7 +242,12 @@ export async function collectPackagePreviewViaSsh(target: SshTarget, options: Ss
   if (!r.ok) return r;
   const preview = parseAptUpgrade(r.outputs.get("aptsim") ?? "");
   if (preview.unreadable > 0) return fail("OUTPUT_INVALID");
-  return { ok: true, preview, installed: parseInstalled(r.outputs.get("installed") ?? "") };
+  return {
+    ok: true,
+    preview,
+    installed: parseInstalled(r.outputs.get("installed") ?? ""),
+    changedConffiles: changedConffiles(parseConffiles(r.outputs.get("conffiles") ?? ""), parseMd5sums(r.outputs.get("conffilesums") ?? "")),
+  };
 }
 
 /** Installed packages only (verification after an update): does not depend on apt being able to simulate. */
