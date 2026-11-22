@@ -62,6 +62,7 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
   const [now, setNow] = useState(() => new Date());
   const [acks, setAcks] = useState<readonly boolean[]>([false, false]);
   const [phase, setPhase] = useState<ApprovalPhase>(IDLE);
+  const [clientError, setClientError] = useState<string | null>(null);
   const keyRef = useRef<{ version: number; key: string } | null>(null);
   const ids = useId();
 
@@ -111,6 +112,17 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
     if (keyRef.current?.version !== plan.version) keyRef.current = { version: plan.version, key: newIdempotencyKey() };
     const body = { planVersion: plan.version, planDigest: plan.digest, idempotencyKey: keyRef.current.key, acknowledgements: vm.acknowledgementTokens };
     await settle(await submitApproval({ client, planId: plan.id, body, onPhase: setPhase }));
+  }
+
+  /** Never fail silently: an unexpected error in the browser is shown, and nothing was sent if it happened before submitting. */
+  async function approveSafely(): Promise<void> {
+    try {
+      await approve();
+    } catch (err) {
+      console.error("approve failed in the browser", err);
+      setPhase(IDLE);
+      setClientError("Approval could not be sent because of an error in this page. Nothing was started. Reload the page and try again.");
+    }
   }
 
   async function checkAgain(): Promise<void> {
@@ -293,13 +305,14 @@ export function PlanScreen({ planId, client: injected }: { planId: string; clien
                     <button
                       type="button"
                       className={styles.primary}
-                      onClick={() => void approve()}
+                      onClick={() => { setClientError(null); void approveSafely(); }}
                       disabled={busy}
                       aria-disabled={phase.phase === "unconfirmed" || !allAcked ? true : undefined}
                       aria-describedby={`${ids}-help`}
                     >
                       {vm.approveLabel}
                     </button>
+                    {clientError && <p className={styles.small} role="alert">{clientError}</p>}
                     <p id={`${ids}-help`} className={styles.small}>
                       {!allAcked && vm.acknowledgements.length > 0 ? "Tick both confirmations to enable approval." : vm.approveHelp}
                     </p>

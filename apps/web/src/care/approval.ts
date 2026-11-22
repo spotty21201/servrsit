@@ -84,6 +84,15 @@ export async function submitApproval(o: SubmitOptions): Promise<ApprovalPhase> {
 }
 
 /** A stable idempotency key (matches the API's ^[A-Za-z0-9_-]{16,128}$). */
-export function newIdempotencyKey(random: () => string = () => globalThis.crypto.randomUUID()): string {
+/** Random hex from crypto.getRandomValues, which (unlike crypto.randomUUID) also works on plain-HTTP pages. */
+function randomHex(): string {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  let s = "";
+  for (const b of bytes) s += b.toString(16).padStart(2, "0");
+  return s;
+}
+
+export function newIdempotencyKey(random: () => string = randomHex): string {
   return `appr_${random().replace(/[^A-Za-z0-9]/g, "")}`;
 }
