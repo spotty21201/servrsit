@@ -2282,3 +2282,9 @@ Tester gates (1c9d5a7 + 22 routes): routes-401 7/7, auth 37/37, care-loop 41/42 
 - **api:** reboot, restart and directories plans on Sentani answer 409 `PLAN_BLOCKED` with their blockers, and nothing is submitted.
 
 **Not proven live:** the conffile sections against Sentani's real `/etc/wgetrc` edit. That is the Tester's next package plan on Sentani after the merge.
+
+## T-094 / T-095: paused (WIP on `feat/coder/t094-receipts`, not merged)
+
+- Done so far: the branch includes D-T2/O-T1 (`feat/coder/preview-conffiles`, merged into this branch only). The new contract `packages/contracts/src/receipt.ts` defines the helper report with bounded output, the reboot evidence, the service restarts and the plan's self-restarts. `packages/ssh/src/preview.ts` gains read-only sections for unit files (`unitfiles`), service InvocationIDs (`services`) and reboot evidence, plus `VERIFY_SECTIONS` and `SERVICE_STATE_SECTIONS`.
+- Not done: parsers for the new sections. The worker still needs the service snapshot before submit, post-update verification (reboot and services) and `helperReport.output`. The domain still needs `scope.selfRestarts`/`systemdReexec`, and the inspect-access allowlist still lists the old scripts. T-095 (the `timedatectl` section and the time-sync finding, with a 1 h rule held in the FleetService state) has not been started. Tests are incomplete, and the suite has not been run on this WIP.
+- Resume: finish preview.ts (index exports still reference `INSTALLED_SECTIONS`/`collectInstalledViaSsh`, which this WIP renamed partway), then the worker and domain, then the tests. Tell the Orchestrator before any merge into integration/live-v1 (Merge rule: rebuild + /health).

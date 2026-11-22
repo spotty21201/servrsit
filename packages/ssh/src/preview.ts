@@ -44,13 +44,42 @@ export const CONFFILE_SECTIONS: readonly CollectorSection[] = [
   },
 ];
 
+/**
+ * T-094 (4): the systemd service units each installed package ships, from dpkg's own file lists.
+ * A package's install scripts usually restart its own services during an update; the plan names
+ * them before approval. Read-only; prints "<package>[:arch] <unit path>".
+ */
+export const UNIT_FILE_SECTION: CollectorSection = {
+  name: "unitfiles",
+  command: String.raw`$T awk '/^\/(usr\/)?lib\/systemd\/system\/[^\/]+\.service$/ { n = FILENAME; sub(/^.*\//, "", n); sub(/\.list$/, "", n); print n " " $0 }' /var/lib/dpkg/info/*.list`,
+};
+
+const INSTALLED_SECTION: CollectorSection = { name: "installed", command: "$T dpkg-query -W -f '${Package} ${Architecture} ${Version} ${db:Status-Abbrev}\\n'" };
+
+/** T-094 (3): every active service with its InvocationID, which systemd renews on every start. Read-only. */
+export const SERVICE_STATE_SECTION: CollectorSection = {
+  name: "services",
+  command: "$T systemctl show -p Id -p InvocationID -p ActiveState --type=service --state=active '*'",
+};
+
+/** T-094 (1): reboot evidence after an update. Their exit status is data (the files may be absent). */
+const REBOOT_SECTIONS: readonly CollectorSection[] = [
+  { name: "rebootreq", command: "test -e /var/run/reboot-required" },
+  { name: "rebootpkgs", command: "cat /var/run/reboot-required.pkgs" },
+];
+/** Sections whose non-zero exit status is an answer, not a failure. */
+const EXIT_IS_DATA = new Set(["rebootreq", "rebootpkgs"]);
+
 export const PREVIEW_SECTIONS: readonly CollectorSection[] = [
   { name: "aptsim", command: "$T apt-get -s -o Debug::NoLocking=1 upgrade" },
-  { name: "installed", command: "$T dpkg-query -W -f '${Package} ${Architecture} ${Version} ${db:Status-Abbrev}\\n'" },
+  INSTALLED_SECTION,
   ...CONFFILE_SECTIONS,
+  UNIT_FILE_SECTION,
 ];
-/** Verification reads installed versions only. */
-export const INSTALLED_SECTIONS: readonly CollectorSection[] = PREVIEW_SECTIONS.filter((s) => s.name === "installed");
+/** Verification: installed versions, reboot evidence and service states, independent of the ledger. */
+export const VERIFY_SECTIONS: readonly CollectorSection[] = [INSTALLED_SECTION, ...REBOOT_SECTIONS, SERVICE_STATE_SECTION];
+/** T-094 (3): the service states just before an update is sent. */
+export const SERVICE_STATE_SECTIONS: readonly CollectorSection[] = [SERVICE_STATE_SECTION];
 const LIMITS = { maxTotalOutputBytes: 2 * 1024 * 1024, maxSectionBytes: 1024 * 1024 } as const;
 
 const PACKAGE = /^[a-z0-9][a-z0-9+.-]{0,99}$/;
@@ -200,7 +229,7 @@ async function runSections(
   options: SshOptions,
   sections: readonly CollectorSection[],
   deps: PreviewDeps,
-): Promise<{ readonly ok: true; readonly outputs: Map<string, string> } | Failure> {
+): Promise<{ readonly ok: true; readonly outputs: Map<string, string>; readonly exits: Map<string, number> } | Failure> {
   try {
     validateTarget(target, options);
   } catch (error) {
@@ -228,12 +257,14 @@ async function runSections(
   if (!r.stdout.includes(`@@BEGIN ${nonce} `)) return fail(classifySshFailure(r.stderr));
   const found = splitSections(r.stdout, nonce, LIMITS.maxSectionBytes, sections.map((s) => s.name));
   const outputs = new Map<string, string>();
+  const exits = new Map<string, number>();
   for (const s of sections) {
     const raw = found.get(s.name);
-    if (raw === undefined || raw.exitCode !== 0 || raw.truncated) return fail("OUTPUT_INVALID");
+    if (raw === undefined || raw.truncated || (raw.exitCode !== 0 && !EXIT_IS_DATA.has(s.name))) return fail("OUTPUT_INVALID");
     outputs.set(s.name, raw.output);
+    exits.set(s.name, raw.exitCode);
   }
-  return { ok: true, outputs };
+  return { ok: true, outputs, exits };
 }
 
 /** The simulated upgrade and the installed packages, in one read-only connection. */
