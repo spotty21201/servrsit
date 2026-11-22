@@ -353,6 +353,15 @@ T-088 condition 3: the live wget case kept the owner's file but created no `.dpk
 
 `apps/api/config/writes.json`: `sentani.writesEnabled = true`. Package updates only (restart, reboot, directories stay refused by T-089). Basis: ADR-021 (disposable), T-088 final verdict GO for Sentani only, ADR-025. Nabire, Timika and Merauke remain write-disabled; writes.json cannot name them. Revert by setting the flag to false and restarting the API.
 
+## ADR-027 — Milestone: first founder-approved update through the app (Sentani)
+
+| Field | Value |
+|---|---|
+| **Date** | 2026-11-22 |
+| **Status** | [EVIDENCE] |
+
+Founder reviewed and approved a 12-package plan (systemd group + xkb-data) for Sentani in the app on http://100.104.220.8:5173. Operation: approved 15:36:24 WIB, accepted 15:36:29, installed 15:36:29-15:37:18, verified 12/12, succeeded 15:37:24. Orchestrator verified independently on Sentani: all 12 at target versions, 0 pending, dpkg clean, no reboot required, system state `running`, systemd-resolved and systemd-timesyncd restarted by the packages' own maintainer scripts (not by ServrSit) and active, name resolution working. First real-server proof of FR-10, FR-11, FR-12 and FR-16 end to end. Writes remain Sentani-only.
+
 ## Pending decisions (require Spotty input before proceeding)
 
 | ID | Decision | Blocking task |
