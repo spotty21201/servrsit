@@ -60,7 +60,8 @@ export {
 export type { Inventory, InventoryDeps, InventoryDirectory, InventoryResult, Part } from "./inventory.js";
 export { buildPrivilegeScript, classifySudo, PRIVILEGE_SUMMARIES, probePrivilegeViaSsh } from "./privilege.js";
 export type { PrivilegeDeps, PrivilegeLevel, PrivilegeProbeResult, PrivilegeResult } from "./privilege.js";
-export { collectInstalledViaSsh, collectPackagePreviewViaSsh, INSTALLED_SECTIONS, parseAptUpgrade, parseInstalled, PREVIEW_SECTIONS } from "./preview.js";
+export { changedConffiles, collectInstalledViaSsh, collectPackagePreviewViaSsh, CONFFILE_SECTIONS, INSTALLED_SECTIONS, parseAptUpgrade, parseConffiles, parseInstalled, parseMd5sums, PREVIEW_SECTIONS } from "./preview.js";
+export type { ChangedConffile } from "./preview.js";
 export type { InstalledPackages, InstalledResult, PackagePreview, PreviewChange, PreviewDeps, PreviewResult } from "./preview.js";
 export { GATEWAY_TIMEOUT_MS, MAX_GATEWAY_REPLY_BYTES, sendGatewayRequest } from "./gateway.js";
 export type { GatewayReply, GatewayTarget } from "./gateway.js";

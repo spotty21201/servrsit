@@ -280,3 +280,23 @@ test("dispatch loop: one step at a time, errors logged and survived, stops clean
   assert.ok(steps <= at + 1, "no new step after stop");
   assert.deepEqual(errors, ["writes: dispatcher step failed"]);
 });
+
+test("O-T1: approving a blocked reboot, restart or directories plan on Sentani answers PLAN_BLOCKED with its blockers", async () => {
+  const h = await app(true);
+  try {
+    for (const body of [
+      { operation: "reboot.host.v1", serverId: SENTANI },
+      { operation: "restart.service.v1", serverId: SENTANI, unit: "ssh.service" },
+      { operation: "prepare.directories.v1", serverId: SENTANI, directories: [{ path: "/srv/app", owner: "spotty", group: "spotty", mode: "0755" }] },
+    ]) {
+      const plan = (await h.post("/api/plans", body)).json() as PlanJson;
+      assert.ok(plan.blockers.length > 0, body.operation);
+      const r = await h.post(`/api/plans/${plan.id}/approvals`, { planVersion: plan.version, planDigest: plan.digest, idempotencyKey: `idem-key-ot1-${body.operation.replace(/\./g, "-")}`, acknowledgements: plan.requiredAcknowledgements });
+      assert.equal(r.statusCode, 409, body.operation);
+      assert.deepEqual(r.json(), { error: "PLAN_BLOCKED", blockers: plan.blockers.map((b) => b.code) }, body.operation);
+    }
+    assert.equal(h.server.calls.submit, 0);
+  } finally {
+    await h.fastify.close();
+  }
+});

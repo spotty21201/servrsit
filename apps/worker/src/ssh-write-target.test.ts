@@ -42,6 +42,9 @@ class FakeSentani {
     { key: "docker-ce:amd64", to: "5:27.4.0-1", origin: "Docker CE:noble" },
   ];
   held = new Set<string>();
+  /** D-T2: dpkg's conffile records (path -> packaged MD5) and the files' current MD5 (absent: unreadable). */
+  conffiles: Record<string, Record<string, string>> = { "wget:amd64": { "/etc/wgetrc": "a".repeat(32) }, "vim-common:all": { "/etc/vim/vimrc": "b".repeat(32) } };
+  currentMd5: Record<string, string> = { "/etc/wgetrc": "a".repeat(32), "/etc/vim/vimrc": "b".repeat(32) };
   ledger = new Map<string, { digest: string; manifest: SignedManifest["manifest"]; state: "running" | "finished"; exitCode: number | null }>();
   claims: string[] = [];
   gatewayRequests: Array<{ op: string; identity: string | undefined }> = [];
@@ -110,6 +113,10 @@ class FakeSentani {
             return `Inst ${name} [${this.installed[u.key]}] (${u.to} ${u.origin} [${arch}])`;
           })
           .join("\n");
+      } else if (s === "conffiles") {
+        body = Object.entries(this.conffiles).map(([k, files]) => [`@${k}`, ...Object.entries(files).map(([p, m]) => ` ${p} ${m}`)].join("\n")).join("\n");
+      } else if (s === "conffilesums") {
+        body = Object.entries(this.currentMd5).map(([p, m]) => `${m}  ${p}`).join("\n");
       } else if (s === "installed") {
         body = Object.entries(this.installed)
           .map(([k, v]) => `${k.split(":")[0]} ${k.split(":")[1]} ${v} ${this.held.has(k) ? "hi" : "ii"} `)
@@ -186,7 +193,7 @@ test("preview: Ubuntu updates only, the helper's digest rule over exactly those 
   assert.deepEqual(p.scope.packages.map((c) => `${c.name}:${c.arch}`), ["vim-common:all", "wget:amd64"]);
   assert.deepEqual(p.scope.excludedPackages.map((c) => c.name), ["docker-ce"]);
   assert.equal(p.preconditions.previewDigest, digestOf({ installed: { "vim-common:all": "2:9.1.0016-1ubuntu7.8", "wget:amd64": "1.21.4-1ubuntu4" } }));
-  assert.deepEqual(h.server.inspectRequests, [{ sections: ["aptsim", "installed"], identity: INSPECT }]);
+  assert.deepEqual(h.server.inspectRequests, [{ sections: ["aptsim", "installed", "conffiles", "conffilesums"], identity: INSPECT }]);
   assert.equal(h.server.gatewayRequests.length, 0, "planning never reaches the gateway");
   assert.deepEqual(h.target.identity(), { hostKeyFingerprint: FP, machineId: "0123456789abcdef0123456789abcdef" });
 });
@@ -294,4 +301,23 @@ test("without a connection the target contacts nothing and refuses every write (
   assert.deepEqual(await t.submit({} as SignedManifest), { status: "rejected", code: "WRITES_DISABLED" });
   await assert.rejects(t.query(randomUUID()));
   await assert.rejects(t.inspectInstalled(["wget:amd64"]));
+});
+
+test("D-T2: the owner's changed conffiles in the update are shown before approval; the precondition digest ignores them", async () => {
+  const h = harness();
+  const before = await h.plan();
+  assert.equal(before.scope.keptOwnerFiles, undefined, "nothing changed: no field, earlier plan shape");
+  h.server.currentMd5["/etc/wgetrc"] = "c".repeat(32);
+  h.server.conffiles["docker-ce:amd64"] = { "/etc/docker/daemon.json": "d".repeat(32) };
+  h.server.currentMd5["/etc/docker/daemon.json"] = "e".repeat(32);
+  const after = await h.plan();
+  assert.deepEqual(after.scope.keptOwnerFiles, [{ package: "wget:amd64", path: "/etc/wgetrc" }], "only files of planned packages (docker-ce is excluded)");
+  assert.equal(after.preconditions.previewDigest, before.preconditions.previewDigest, "the helper's digest is installed versions only");
+  assert.notEqual(after.digest, before.digest, "the plan digest covers the kept files, so approval does");
+  delete h.server.currentMd5["/etc/vim/vimrc"];
+  h.server.conffiles["vim-common:all"] = { "/etc/vim/vimrc": "f".repeat(32) };
+  assert.deepEqual((await h.plan()).scope.keptOwnerFiles, [{ package: "wget:amd64", path: "/etc/wgetrc" }], "an unreadable file is not claimed");
+  const op = h.approve(after);
+  await h.dispatcher.drain();
+  assert.equal(h.state(op.id), "succeeded");
 });

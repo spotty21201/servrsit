@@ -8,7 +8,9 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { collectInstalledViaSsh, collectPackagePreviewViaSsh, INSTALLED_SECTIONS, parseAptUpgrade, parseInstalled, PREVIEW_SECTIONS } from "./preview.js";
+import { changedConffiles, collectInstalledViaSsh, collectPackagePreviewViaSsh, CONFFILE_SECTIONS, INSTALLED_SECTIONS, parseAptUpgrade, parseConffiles, parseInstalled, parseMd5sums, PREVIEW_SECTIONS } from "./preview.js";
+import { spawnSync } from "node:child_process";
+import { splitSections } from "./parse.js";
 import { buildCollectorScript } from "./script.js";
 import type { RunRequest, RunResult } from "./runner.js";
 
@@ -65,15 +67,63 @@ test("dpkg-query: installed and held packages only; broken, removed and malforme
   assert.deepEqual(r.held, ["nginx:amd64"]);
 });
 
-test("the preview script is read-only: simulated apt, dpkg-query, nothing else, no sudo, no variable input", () => {
+test("the preview script is read-only: simulated apt, dpkg-query, md5sum of conffiles, nothing else, no sudo, no variable input", () => {
   assert.deepEqual(PREVIEW_SECTIONS.map((s) => s.command), [
     "$T apt-get -s -o Debug::NoLocking=1 upgrade",
     "$T dpkg-query -W -f '${Package} ${Architecture} ${Version} ${db:Status-Abbrev}\\n'",
+    "$T dpkg-query -W -f '@${Package}:${Architecture}\\n${Conffiles}\\n'",
+    // D-T2: the one reviewed pipeline: dpkg's conffile list, read line by line, hashed if under /etc and readable.
+    "$T sh -c 'dpkg-query -W -f \"\\${Conffiles}\\n\" | while read -r p s x; do case $p in /etc/*) if [ -f \"$p\" ] && [ -r \"$p\" ]; then md5sum -- \"$p\"; fi ;; esac; done; exit 0'",
   ]);
   const script = buildCollectorScript(PREVIEW_SECTIONS);
-  for (const re of [/\bsudo\b/, /\bsu\b/, /apt-get\s+(?!-s\b)/, /\bdpkg\s/, /\brm\b/, /\$\(|`/, /\|/, /apt(-get)? update/]) {
+  for (const re of [/\bsudo\b/, /\bsu\b/, /apt-get\s+(?!-s\b)/, /\bdpkg\s/, /\brm\b/, /\$\(|`/, /apt(-get)? update/, />(?!\/dev\/null|&)/]) {
     assert.equal(re.test(script), false, `script must not match ${re}`);
   }
+  const withoutReviewedPipe = script.replace(PREVIEW_SECTIONS[3]!.command, "");
+  assert.equal(/\|/.test(withoutReviewedPipe.replace(/\|\|/g, "")), false, "no pipe outside the reviewed conffile section");
+});
+
+test("D-T2: conffile parsing: dpkg's records per package, md5sum lines, changed = different MD5 only", () => {
+  const records = parseConffiles([
+    "@wget:amd64",
+    " /etc/wgetrc 6a6ad4e3a8a6e6e7d9e1c1d2b3a4f5e6",
+    "@vim-common:all",
+    " /etc/vim/vimrc 11111111111111111111111111111111",
+    " /etc/vim/old 22222222222222222222222222222222 obsolete",
+    " /etc/vim/new newconffile",
+    "@openssl:amd64",
+    " /etc/ssl/openssl.cnf 33333333333333333333333333333333",
+    " /etc/../shadow 44444444444444444444444444444444",
+    "@bad name:amd64",
+    " /etc/x 55555555555555555555555555555555",
+  ].join("\n"));
+  assert.deepEqual(records, {
+    "wget:amd64": [{ path: "/etc/wgetrc", md5: "6a6ad4e3a8a6e6e7d9e1c1d2b3a4f5e6" }],
+    "vim-common:all": [{ path: "/etc/vim/vimrc", md5: "11111111111111111111111111111111" }],
+    "openssl:amd64": [{ path: "/etc/ssl/openssl.cnf", md5: "33333333333333333333333333333333" }],
+  });
+  const sums = parseMd5sums([
+    "ffffffffffffffffffffffffffffffff  /etc/wgetrc",
+    "11111111111111111111111111111111  /etc/vim/vimrc",
+    "\\eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee  /etc/odd\\nname",
+  ].join("\n"));
+  assert.deepEqual(sums, { "/etc/wgetrc": "ffffffffffffffffffffffffffffffff", "/etc/vim/vimrc": "11111111111111111111111111111111" });
+  // openssl.cnf has no sum (unreadable to this account): not claimed either way.
+  assert.deepEqual(changedConffiles(records, sums), [{ package: "wget:amd64", path: "/etc/wgetrc" }]);
+});
+
+test("D-T2: the conffile sections run on this machine's real dpkg and give well-formed results (read-only)", () => {
+  const nonce = "fedcba9876543210fedcba9876543210";
+  const r = spawnSync("/bin/sh", ["-s", nonce], { input: buildCollectorScript(CONFFILE_SECTIONS), encoding: "utf8", timeout: 60_000, maxBuffer: 8 * 1024 * 1024 });
+  assert.equal(r.status, 0);
+  const found = splitSections(r.stdout, nonce, 4 * 1024 * 1024, ["conffiles", "conffilesums"]);
+  assert.equal(found.get("conffiles")?.exitCode, 0);
+  assert.equal(found.get("conffilesums")?.exitCode, 0);
+  const records = parseConffiles(found.get("conffiles")!.output);
+  const sums = parseMd5sums(found.get("conffilesums")!.output);
+  assert.ok(Object.keys(records).length > 10, "dpkg lists conffiles for many packages");
+  assert.ok(Object.keys(sums).length > 10, "readable conffiles are hashed");
+  for (const c of changedConffiles(records, sums)) assert.match(c.path, /^\/etc\//);
 });
 
 function pinned(): string {
@@ -84,8 +134,11 @@ function pinned(): string {
 }
 
 const ok = (stdout: string): RunResult => ({ exitCode: 0, stdout, stderr: "", timedOut: false, stdoutTruncated: false, spawnFailed: false });
+const CONFFILES = "@wget:amd64\n /etc/wgetrc 6a6ad4e3a8a6e6e7d9e1c1d2b3a4f5e6\n@vim-common:all\n /etc/vim/vimrc 11111111111111111111111111111111";
+const SUMS = "ffffffffffffffffffffffffffffffff  /etc/wgetrc\n11111111111111111111111111111111  /etc/vim/vimrc";
 const sections = (apt: string, dpkg: string, aptRc = 0) =>
-  `@@BEGIN ${NONCE} aptsim@@\n${apt}\n@@END ${NONCE} aptsim ${aptRc}@@\n@@BEGIN ${NONCE} installed@@\n${dpkg}\n@@END ${NONCE} installed 0@@\n`;
+  `@@BEGIN ${NONCE} aptsim@@\n${apt}\n@@END ${NONCE} aptsim ${aptRc}@@\n@@BEGIN ${NONCE} installed@@\n${dpkg}\n@@END ${NONCE} installed 0@@\n` +
+  `@@BEGIN ${NONCE} conffiles@@\n${CONFFILES}\n@@END ${NONCE} conffiles 0@@\n@@BEGIN ${NONCE} conffilesums@@\n${SUMS}\n@@END ${NONCE} conffilesums 0@@\n`;
 
 test("over SSH: the fixed script on stdin, the inspect key, the pinned file; result parsed", async () => {
   const calls: RunRequest[] = [];
@@ -103,6 +156,7 @@ test("over SSH: the fixed script on stdin, the inspect key, the pinned file; res
   if (r.ok) {
     assert.equal(r.preview.upgrades.length, 3);
     assert.equal(r.installed.installed["vim-common:all"], "2:9.1.0016-1ubuntu7.8");
+    assert.deepEqual(r.changedConffiles, [{ package: "wget:amd64", path: "/etc/wgetrc" }], "D-T2: the owner's changed wgetrc");
   }
 });
 

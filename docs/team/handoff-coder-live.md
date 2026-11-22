@@ -2233,3 +2233,52 @@ scripts/sentani-helper-install.sh --no-copy: builds, makes root-step.sh, prints 
 - **The root step on real Ubuntu with sudo:** it runs at the next helper install.
 
 **Next:** the founder replaces Sentani's inspect line, and the Tester checks it on Sentani and re-checks D-S1. Then the Orchestrator flips writes.json for the fault-injection suite.
+
+## D-T2 and O-T1 from test-report-t089-001 (branch `feat/coder/preview-conffiles`, from `integration/live-v1` `695f25e`)
+
+**Status:** committed on the branch. **Not merged.** The merge into live-v1 waits for the Tester's scenario 3 run and the user's go-ahead. After it come the rebuild and the `/health` check (Merge rule).
+
+### D-T2: the plan shows the owner's changed configuration files before approval
+
+**Two new read-only sections in the package preview** (`packages/ssh/src/preview.ts`, `CONFFILE_SECTIONS`):
+- `dpkg-query -W -f '@${Package}:${Architecture}\n${Conffiles}\n'`: dpkg's own record of each package's configuration files and their packaged MD5.
+- `sh -c 'dpkg-query -W -f "${Conffiles}\n" | while read -r p s x; do case $p in /etc/*) if [ -f "$p" ] && [ -r "$p" ]; then md5sum -- "$p"; fi ;; esac; done; exit 0'`: the current MD5 of each listed conffile under /etc that the inspect account can read.
+  - This is the only pipeline in any inspect script. The test pins its exact text.
+  - Only hashes leave the server, never file contents. No package name or path is sent to the server.
+
+**The rule is the helper's `dpkg --verify` rule:** a file counts as changed when its MD5 differs from dpkg's record.
+- A missing file, an obsolete conffile, a `newconffile` placeholder, a path outside /etc or with `.`/`..` segments, and a file the inspect account cannot read are not claimed.
+- `SshWriteTarget.previewPackages` sets `keptConffiles` to the changed files of packages in the update. The planner already filters those to the plan's packages and fills `scope.keptOwnerFiles`, which `PlanView.keptOwnerFiles` shows.
+
+**Digests:**
+- **`previewDigest` is unchanged.** The helper's precondition digest is installed versions only, and the manifest's scope carries only `packages`. So conffile state stays out of it, and equality with the helper still holds.
+- **The plan digest covers `keptOwnerFiles`**, so approval covers the disclosed list. The field appears only when the list is non-empty, so plans without kept files keep their earlier shape and digest.
+
+**Limits:**
+- A conffile the inspect account cannot read (root-only) is not disclosed in advance. The helper still keeps it and reports it in `helperReport.keptFiles`.
+- A file edited between planning and approval is not re-checked. Approval re-checks installed versions only.
+- Changing the preview script changes its T-091 forced-command digest. No server has the forced-command line yet (O-T3), so nothing breaks. Any line made before this merge would refuse the preview.
+
+### O-T1: a blocked plan answers PLAN_BLOCKED
+
+In `routes/care.ts`, the approval-time target re-check is skipped when the latest plan version has blockers. The store then refuses with `PLAN_BLOCKED` and the plan's own blockers. Before, a kind the target cannot preview (restart, reboot, directories on Sentani) returned `null` there and answered `PLAN_CHANGED`. A stale version or digest still answers `PLAN_CHANGED` from the store.
+
+### Checks run
+
+```
+pnpm -r --workspace-concurrency=1 run test: exit 0 (api 260, web 216, ai 156, ssh 80, store 28, domain 26, worker 29, infra 9)
+target-helper unittest: OK (unchanged helper)
+typecheck: all 9 ok; web build ok
+Tester gates (1c9d5a7 + 22 routes): routes-401 7/7, auth 37/37, care-loop 41/42 (CL-09a, known), zt01 12/13 (T-089 import check, Tester revision pending)
+```
+
+**Tests added:**
+- **ssh:** the parsers (records, sums, the changed-only rule, path and package validation). One test runs the conffile sections on this machine's real dpkg with `/bin/sh` (read-only) and checks the results are well formed. Another checks the preview over the fake runner, including the owner's `/etc/wgetrc`.
+- **worker:**
+  - a changed `/etc/wgetrc` appears as `keptOwnerFiles` and a changed docker-ce file (an excluded package) does not;
+  - `previewDigest` is identical with and without the change, while the plan digest differs;
+  - an unreadable file is not claimed;
+  - the plan still dispatches to `succeeded`.
+- **api:** reboot, restart and directories plans on Sentani answer 409 `PLAN_BLOCKED` with their blockers, and nothing is submitted.
+
+**Not proven live:** the conffile sections against Sentani's real `/etc/wgetrc` edit. That is the Tester's next package plan on Sentani after the merge.

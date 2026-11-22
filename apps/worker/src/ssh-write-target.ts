@@ -159,6 +159,7 @@ export class SshWriteTarget implements WriteTarget {
     // apt and dpkg must agree on every installed version, or neither is trusted.
     if (r.preview.upgrades.some((u) => installed[`${u.name}:${u.arch}`] !== u.from)) return null;
     const heldSet = new Set(held);
+    const upgradeKeys = new Set(r.preview.upgrades.map((u) => `${u.name}:${u.arch}`));
     const preview: TransactionPreview = {
       upgrades: r.preview.upgrades,
       removals: r.preview.removals,
@@ -168,6 +169,10 @@ export class SshWriteTarget implements WriteTarget {
       locked: false,
       stateDigest: "",
       digestRule: "installed-v1",
+      // D-T2 (ADR-024): the owner's changed configuration files in packages of this update, shown before
+      // approval. Same rule as the helper's dpkg --verify. Not part of the precondition digest, because
+      // the helper's digest is installed versions only; the plan digest covers them, so approval does.
+      keptConffiles: r.changedConffiles.filter((c) => upgradeKeys.has(c.package)),
     };
     const keys = preview.upgrades.map((u) => `${u.name}:${u.arch}`);
     return { ...preview, stateDigest: packagesPreconditionDigest(installedFromPreview(preview, keys)) };
