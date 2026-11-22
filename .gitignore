@@ -44,3 +44,4 @@ apps/web/public/review-002/
 
 # Python
 __pycache__/
+apps/web/public/github-deploy-key.txt
