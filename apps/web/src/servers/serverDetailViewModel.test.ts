@@ -89,7 +89,7 @@ test("findings come sorted by severity, and 'no findings' names how many checks 
   assert.equal(toServerDetailVM(server(), 0, NOW, TZ).findingsEmpty, "No findings from the 16 of 16 checks that ran.");
 });
 
-test("care: Ubuntu and third-party updates listed separately; Review updates reason is the writes-off sentence", () => {
+test("care: Ubuntu and third-party updates listed separately; Review updates is available and carries no writes-off text", () => {
   const vm = toServerDetailVM(server(), 0, NOW, TZ);
   assert.equal(vm.care.pending.value, "5");
   assert.equal(vm.care.ubuntu.value, "3");
@@ -97,7 +97,8 @@ test("care: Ubuntu and third-party updates listed separately; Review updates rea
   assert.deepEqual(vm.care.outsideList.map((p) => p.name), ["docker-ce", "containerd.io"]);
   assert.equal(vm.care.packageInfoAge.value, "08:00 WIB (2 h ago)");
   assert.equal(vm.care.reboot.value, "No reboot flagged by the server");
-  assert.equal(vm.care.reviewDisabledReason, "Changes are switched off for this server until testing on a disposable server is complete.");
+  assert.deepEqual(vm.care.review, { state: "available", note: null });
+  assert.doesNotMatch(JSON.stringify(vm.care), /switched off/);
 });
 
 test("package info age is marked when the server's clock was wrong or unreadable", () => {
@@ -126,4 +127,16 @@ test("access is read-only and says so", () => {
   const vm = toServerDetailVM(server(), 0, NOW, TZ);
   assert.equal(vm.accessLabel, "Read-only · SSH");
   assert.match(vm.accessNote, /cannot change anything/);
+});
+
+test("review updates: a known zero hides the button, an unknown count does not, writes are never consulted", () => {
+  const zero = toServerDetailVM(server({ observation: obs({}, { pendingCount: ok(0), pendingOutsideUbuntu: ok({ count: 0, packages: [] }) }) }), 0, NOW, TZ);
+  assert.deepEqual(zero.care.review, { state: "none", note: "Nothing to update." });
+  const onlyOutside = toServerDetailVM(server({ observation: obs({}, { pendingCount: ok(2) }) }), 0, NOW, TZ);
+  assert.equal(onlyOutside.care.review.state, "none");
+  assert.match(onlyOutside.care.review.note ?? "", /Nothing to update from Ubuntu/);
+  const unknown = toServerDetailVM(server({ observation: obs({}, { pendingCount: na("apt could not be read") }) }), 0, NOW, TZ);
+  assert.equal(unknown.care.review.state, "available");
+  assert.equal(toServerDetailVM(server({ observation: null }), 0, NOW, TZ).care.review.state, "available");
+  assert.doesNotMatch(JSON.stringify(toServerDetailVM(server(), 0, NOW, TZ).care), /writes|switched off/i);
 });

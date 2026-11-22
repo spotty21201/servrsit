@@ -23,7 +23,6 @@ import {
 import { toServerCard } from "../components/overview/fleetViewModel";
 import type { ServerCardVM } from "../components/overview/fleetViewModel";
 import { formatClockWithAge, parseIso } from "../lib/time";
-import { WRITES_OFF_TEXT } from "../care/planViewModel";
 
 export const DASH = "—";
 
@@ -122,7 +121,8 @@ export interface ServerDetailVM {
     readonly outsideList: readonly { name: string; origin: string }[];
     readonly heldBack: Shown;
     readonly reboot: Shown;
-    readonly reviewDisabledReason: string;
+    /** Review updates: "none" when the checks show nothing to update from Ubuntu, otherwise "available". */
+    readonly review: { readonly state: "available" | "none"; readonly note: string | null };
     readonly operations: Shown;
     readonly baseline: Shown;
   };
@@ -158,6 +158,22 @@ function mounts(o: InspectionObservation): { rows: MountRow[]; why: string | nul
     };
   });
   return { rows, why: rows.length === 0 ? "No mounted filesystems were reported." : null };
+}
+
+/**
+ * Whether there is anything to review. Only a known count of zero hides the
+ * button. An unknown count leaves it available: the plan the API prepares is
+ * the authority, including for writes (a server without writes gets a plan
+ * with blockers and the plan page says so). Nothing about writes is decided here.
+ */
+function reviewState(pk: NonNullable<FleetServer["observation"]>["packages"] | undefined): { state: "available" | "none"; note: string | null } {
+  if (pk && pk.pendingCount.status === "ok") {
+    const outside = pk.pendingOutsideUbuntu.status === "ok" ? pk.pendingOutsideUbuntu.value.count : 0;
+    if (pk.pendingCount.value - outside <= 0) {
+      return { state: "none", note: pk.pendingCount.value === 0 ? "Nothing to update." : "Nothing to update from Ubuntu. Updates from other sources are left out of plans." };
+    }
+  }
+  return { state: "available", note: null };
 }
 
 export function toServerDetailVM(s: FleetServer, index: number, now: Date, tz: string, agesUncertain = false): ServerDetailVM {
@@ -278,7 +294,7 @@ export function toServerDetailVM(s: FleetServer, index: number, now: Date, tz: s
       outsideList,
       heldBack: pk ? fromField(pk.heldBackCount, (n) => formatCount(n)) : missing(NO_OBSERVATION),
       reboot: pk ? fromField(pk.rebootRequired, (v) => (v ? "Reboot required" : "No reboot flagged by the server")) : missing(NO_OBSERVATION),
-      reviewDisabledReason: WRITES_OFF_TEXT,
+      review: reviewState(pk),
       operations: missing("Operation history is not available from the API yet."),
       baseline: missing("Comparing this server with a baseline runs on sample data for now, not on this server's own directories."),
     },

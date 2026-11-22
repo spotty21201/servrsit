@@ -7,11 +7,13 @@
  *
  * Honesty rules: an empty value is an em dash plus the reason, never zero;
  * "no findings" names how many checks ran; nothing here changes a server.
- * Review updates is shown disabled with the writes-off reason.
+ * Review updates asks the API for a plan and opens it (T-093). Whether writes
+ * are allowed is the API's call and shows on the plan page, never here.
  * Settings are read-only until editing exists. The address and the key in use
  * are not in the API yet and say so; no key path is ever shown.
  */
-import { useEffect, useId, useState, type CSSProperties } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createCareClient, type CareClient } from "../api/care";
 import { useFleet } from "../api/useFleet";
 import { CareShell, LoadFailure, ProductionLabel } from "../care/CareShell";
 import { useClock } from "../clock/ClockContext";
@@ -19,6 +21,7 @@ import { StatusBadge } from "../components/StatusBadge/index.js";
 import { PixelServerIcon } from "../components/server-card/PixelServerIcon.js";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
 import { usePageTitle } from "../lib/pageTitle";
+import { createReviewRunner, REVIEW_PENDING_LABEL, type ReviewPhase } from "./reviewUpdates";
 import { DASH, toServerDetailVM, type MountRow, type ServerDetailVM, type Shown } from "./serverDetailViewModel";
 import c from "../care/care.module.css";
 import styles from "./servers.module.css";
@@ -59,8 +62,12 @@ function severityClass(s: "critical" | "warning" | "advisory"): string {
   return s === "critical" ? c.tagBlocked ?? "" : s === "warning" ? c.tagOwner ?? "" : c.tagUnknown ?? "";
 }
 
-function Sections({ vm, section }: { vm: ServerDetailVM; section: "settings" | "verify" | null }) {
-  const reasonId = useId();
+function Sections({ vm, section, client }: { vm: ServerDetailVM; section: "settings" | "verify" | null; client: Pick<CareClient, "createPlan"> }) {
+  const noteId = useId();
+  const [phase, setPhase] = useState<ReviewPhase>({ phase: "idle" });
+  const runner = useRef<ReturnType<typeof createReviewRunner> | null>(null);
+  runner.current ??= createReviewRunner({ client, serverId: vm.id, onPhase: setPhase, navigate: (path) => globalThis.location.assign(path) });
+  const pending = phase.phase === "pending";
   const { facts, care, settings } = vm;
   useEffect(() => {
     if (section === "settings") document.getElementById("server-settings")?.scrollIntoView({ block: "start" });
@@ -161,8 +168,19 @@ function Sections({ vm, section }: { vm: ServerDetailVM; section: "settings" | "
               <Fact label="Recent operations" v={care.operations} />
             </dl>
           )}
-          <button type="button" className={c.secondary} disabled aria-describedby={reasonId}>Review updates</button>
-          <p id={reasonId} className={c.small}>{care.reviewDisabledReason}</p>
+          {care.review.state === "available" ? (
+            <>
+              <button type="button" className={c.secondary} aria-disabled={pending || undefined} aria-describedby={noteId} onClick={() => { if (!pending) void runner.current?.run(); }}>
+                {pending ? REVIEW_PENDING_LABEL : "Review updates"}
+              </button>
+              <p id={noteId} className={c.small} role="status">
+                {pending ? "Preparing a plan. Nothing is changed on the server until you approve one." : "Opens a plan to review. Nothing is changed until you approve it."}
+              </p>
+              {phase.phase === "failed" && <p className={c.small} role="alert">{phase.text}</p>}
+            </>
+          ) : (
+            <p className={c.p}>{care.review.note}</p>
+          )}
         </section>
 
         <section className={c.panel} id="server-settings" aria-labelledby="server-settings-h">
@@ -183,8 +201,9 @@ function Sections({ vm, section }: { vm: ServerDetailVM; section: "settings" | "
   );
 }
 
-export function ServerDetailScreen({ serverId, section }: { serverId: string; section: "settings" | "verify" | null }) {
+export function ServerDetailScreen({ serverId, section, careClient }: { serverId: string; section: "settings" | "verify" | null; careClient?: Pick<CareClient, "createPlan"> }) {
   const fleet = useFleet();
+  const client = useMemo(() => careClient ?? createCareClient(), [careClient]);
   const clockView = useClock().view;
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -254,7 +273,7 @@ export function ServerDetailScreen({ serverId, section }: { serverId: string; se
           <nav aria-label="On this page" className={styles.jump}>
             <a href="#server-status">Status</a><a href="#server-care">Care</a><a href="#server-settings">Settings</a>
           </nav>
-          <Sections vm={vm} section={section} />
+          <Sections key={vm.id} vm={vm} section={section} client={client} />
         </>
       )}
     </CareShell>
