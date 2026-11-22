@@ -44,3 +44,7 @@ apps/web/public/review-002/
 
 # Python
 __pycache__/
+
+# local test caches and vendored tools (not part of the product)
+__pycache__/
+tests/helper/vendor/
