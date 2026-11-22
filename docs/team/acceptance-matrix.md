@@ -12,7 +12,7 @@
 
 | Column | Meaning |
 |---|---|
-| Test ID | Unique identifier. Prefix: `SA-` = Stage A scenario, `FI-` = Fault Injection, `UX-` = UX / accessibility |
+| Test ID | Unique identifier. Prefix: `SA-` = Stage A scenario, `FI-` = Fault Injection, `UX-` = UX / accessibility, `NF-` = non-functional and security |
 | PRD / Spec reference | Source requirement or scenario |
 | Test type | `unit` / `integration` / `e2e` / `manual` |
 | Pass criteria | Observable product behavior that constitutes a pass — not "code looks correct" |
@@ -821,6 +821,30 @@ These checks are part of the Stage A gate but are not covered by the named scena
 
 ---
 
+### NF-009 — Web flows work on a plain-HTTP origin (a non-secure context), not only on localhost
+
+| Field | Value |
+|---|---|
+| **PRD / Spec reference** | The founder opens the app at `http://100.104.220.8:5173` (plain HTTP on the tailnet). Browsers expose `crypto.randomUUID`, `crypto.subtle`, `navigator.clipboard`, service workers, notifications and file pickers only in a secure context (https or localhost). Incident: `crypto.randomUUID` broke approval there (fixed `b615f67`). Standing checklist item from the Orchestrator, 2026-11-22 |
+| **Test type** | static + e2e (real browser) |
+| **Pass criteria** | (a) `tests/e2e/web-nonsecure/scan-secure-context.mjs` reports no unreviewed use of a secure-context-only API in `apps/web/src`, and its self-test passes. (b) On the founder's real origin, `isSecureContext` is `false` (the run states it if not, because a secure run proves nothing about this class), the first load raises no page error and no console error, and the run makes only GET requests (it never signs in and never uses the founder's account). (c) The approval modules the origin serves now contain no `crypto.randomUUID` call. (d) An authenticated plan → approve flow completes with the page origin set to the real origin string, against my own API instance, and a browser-side exception during approval is shown to the owner instead of failing silently. (e) Every web change that touches crypto, clipboard, storage, notifications, service workers or file pickers is checked in a non-secure context before sign-off. |
+| **Evidence type** | real browser on the real origin (GET only) + static scan |
+| **Status** | in-progress: (a) to (c) run 2026-11-22, see `test-report-web-nonsecure-001.md`; (d) and (e) open |
+
+---
+
+### NF-010 — The dev web server serves no file from the API's data directory
+
+| Field | Value |
+|---|---|
+| **PRD / Spec reference** | execution-security steering (credentials never in places they are not needed); Technical Spec §3.1 and §6 (keys, databases) |
+| **Test type** | e2e (real origin, GET only) |
+| **Pass criteria** | A GET to `/@fs/<workspace>/apps/api/.data/...` on the founder's origin returns 403 or 404 for every file there, including a public canary file. No key, no database and no credential file can be fetched through the dev server by anyone who can reach the origin. Tested with a public canary only: no secret is ever requested. |
+| **Evidence type** | real browser or HTTP client on the real origin (GET only, public canary) |
+| **Status** | **failed** on 2026-11-22: the canary returns 200 (D-W2) |
+
+---
+
 ## Status summary
 
 | Section | Test count | not-started | in-progress | passed | failed |
@@ -829,8 +853,8 @@ These checks are part of the Stage A gate but are not covered by the named scena
 | SA — Stage A scenarios | 15 | 15 | — | — | — |
 | FI — Fault injection | 20 | 20 | — | — | — |
 | UX — UX / accessibility | 19 | 19 | — | — | — |
-| NF — Non-functional | 8 | 8 | — | — | — |
-| **Total** | **68** | **68** | — | — | — |
+| NF — Non-functional | 10 | 8 | 1 (NF-009) | — | 1 (NF-010) |
+| **Total** | **70** | **68** | 1 | — | 1 |
 
 ---
 
@@ -887,3 +911,5 @@ These checks are part of the Stage A gate but are not covered by the named scena
 | NF-005–NF-006 | — | 19 | — |
 | NF-007 | FR-11 | 9.2 | 10.2 |
 | NF-008 | FR-16, FR-18 | 13 | 11 |
+| NF-009 | FR-11, FR-12 | 3.1 | 10.2 |
+| NF-010 | — | 3.1, 6 | — |
