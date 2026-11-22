@@ -72,4 +72,4 @@ The product is spelled **ServrSit**; the source document filenames use "ServerSi
 
 ## License
 
-No license yet. All rights reserved by the owner.
+[MIT](LICENSE) © 2026 spotty21201.
