@@ -1,8 +1,8 @@
 /**
  * AuthFrame: the centred surface for sign-in and setup, in the Bellroad theme (round 5): dark green page, bone text,
- * amber main action. Agnes and Otis stand on the top edge of the card as decoration only: they are outside the card, so
- * they never touch a field, a button, an error or the QR code. They are small on phones (Otis is hidden below 480 px),
- * and `scene={false}` leaves them out (the loading and "can't reach ServrSit" screens).
+ * amber main action. Otis stands on the top edge of the card as decoration only (founder: Otis only, no Agnes): he is
+ * outside the card, so he never touches a field, a button, an error or the QR code. He is smaller on phones, and
+ * `scene={false}` leaves him out (the loading and "can't reach ServrSit" screens).
  */
 import type { ReactNode } from "react";
 import bellroad from "../bellroad/Bellroad.module.css";
@@ -16,7 +16,6 @@ export function AuthFrame({ title, titleRef, children, scene = true }: { title: 
         <p className={styles.brand}>ServrSit</p>
         <div className={scene ? `${styles.cardWrap} ${styles.withScene}` : styles.cardWrap}>
           {scene && <img className={styles.otis} src="/bellroad/otis.webp" alt="" width="245" height="166" />}
-          {scene && <img className={styles.agnes} src="/bellroad/agnes.webp" alt="" width="249" height="236" />}
           <section className={styles.card} aria-labelledby="auth-title">
             <h1 id="auth-title" ref={titleRef} tabIndex={-1} className={styles.title}>{title}</h1>
             {children}
