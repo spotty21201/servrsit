@@ -389,3 +389,12 @@
   0%, 7%, 15%, 100% { background-color: #50665f; }
   4%, 11% { background-color: var(--rack-led); }
 }
+
+/* Windows that fit the Overview without page scroll (1200 px wide, 820 px tall): a slightly tighter masthead
+   and composer, so the cards, both panels and the composer with its characters share the height. */
+@media (min-width: 1200px) and (min-height: 820px) {
+  .masthead { min-height: 8.75rem; }
+  .headline { padding-block: .65rem .5rem; }
+  .brandTitle { font-size: clamp(2.1rem, 3.9vw, 3.6rem); }
+  .composer { padding-block: .75rem; }
+}

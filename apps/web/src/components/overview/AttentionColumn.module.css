@@ -182,8 +182,8 @@
   text-transform: uppercase;
   color: var(--bellroad-name);
 }
-/* Bellroad lets the page scroll: the lists show everything instead of scrolling inside the panel. */
-@media (min-width: 1200px) and (min-height: 620px) {
+/* Windows 620 to 819 px tall: the page scrolls and the lists show everything. From 820 px tall the panels scroll inside (see OverviewScreen). */
+@media (min-width: 1200px) and (min-height: 620px) and (max-height: 819px) {
   :global(.bellroad-theme) .column { max-height: none; }
   :global(.bellroad-theme) .scroll { overflow: visible; }
 }
