@@ -1,10 +1,20 @@
 # ServrSit
 
-<img src="apps/web/public/bellroad/milley.webp" alt="Millie, the pixel-art server sitter" width="140" align="right">
+<img src="apps/web/public/bellroad/milley.webp" alt="Milley, the pixel-art babysitter" width="140" align="right">
 
 **Your servers have a sitter. Less babysitting, more building.**
 
 ServrSit was built from the ground up with Kiro agents.
+
+## The House on Bell Street
+
+*October 1978. Alder Ferry, Massachusetts.*
+
+Ruth and Arthur Vale hire seventeen-year-old Milley Reed to watch Agnes and Otis while they go to an autumn dinner with friends across town. Ruth leaves the party’s number beside the kitchen phone. If the nursery bell rings, she tells Milley, knock on the wall before going upstairs.
+
+At eight, the bell rings. Agnes knocks three times. Three knocks come back. Then her mother’s voice calls from upstairs and gets her name wrong. “She usually gets my name right,” Agnes says, putting down her apple slice. Milley calls the party and hears Ruth on the line. The voice upstairs is still talking.
+
+That’s the story behind ServrSit’s Bellroad theme. **If Agnes and Otis need Milley, your servers need a sitter too.**
 
 ## A home for your agents
 
@@ -24,7 +34,7 @@ The screens below use labeled sample data.
 
 ### Fleet overview
 
-See which servers need attention, when they were last checked, and where to ask Millie about the fleet.
+See which servers need attention, when they were last checked, and where to ask Milley about the fleet.
 
 ![ServrSit fleet overview with server health, observation times, findings, and the Ask the Sitter panel](docs/images/fleet-overview.png)
 
@@ -55,13 +65,11 @@ It also keeps a history of every check and operation (with export), tracks findi
 
 ## The Bellroad crew
 
-The house on Bellroad got its first server when an agent needed somewhere to finish a job overnight. The spare computer went under the stairs. A second soon followed, and three neighbors started taking turns checking on them.
-
 | Character | Backstory |
 | --- | --- |
-| <img src="apps/web/public/bellroad/milley.webp" alt="Millie with her notebook" width="90"> | **Millie** was the neighbor everyone trusted with a spare key. Now she makes her rounds with a lantern and a notebook. Her first question is always, “When did we last see it working?” |
-| <img src="apps/web/public/bellroad/otis.webp" alt="Otis and his toy duck" width="90"> | **Otis** built the first server shelf after his toy duck slid off a crooked stack of blocks. He measures everything twice now. The duck supervises. |
-| <img src="apps/web/public/bellroad/agnes.webp" alt="Agnes launching a paper plane" width="90"> | **Agnes** used to fly paper planes over the garden fence to share the neighborhood news. Now she pins each check to the kitchen corkboard and saves her best planes for messages Millie needs to see right away. |
+| <img src="apps/web/public/bellroad/milley.webp" alt="Milley reading a notebook" width="90"> | **Milley Reed, 17.** She runs sound for the school plays and babysits to save up for a used bicycle. When the nursery bell rings, she brings out her cassette recorder and keeps both kids close. |
+| <img src="apps/web/public/bellroad/agnes.webp" alt="Agnes launching a paper plane" width="90"> | **Agnes Vale, 9.** She keeps a notebook of the house’s strange noises and exactly when she heard them. A voice in the wall can scare her and still get corrected on its pronunciation. |
+| <img src="apps/web/public/bellroad/otis.webp" alt="Otis and his toy duck" width="90"> | **Otis Vale, 18 months.** One sock is always coming off, and he drums on whatever’s handy with his wooden spoon. When he hears his mother’s voice, he waits for her footsteps. When none come, he turns back to Milley for another bite. |
 
 ## Safety model, briefly
 
