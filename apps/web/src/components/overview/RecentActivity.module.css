@@ -199,3 +199,8 @@
 :global(.bellroad-theme) .heading::before {
   content: none;
 }
+
+@media (min-width: 1200px) and (min-height: 620px) {
+  :global(.bellroad-theme) .section { max-height: none; }
+  :global(.bellroad-theme) .scroll { overflow: visible; }
+}

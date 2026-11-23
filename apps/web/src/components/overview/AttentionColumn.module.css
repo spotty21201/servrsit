@@ -172,3 +172,18 @@
 :global(.bellroad-theme) .heading::before {
   content: none;
 }
+
+/* The short server tag in each finding: same name treatment as the cards (T-097). */
+:global(.bellroad-theme) .serverName {
+  font-family: var(--bellroad-font-name);
+  font-weight: 400;
+  font-size: .95rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--bellroad-name);
+}
+/* Bellroad lets the page scroll: the lists show everything instead of scrolling inside the panel. */
+@media (min-width: 1200px) and (min-height: 620px) {
+  :global(.bellroad-theme) .column { max-height: none; }
+  :global(.bellroad-theme) .scroll { overflow: visible; }
+}

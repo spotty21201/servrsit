@@ -124,15 +124,15 @@
 
 .brandTitle {
   margin: 0;
-  font: 700 clamp(2.65rem, 5.5vw, 5.5rem)/1.02 var(--font-sans);
-  letter-spacing: -.072em;
+  font: 400 clamp(2.1rem, 4.6vw, 4.4rem)/1.05 var(--bellroad-font-wordmark);
+  letter-spacing: -.02em;
 }
 
 .tagline {
   margin: .15rem 0 .35rem;
   color: #e5d5b8;
   font-size: clamp(.91rem, 1.4vw, 1.3rem);
-  font-weight: 600;
+  font-weight: 400;
 }
 
 .fleetMeta {
@@ -189,7 +189,7 @@
 
 .pageHeader h1 {
   font-family: var(--font-sans);
-  font-weight: 600;
+  font-weight: 400;
   font-size: 1.65rem;
   line-height: 1.2;
 }

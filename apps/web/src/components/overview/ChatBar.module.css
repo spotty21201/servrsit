@@ -265,7 +265,13 @@
 }
 
 :global(.bellroad-theme) .wrap { max-width: none; }
-:global(.bellroad-theme) .label { font-family: var(--font-pixel); }
+:global(.bellroad-theme) .label {
+  font-family: var(--bellroad-font-wordmark);
+  font-weight: 400;
+  font-size: 1.05rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
 :global(.bellroad-theme) .console { background: #182d30; box-shadow: none; }
 :global(.bellroad-theme) .send:not(:disabled) {
   background-color: var(--bellroad-amber);

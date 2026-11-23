@@ -512,3 +512,7 @@
     font-size: .7rem;
   }
 }
+
+@media (min-width: 1200px) and (min-height: 620px) {
+  .appShell:global(.bellroad-theme) .lowerGrid { max-height: none; }
+}
