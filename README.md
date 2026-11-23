@@ -24,7 +24,11 @@ You close your laptop at night and take it with you when you leave. Agents that 
 
 Soon you're keeping track of what every agent is doing while also dealing with full disks, failed services, and pending updates on the machines they live on. **That's when you hire a ServerSitter.**
 
-ServrSit is a caretaker for a small fleet of Ubuntu servers (about 2 to 20), for people who need servers but don't want to spend their time administering them. It checks your machines, explains what it found in plain language, proposes maintenance, and makes changes only after you approve them, then verifies the result.
+ServrSit is an agentic caretaker for small Ubuntu fleets (about 2 to 20 servers). It connects to an AI model so you can ask about any connected server or the whole fleet in plain language. Try “How’s my web server doing?” or “Does it need updates?” ServrSit answers from its latest observations and shows when they were collected.
+
+If updates are needed, open the server’s **Care → Review updates** control to request a plan. You’ll see the exact packages and the potential impact. Once you approve the plan, ServrSit applies it and verifies the installed versions.
+
+The [product requirements](docs/product/02_ServerSit%20-%20PRD.md#63-perform-maintenance) also describe asking “Prepare an update for my web server” in chat to open that same review flow.
 
 > **Status: founder alpha, in development.** Not ready for other users. It runs privately on the founder's own machines. Changes are enabled on one disposable test server only.
 
