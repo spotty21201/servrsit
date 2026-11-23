@@ -335,11 +335,17 @@ h1.noticeTitle { font-size: var(--text-section-title-size); line-height: var(--t
 }
 
 /* Bellroad pages: the main action is amber with dark ink (T-097). Plan, operation and connect are not themed. */
-:global(.bellroad-theme) .primary {
+:global(.bellroad-theme) .primary:not(:disabled):not([aria-disabled="true"]) {
   background-color: var(--bellroad-amber);
   border-color: #ffcb83;
   color: var(--bellroad-button-ink);
 }
 :global(.bellroad-theme) .primary:hover:not(:disabled):not([aria-disabled="true"]) {
   background-color: #ffc16c;
+}
+
+/* Bellroad: page titles use the interface font (Almarai); the pixel faces are for the wordmark, labels and server names. */
+:global(.bellroad-theme) .title {
+  font-family: var(--font-sans);
+  font-weight: 400;
 }

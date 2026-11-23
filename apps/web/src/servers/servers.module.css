@@ -93,3 +93,6 @@
 .progress li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-1); font-size: var(--text-compact-size); }
 
 .inlineLink { display: inline-flex; align-items: center; min-height: var(--touch-target-min); text-decoration: underline; font-weight: var(--font-weight-semibold); }
+
+/* On the dark Bellroad page the server name takes the same warm amber as the cards (6:1 on the page). */
+:global(.bellroad-theme) .name { color: var(--bellroad-name); }
