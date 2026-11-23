@@ -113,10 +113,13 @@ function SourceBadge({ source }: { source: DataSourceVM }) {
 }
 
 /**
- * Rack lights are presentation only and follow the existing status: green for passed, amber for attention.
- * Anything that is overdue, unobserved, historical or in another state stays dim.
+ * Rack lights are presentation only and follow the existing status:
+ *   green for passed and amber for attention, when the server was observed and the data is current;
+ *   their own failed lamp for a failed status (access denied, host key changed, configuration rejected);
+ *   dim for everything else: unknown, unobserved, overdue, historical, in progress.
  */
-function rackState(s: ServerCardVM): "passed" | "attention" | "dim" {
+function rackState(s: ServerCardVM): "passed" | "attention" | "failed" | "dim" {
+  if (s.statusKey === "failed") return "failed";
   if (s.tone === "no-data" || s.historical) return "dim";
   return s.statusKey === "passed" || s.statusKey === "attention" ? s.statusKey : "dim";
 }

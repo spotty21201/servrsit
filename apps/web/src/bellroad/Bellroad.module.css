@@ -351,6 +351,9 @@
 
 .rack[data-state="passed"] { --rack-led: #b7e674; }
 .rack[data-state="attention"] { --rack-led: #ffb451; }
+/* Failed uses the theme's own failed colour, lit and steady (it does not pulse). */
+.rack[data-state="failed"] { --rack-led: var(--color-state-failed-fg); }
+.rack[data-state="failed"] .lamp:not(.pulse) { box-shadow: 0 0 4px var(--rack-led); }
 
 .bay {
   position: relative;

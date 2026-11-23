@@ -95,7 +95,7 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
 
       <nav ref={navRef} className={styles.nav} aria-label="Main navigation">
         <div className={styles.wordmark}>
-          <BellroadMark />
+          <BellroadMark current />
         </div>
 
         <div className={styles.navAccount}>
@@ -120,7 +120,7 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
 
       <main className={styles.main} id="main-content" tabIndex={-1}>
         <div className={styles.contentWrapper}>
-          <section className={styles.roster} aria-labelledby="servers-heading" aria-busy={vm.phase === "loading" || undefined}>
+          <section className={styles.roster} aria-label="Your servers" aria-busy={vm.phase === "loading" || undefined}>
             <header className={bellroad.masthead}>
               <div className={bellroad.headline}>
                 <h1 id="servers-heading" className={bellroad.brandTitle}>ServrSit</h1>

@@ -24,9 +24,10 @@ export function isBellroadPage(section: string): section is Scene {
   return Object.prototype.hasOwnProperty.call(scenes, section);
 }
 
-export function BellroadMark() {
+/** The portrait links to the Overview. Its accessible name contains the visible text ("ServerSitter version 1.0"). */
+export function BellroadMark({ current = false }: { current?: boolean }) {
   return (
-    <a href="/overview" className={styles.mark} aria-label="ServrSit overview">
+    <a href="/overview" className={styles.mark} aria-label="ServerSitter version 1.0, Overview" aria-current={current ? "page" : undefined}>
       <img src={artRoot + "/milley-icon.webp"} alt="" width="96" height="96" />
       <span>ServerSitter version 1.0</span>
     </a>
@@ -58,7 +59,7 @@ export function BellroadLinks({ current, className, itemClassName, activeClassNa
   );
 }
 
-export function BellroadRack({ state }: { state: string }) {
+export function BellroadRack({ state }: { state: "passed" | "attention" | "failed" | "dim" }) {
   return (
     <span className={styles.rack} data-state={state} aria-hidden="true">
       <span className={styles.bay}><span className={styles.lamp} /></span>
