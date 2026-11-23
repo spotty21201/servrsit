@@ -21,6 +21,7 @@ import { DEFAULT_OWNER_TIME_ZONE, formatClock, formatClockWithAge, parseIso } fr
 import { usePageTitle } from "../lib/pageTitle";
 import { SchedulerNotice } from "./SchedulerNotice";
 import { actionErrorText, schedulerNotice, sortFindings, summarise, toFindingVM, type FindingVM } from "./findingsViewModel";
+import { BellroadPageHeader } from "../bellroad/Bellroad";
 import c from "../care/care.module.css";
 import s from "./findings.module.css";
 
@@ -113,10 +114,10 @@ export function FindingsScreen({ client: injected, fixture = false }: { client?:
 
   return (
     <CareShell fixture={fixture || snap?.mode === "fixture"} section="Findings">
-      <header className={c.header}>
+      <BellroadPageHeader scene="Findings">
         <h1 className={c.title}>Findings</h1>
         <p className={c.small}>Issues ServrSit found on your servers. Stage A keeps them here in the app. {snap && !snap.externalAlerts.available ? snap.externalAlerts.reason : "External alerts such as email are not available yet."}</p>
-      </header>
+      </BellroadPageHeader>
 
       {notice && <SchedulerNotice notice={notice} />}
       {snap && <SchedulerLine status={snap.scheduler} busy={busy} now={now} onPause={() => void act(client.pause())} onResume={() => void act(client.resume())} />}

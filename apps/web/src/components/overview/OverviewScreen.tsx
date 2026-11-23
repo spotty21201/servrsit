@@ -36,7 +36,8 @@ import { ChatBar } from "./ChatBar.js";
 import type { OverviewVM } from "./fleetViewModel.js";
 import { CompactServerList } from "./CompactServerList.js";
 import { ScrollRegion } from "./ScrollRegion.js";
-import { PixelServerIcon } from "../server-card/PixelServerIcon.js";
+import { BellroadComposer, BellroadHouse, BellroadLinks, BellroadMark } from "../../bellroad/Bellroad";
+import bellroad from "../../bellroad/Bellroad.module.css";
 import {
   applyOrder, effectiveView, offersList, orderDiffers, orderIds, parsePrefs, PREFS_KEY, serializePrefs, SORT_LABEL,
   type OverviewPrefs, type SortKey,
@@ -89,18 +90,12 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
   };
   const changeSort = (sort: SortKey): void => { savePrefs({ ...prefs, sort }); setIds(orderIds(vm.servers, sort)); };
   return (
-    <div className={styles.appShell}>
+    <div className={`${styles.appShell} ${bellroad.theme} bellroad-theme`}>
       <TopBanners fixture={vm.anyFixture} />
 
       <nav ref={navRef} className={styles.nav} aria-label="Main navigation">
         <div className={styles.wordmark}>
-          <span className="sr-only">ServrSit</span>
-          {/* The 88 px rail only has room for a compact mark; the full wordmark shows in the top bar below 1200 px and on every other page. */}
-          <PixelServerIcon variant="lilac" size={32} className={styles.railMark} />
-          <span className={`${styles.wordmarkText} pixel-text`} aria-hidden="true">
-            <span className={styles.wordmarkStack}>Servr</span>
-            <span className={styles.wordmarkStack}>Sit</span>
-          </span>
+          <BellroadMark current />
         </div>
 
         <div className={styles.navAccount}>
@@ -113,67 +108,56 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
           )}
         </div>
 
-        <ul className={styles.navList}>
-          <li>
-            <a href="/overview" className={`${styles.navItem} ${styles.navItemActive}`} aria-current="page">
-              <NavIconOverview />
-              <span className={styles.navLabel}>Overview</span>
-            </a>
-          </li>
-          <li>
-            <a href="/activity" className={styles.navItem}>
-              <NavIconActivity />
-              <span className={styles.navLabel}>Activity</span>
-            </a>
-          </li>
-          <li>
-            <a href="/settings" className={styles.navItem}>
-              <NavIconSettings />
-              <span className={styles.navLabel}>Settings</span>
-            </a>
-          </li>
-        </ul>
+        <BellroadLinks
+          current="Overview"
+          className={styles.navList}
+          itemClassName={styles.navItem}
+          activeClassName={styles.navItemActive}
+          labelClassName={styles.navLabel}
+        />
 
       </nav>
 
       <main className={styles.main} id="main-content" tabIndex={-1}>
-        <div className={styles.band} aria-hidden="true" />
-
         <div className={styles.contentWrapper}>
-          <section className={styles.roster} aria-labelledby="servers-heading" aria-busy={vm.phase === "loading" || undefined}>
-            <header className={styles.columnHeader}>
-              <h1 id="servers-heading" className={`${styles.pageTitle} pixel-text`}>Your servers</h1>
-              <p className={styles.pageMeta}>
-                <span>Spotty&rsquo;s fleet</span>
-                {hasData && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span>
-                      {vm.counts.total} server{vm.counts.total === 1 ? "" : "s"}
-                      {vm.counts.none > 0 && ` (${vm.counts.none} without data)`}
-                    </span>
-                  </>
-                )}
-                {vm.receivedText && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span>Updated {vm.receivedText}</span>
-                  </>
-                )}
-                {vm.nextCheckText && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span>Next check {vm.nextCheckText}</span>
-                  </>
-                )}
-                {vm.refreshing && hasData && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span>Refreshing…</span>
-                  </>
-                )}
-              </p>
-              {!empty && <a href="/servers/new" className={styles.connectLink}>Connect a server</a>}
+          <section className={styles.roster} aria-label="Your servers" aria-busy={vm.phase === "loading" || undefined}>
+            <header className={bellroad.masthead}>
+              <div className={bellroad.headline}>
+                <h1 id="servers-heading" className={bellroad.brandTitle}>ServrSit</h1>
+                <p className={bellroad.tagline}>Your servers have a sitter.</p>
+                <p className={`${styles.pageMeta} ${bellroad.fleetMeta}`}>
+                  <span>Spotty&rsquo;s fleet</span>
+                  {hasData && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        {vm.counts.total} server{vm.counts.total === 1 ? "" : "s"}
+                        {vm.counts.none > 0 && ` (${vm.counts.none} without data)`}
+                      </span>
+                    </>
+                  )}
+                  {vm.receivedText && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span>Updated {vm.receivedText}</span>
+                    </>
+                  )}
+                  {vm.nextCheckText && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span>Next check {vm.nextCheckText}</span>
+                    </>
+                  )}
+                  {vm.refreshing && hasData && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span>Refreshing…</span>
+                    </>
+                  )}
+                </p>
+              </div>
+              <BellroadHouse />
+              {!empty && <a href="/servers/new" className={`${styles.connectLink} ${bellroad.connect}`}>Connect a server</a>}
             </header>
 
             {/* Data-state notices (inline, never a toast) */}
@@ -250,7 +234,7 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
                 ) : (
                   <div className={styles.rosterGrid}>
                     {ordered.map((server) => (
-                      <ServerCard key={server.id} server={server} />
+                      <ServerCard key={server.id} server={server} appearance="bellroad" />
                     ))}
                   </div>
                 )}
@@ -264,7 +248,13 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
             <RecentActivity operations={[]} />
           </div>
 
-          {!empty && <div className={styles.chatSlot}><ChatBar servers={vm.servers.map((s) => ({ id: s.id, name: s.name }))} timeZone={vm.timeZone} /></div>}
+          {!empty && (
+            <div className={styles.chatSlot}>
+              <BellroadComposer>
+                <ChatBar servers={vm.servers.map((s) => ({ id: s.id, name: s.name }))} timeZone={vm.timeZone} />
+              </BellroadComposer>
+            </div>
+          )}
         </div>
       </main>
     </div>
@@ -272,40 +262,3 @@ export function OverviewScreen({ vm, onRetry }: OverviewScreenProps) {
 }
 
 // ── Nav icons (pixel style, 8×8 grid scaled to 24 px, crisp) ──────────────
-
-function NavIconOverview() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
-      <rect x="0" y="0" width="3" height="3" fill="currentColor" />
-      <rect x="5" y="0" width="3" height="3" fill="currentColor" />
-      <rect x="0" y="5" width="3" height="3" fill="currentColor" />
-      <rect x="5" y="5" width="3" height="3" fill="currentColor" />
-    </svg>
-  );
-}
-
-function NavIconActivity() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
-      <rect x="0" y="4" width="2" height="1" fill="currentColor" />
-      <rect x="2" y="2" width="1" height="2" fill="currentColor" />
-      <rect x="3" y="1" width="1" height="1" fill="currentColor" />
-      <rect x="4" y="2" width="1" height="4" fill="currentColor" />
-      <rect x="5" y="5" width="1" height="1" fill="currentColor" />
-      <rect x="6" y="3" width="2" height="1" fill="currentColor" />
-    </svg>
-  );
-}
-
-function NavIconSettings() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
-      <rect x="0" y="1" width="8" height="1" fill="currentColor" />
-      <rect x="0" y="3" width="8" height="1" fill="currentColor" />
-      <rect x="0" y="6" width="8" height="1" fill="currentColor" />
-      <rect x="5" y="0" width="2" height="3" fill="currentColor" />
-      <rect x="1" y="2" width="2" height="3" fill="currentColor" />
-      <rect x="4" y="5" width="2" height="3" fill="currentColor" />
-    </svg>
-  );
-}

@@ -19,6 +19,7 @@ import type { CSSProperties } from "react";
 import type { DataSourceVM, IdentityColor, ServerCardVM } from "../overview/fleetViewModel.js";
 import { StatusBadge } from "../StatusBadge/index.js";
 import { PixelServerIcon } from "./PixelServerIcon.js";
+import { BellroadRack } from "../../bellroad/Bellroad";
 import styles from "./ServerCard.module.css";
 
 const IDENTITY_VAR: Record<IdentityColor, string> = {
@@ -111,11 +112,24 @@ function SourceBadge({ source }: { source: DataSourceVM }) {
   );
 }
 
-interface ServerCardProps {
-  server: ServerCardVM;
+/**
+ * Rack lights are presentation only and follow the existing status:
+ *   green for passed and amber for attention, when the server was observed and the data is current;
+ *   their own failed lamp for a failed status (access denied, host key changed, configuration rejected);
+ *   dim for everything else: unknown, unobserved, overdue, historical, in progress.
+ */
+function rackState(s: ServerCardVM): "passed" | "attention" | "failed" | "dim" {
+  if (s.statusKey === "failed") return "failed";
+  if (s.tone === "no-data" || s.historical) return "dim";
+  return s.statusKey === "passed" || s.statusKey === "attention" ? s.statusKey : "dim";
 }
 
-export function ServerCard({ server: s }: ServerCardProps) {
+interface ServerCardProps {
+  server: ServerCardVM;
+  appearance?: "bellroad";
+}
+
+export function ServerCard({ server: s, appearance }: ServerCardProps) {
   const headingId = `server-${s.id}-name`;
   const isFresh = s.status === "fresh" || s.status === "partial";
 
@@ -126,7 +140,7 @@ export function ServerCard({ server: s }: ServerCardProps) {
       style={{ "--card-identity": IDENTITY_VAR[s.identity] } as CSSProperties}
     >
       <header className={styles.header}>
-        <PixelServerIcon variant={s.identity} className={styles.icon} />
+        {appearance === "bellroad" ? <BellroadRack state={rackState(s)} /> : <PixelServerIcon variant={s.identity} className={styles.icon} />}
         <div className={styles.identity}>
           <h2 id={headingId} className={`${styles.name} pixel-text`}>
             <a href={`/servers/${encodeURIComponent(s.id)}`} className={styles.nameLink} title={s.name}>

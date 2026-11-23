@@ -7,6 +7,8 @@
 import type { ReactNode } from "react";
 import { TopBanners } from "../clock/TopBanners";
 import { SignOutButton } from "../auth/SignOutButton";
+import { BellroadLinks, BellroadMark, isBellroadPage } from "../bellroad/Bellroad";
+import bellroad from "../bellroad/Bellroad.module.css";
 import styles from "./care.module.css";
 
 interface CareShellProps {
@@ -17,19 +19,31 @@ interface CareShellProps {
 }
 
 export function CareShell({ fixture, section, children }: CareShellProps) {
+  // Every screen in this shell wears the Bellroad theme (round 5): the rail from the Overview beside the content.
+  // The breadcrumb and Sign out stay at the top of the content column, in their old tab order after the navigation.
+  // Only the four section pages (Findings, Activity, Baselines, Settings) are marked as the current page in the rail.
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} ${bellroad.theme} bellroad-theme`}>
       <TopBanners fixture={fixture} />
-      <header className={styles.topbar}>
-        <a href="/" className={`${styles.brand} pixel-text`} aria-label="ServrSit, back to Overview">ServrSit</a>
-        <nav aria-label="Breadcrumb" className={styles.crumbs}>
-          <a href="/">Overview</a>
-          <span aria-hidden="true">/</span>
-          <span aria-current="page">{section}</span>
-        </nav>
-        <SignOutButton variant="bar" />
-      </header>
-      <main id="main-content" className={styles.main} tabIndex={-1}>{children}</main>
+      <div className={bellroad.frame}>
+        <aside className={bellroad.rail}>
+          <BellroadMark />
+          <nav aria-label="Main navigation">
+            <BellroadLinks current={isBellroadPage(section) ? section : ""} className={bellroad.railLinks} />
+          </nav>
+        </aside>
+        <div className={bellroad.pane}>
+          <header className={`${styles.topbar} ${bellroad.paneBar}`}>
+            <nav aria-label="Breadcrumb" className={styles.crumbs}>
+              <a href="/">Overview</a>
+              <span aria-hidden="true">/</span>
+              <span aria-current="page">{section}</span>
+            </nav>
+            <SignOutButton variant="bar" />
+          </header>
+          <main id="main-content" className={styles.main} tabIndex={-1}>{children}</main>
+        </div>
+      </div>
     </div>
   );
 }

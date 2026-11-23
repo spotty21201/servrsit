@@ -21,6 +21,7 @@ import { StatusBadge } from "../components/StatusBadge/index.js";
 import { PixelServerIcon } from "../components/server-card/PixelServerIcon.js";
 import { DEFAULT_OWNER_TIME_ZONE, resolveTimeZone } from "../lib/time";
 import { usePageTitle } from "../lib/pageTitle";
+import "../bellroad/fonts.css";
 import { createReviewRunner, REVIEW_PENDING_LABEL, type ReviewPhase } from "./reviewUpdates";
 import { DASH, toServerDetailVM, type MountRow, type ServerDetailVM, type Shown } from "./serverDetailViewModel";
 import c from "../care/care.module.css";

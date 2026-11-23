@@ -190,7 +190,7 @@ export function ChatBar({ servers, timeZone }: ChatBarProps) {
       <form className={styles.form} onSubmit={onSubmit}>
         <div className={styles.header}>
           <label id={labelId} htmlFor={inputId} className={styles.label}>
-            Ask ServrSit
+            Ask the Sitter
           </label>
           <label htmlFor={scopeId} className="sr-only">
             Scope
@@ -217,7 +217,7 @@ export function ChatBar({ servers, timeZone }: ChatBarProps) {
             className={styles.input}
             rows={3}
             maxLength={MAX_MESSAGE_LENGTH}
-            placeholder="What needs attention? Explain Nabire's updates…"
+            placeholder="What needs attention?"
             autoComplete="off"
             value={message}
             onChange={(e) => setMessage(e.target.value)}

@@ -333,3 +333,27 @@ h1.noticeTitle { font-size: var(--text-section-title-size); line-height: var(--t
   .check:has(input:checked) { border: 2px solid Highlight; }
   .transcript { border: 1px solid CanvasText; }
 }
+
+/* Bellroad pages: the main action is amber with dark ink (T-097). Plan, operation and connect are not themed. */
+:global(.bellroad-theme) .primary:not(:disabled):not([aria-disabled="true"]) {
+  background-color: var(--bellroad-amber);
+  border-color: #ffcb83;
+  color: var(--bellroad-button-ink);
+}
+:global(.bellroad-theme) .primary:hover:not(:disabled):not([aria-disabled="true"]) {
+  background-color: #ffc16c;
+}
+
+/* Bellroad: page titles use the interface font (Almarai); the pixel faces are for the wordmark, labels and server names. */
+:global(.bellroad-theme) .title {
+  font-family: var(--font-sans);
+  font-weight: 400;
+}
+
+/* Bellroad: the read-only transcript stays a dark tile (the theme's ink is bone). Text 14.8:1, times 10.7:1. */
+:global(.bellroad-theme) .transcript {
+  background-color: #0d1a1b;
+  color: #f5e9d5;
+  border: 1px solid var(--bellroad-line);
+}
+:global(.bellroad-theme) .tTime { color: #c0cbc3; }

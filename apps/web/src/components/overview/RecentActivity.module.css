@@ -186,3 +186,33 @@
   .section { min-height: 0; max-height: 100%; }
   .scroll { flex: 1 1 auto; overflow: auto; overscroll-behavior: contain; padding-right: var(--space-half); }
 }
+
+:global(.bellroad-theme) .section {
+  padding: .7rem .8rem;
+  border: 1px solid var(--bellroad-line);
+  border-radius: 10px;
+  background-color: var(--color-surface);
+}
+:global(.bellroad-theme) .heading {
+  font-family: var(--font-sans);
+}
+:global(.bellroad-theme) .heading::before {
+  content: none;
+}
+
+@media (min-width: 1200px) and (min-height: 620px) and (max-height: 819px) {
+  :global(.bellroad-theme) .section { max-height: none; }
+  :global(.bellroad-theme) .scroll { overflow: visible; }
+}
+
+/* Fit-to-window mode (T-097): the list never shrinks below one whole row, and scrolling settles on row starts. */
+@media (min-width: 1200px) and (min-height: 820px) {
+  :global(.bellroad-theme) .scroll { min-height: 5.5rem; scroll-snap-type: y proximity; }
+  /* Where the list continues below the edge, the rows fade out instead of being cut mid-glyph. The first row ends above the fade. */
+  :global(.bellroad-theme) .scroll[tabindex="0"] {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1rem), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 1rem), transparent);
+  }
+  :global(.bellroad-theme) .scroll[tabindex="0"] > ul { padding-bottom: 1rem; }
+  :global(.bellroad-theme) .item { scroll-snap-align: start; }
+}

@@ -320,3 +320,34 @@
     padding: 0 var(--space-2);
   }
 }
+
+:global(.bellroad-theme) .card {
+  border-color: var(--bellroad-line);
+  background: linear-gradient(142deg, #263c3d, var(--color-surface));
+  box-shadow: 0 3px 0 #10212180;
+}
+:global(.bellroad-theme) .card:hover {
+  border-color: var(--color-control-boundary);
+}
+:global(.bellroad-theme) .primaryAction {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* Bellroad server names: Bitcount Single, uppercase, warm amber on the dark card (T-097). */
+:global(.bellroad-theme) .name {
+  font-family: var(--bellroad-font-name);
+  font-weight: 400;
+  font-size: clamp(1.15rem, 1.9vw, 1.6rem);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--bellroad-name);
+}
+:global(.bellroad-theme) .nameLink:focus-visible {
+  background-color: transparent;
+  text-decoration: underline;
+  text-decoration-color: var(--color-focus);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

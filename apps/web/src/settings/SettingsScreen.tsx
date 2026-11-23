@@ -34,6 +34,7 @@ import {
   nextDailyRun, nextHealthRun, REFRESH_NOTE, RETENTION_NOTE, SCHEDULE_STATEMENT, SENT_TO_AI, settingsErrorText, TIME_ZONES, toScheduleDraft, validateSchedule, zoneName,
   type ScheduleDraft,
 } from "./settingsLogic";
+import { BellroadPageHeader } from "../bellroad/Bellroad";
 import c from "../care/care.module.css";
 import s from "../servers/servers.module.css";
 import st from "./settings.module.css";
@@ -137,10 +138,10 @@ export function SettingsScreen({ client: injected, fixture = false }: { client?:
 
   return (
     <CareShell fixture={fixture || fleet.data?.mode === "fixture"} section="Settings">
-      <header className={c.header}>
+      <BellroadPageHeader scene="Settings">
         <h1 className={c.title}>Settings</h1>
         <p className={c.small}>Schedules, AI and data, and server access.{fixture ? " This page uses sample data and does not touch a real schedule or connection." : ""}</p>
-      </header>
+      </BellroadPageHeader>
 
       {error && !data && <LoadFailure title="Couldn't load settings" text="Nothing is shown until real data arrives. Your schedule and connections are unchanged." onRetry={() => void load()} heading={false} />}
       {!data && !error && <p className={c.p} role="status">Loading settings…</p>}
