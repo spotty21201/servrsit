@@ -4,6 +4,8 @@
 
 **Your servers have a sitter. Less babysitting, more building.**
 
+ServrSit was built from the ground up with Kiro agents.
+
 ## A home for your agents
 
 In the agentic era, one person can keep several agents working around the clock. One runs tests, another writes docs, and a third works through a backlog. They can work together on one server or run independently on separate machines and hand work to each other. There's usually a job for one more.
