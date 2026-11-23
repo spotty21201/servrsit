@@ -18,7 +18,7 @@
   --color-state-unknown-fg: #d9dfd9;
   --color-state-unknown-bg: #38494b;
   --color-state-failed-fg: #ffd2c5;
-  --color-state-failed-bg: #60342d;
+  --color-state-failed-bg: #702629; /* clearly redder than the attention brown #573d25: 7.65:1 with the failed text */
   --color-state-progress-fg: #bfdfed;
   --color-state-progress-bg: #244658;
   --bellroad-rail: #101f20;

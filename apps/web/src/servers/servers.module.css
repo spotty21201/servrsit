@@ -96,3 +96,11 @@
 
 /* On the dark Bellroad page the server name takes the same warm amber as the cards (6:1 on the page). */
 :global(.bellroad-theme) .name { color: var(--bellroad-name); }
+
+/* Bellroad: code blocks (fingerprint, commands, key lines) keep a dark tile with light mono text.
+   In the theme --color-ink is bone, so the old "ink background" made them light on light. 14.8:1. */
+:global(.bellroad-theme) .codeBlock {
+  background: #0d1a1b;
+  color: #f5e9d5;
+  border: 1px solid var(--bellroad-line);
+}
