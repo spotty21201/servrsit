@@ -245,3 +245,66 @@
   .card { padding: var(--space-3); }
   .qrWrap { grid-template-columns: auto minmax(0, 1fr); align-items: start; }
 }
+
+/* ── Bellroad theme (round 5) ──────────────────────────────────────────── */
+
+.cardWrap { position: relative; }
+.withScene { margin-top: 4.8rem; }
+
+/* Decoration only: standing on the top edge of the card, outside it. */
+.agnes, .otis {
+  position: absolute;
+  bottom: calc(100% - 3px);
+  height: auto;
+  pointer-events: none;
+  image-rendering: pixelated;
+  filter: drop-shadow(2px 3px 0 #0c1819);
+}
+.agnes { right: .75rem; width: 4.75rem; }
+.otis { display: none; left: .75rem; width: 5.5rem; }
+
+@media (min-width: 480px) {
+  .withScene { margin-top: 6.2rem; }
+  .agnes { right: 1rem; width: 6.25rem; }
+  .otis { left: 1rem; width: 7rem; }
+  .otis { display: block; }
+}
+
+:global(.bellroad-theme) .brand {
+  font-family: var(--bellroad-font-wordmark);
+  font-weight: 400;
+  font-size: clamp(1.9rem, 9vw, 2.6rem);
+  line-height: 1.05;
+  letter-spacing: -.02em;
+}
+:global(.bellroad-theme) .tagline { color: #e5d5b8; }
+:global(.bellroad-theme) .card {
+  border: 1px solid var(--bellroad-line);
+  border-radius: 10px;
+  background: linear-gradient(142deg, #263c3d, var(--color-surface));
+  box-shadow: 0 3px 0 #10212180;
+}
+:global(.bellroad-theme) .title {
+  font-family: var(--bellroad-font-wordmark);
+  font-weight: 400;
+  font-size: 1.35rem;
+  line-height: 1.25;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+:global(.bellroad-theme) .primary {
+  background-color: var(--bellroad-amber);
+  border-color: #ffcb83;
+  color: var(--bellroad-button-ink);
+}
+:global(.bellroad-theme) .primary:hover:not(:disabled):not([aria-disabled="true"]) { background-color: #ffc16c; }
+:global(.bellroad-theme) .primary:disabled,
+:global(.bellroad-theme) .primary[aria-disabled="true"] {
+  background-color: var(--color-state-unknown-bg);
+  border-color: var(--color-control-boundary);
+  color: var(--color-state-unknown-fg);
+}
+:global(.bellroad-theme) .field input[type="text"],
+:global(.bellroad-theme) .field input[type="password"] { background-color: #182d30; }
+:global(.bellroad-theme) .signOutBtnBar,
+:global(.bellroad-theme) .signOutBtnRail { border-color: var(--color-ink); }

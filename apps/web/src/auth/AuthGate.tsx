@@ -81,13 +81,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
   switch (mode.kind) {
     case "checking":
       return (
-        <AuthFrame title="ServrSit">
+        <AuthFrame title="ServrSit" scene={false}>
           <p className={styles.p} role="status">Checking your session…</p>
         </AuthFrame>
       );
     case "unreachable":
       return (
-        <AuthFrame title="Can't reach ServrSit">
+        <AuthFrame title="Can't reach ServrSit" scene={false}>
           <Notice tone="unknown" alert>The ServrSit API did not answer, so it isn&rsquo;t known whether you are signed in. Nothing was changed.</Notice>
           <button type="button" className={styles.primary} onClick={() => void check()}>Try again</button>
         </AuthFrame>
