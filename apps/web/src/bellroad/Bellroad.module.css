@@ -322,7 +322,9 @@
 @media (max-width: 650px) {
   .masthead { grid-template-columns: minmax(0, 1fr) auto; min-height: 8.125rem; }
   .headline { padding-block: .8rem; }
-  .house { grid-column: 1 / -1; width: 76%; filter: brightness(.5); }
+  /* Phones: the sprite stays inside the masthead (no bleed past its edges) and the cards start a clear gap below it. */
+  .masthead { margin-block-end: .75rem; }
+  .house { grid-column: 1 / -1; width: 76%; inset-block-start: 0; height: 100%; filter: brightness(.5); }
   .masthead .connect { grid-column: 2; align-self: end; margin-block-end: .8rem; padding-inline: .45rem; }
   .brandTitle { font-size: clamp(2.3rem, 9.4vw, 4.1rem); }
   .composer { margin-block-start: 4.7rem; grid-template-columns: minmax(0, 1fr); padding-inline: .7rem; }
@@ -400,4 +402,10 @@
   .headline { padding-block: .65rem .5rem; }
   .brandTitle { font-size: clamp(2.1rem, 3.9vw, 3.6rem); }
   .composer { padding-block: .75rem; }
+}
+
+/* The skip link sits outside the themed scope; on Bellroad pages its focus ring uses the Bellroad focus colour. */
+:global(body:has(.bellroad-theme)) :global(.skip-link):focus-visible {
+  outline: 2px solid #ffd896;
+  outline-offset: 2px;
 }

@@ -540,12 +540,20 @@
  * banner leaves too little room, the main column scrolls instead of clipping anything. */
 @media (min-width: 1200px) and (min-height: 820px) {
   .appShell:global(.bellroad-theme) { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
-  .appShell:global(.bellroad-theme) .main { overflow-x: hidden; overflow-y: auto; }
+  /* position: relative makes main the containing block for absolutely positioned content (the visually hidden
+     labels in the lists): without it they sit at the page level, below the fold, and make the document scroll as well. */
+  .appShell:global(.bellroad-theme) .main { position: relative; overflow-x: hidden; overflow-y: auto; }
   .appShell:global(.bellroad-theme) .roster { flex: 0 0 auto; min-height: 0; }
   /* 1200 to 1299 px: four cards in one row, so the cards stay one row tall and the window still fits. */
   .appShell:global(.bellroad-theme) .rosterGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .appShell:global(.bellroad-theme) .rosterScroll { overflow: visible; }
   .appShell:global(.bellroad-theme) .lowerGrid { flex: 1 1 auto; min-height: 11rem; max-height: min(36dvh, 20rem); }
   .appShell:global(.bellroad-theme) .chatSlot { flex: none; }
-  .appShell:global(.bellroad-theme) .contentWrapper { padding-bottom: .75rem; }
+  /* The bottom space belongs to main, so it also follows the content when main scrolls (the composer never touches the window edge). */
+  .appShell:global(.bellroad-theme) .contentWrapper { padding-bottom: 0; }
+  .appShell:global(.bellroad-theme) .main { padding-bottom: .75rem; }
+  /* An overflowing flex item does not carry the bottom space with it, so a small absolutely positioned spacer
+     below the composer keeps 12 px of room under it when main is scrolled to the end. */
+  .appShell:global(.bellroad-theme) .chatSlot { position: relative; }
+  .appShell:global(.bellroad-theme) .chatSlot::after { content: ""; position: absolute; inset-inline-start: 0; top: 100%; width: 1px; height: .75rem; pointer-events: none; }
 }
