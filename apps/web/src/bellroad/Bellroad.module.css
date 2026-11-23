@@ -74,30 +74,86 @@
   image-rendering: pixelated;
 }
 
-.careNav {
+/* Bellroad shell for Findings, Activity, Baselines and Settings: the Overview's rail beside the content. */
+.frame {
+  display: grid;
+  grid-template-columns: 9.625rem minmax(0, 1fr);
+  align-items: start;
+  min-height: calc(100dvh - var(--banner-h, 0px));
+  background: radial-gradient(ellipse at 55% 8%, #1b3439, transparent 58%);
+}
+
+.rail {
+  position: sticky;
+  top: var(--banner-h, 0px);
   display: flex;
-  flex: 1 1 24rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4rem;
+  box-sizing: border-box;
+  height: calc(100dvh - var(--banner-h, 0px));
+  overflow-y: auto;
+  padding: 1.25rem .6rem;
+  background: linear-gradient(163deg, #13292b, var(--bellroad-rail) 68%);
+  border-right: 1px solid #344b49;
+}
+
+.rail .mark {
+  width: 100%;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--bellroad-line);
+}
+
+.rail .mark img { width: 6.25rem; }
+
+.railLinks {
+  display: grid;
   gap: .25rem;
+  width: 100%;
   padding: 0;
 }
 
-.careNav .link {
+.railLinks .link {
   min-height: var(--touch-target-min);
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: .4rem;
-  padding-inline: .55rem;
-  border-radius: 6px;
+  gap: .55rem;
+  padding: .6rem .55rem;
+  border-radius: 7px;
   color: var(--color-ink);
-  font-size: .875rem;
+  font-size: .94rem;
+  text-decoration: none;
 }
 
-.careNav .link:hover,
-.careNav .link[aria-current="page"] {
-  background-color: #c4d3af;
-  color: #172a25;
-  text-decoration: none;
+.railLinks .link:hover { background: #293d3d; text-decoration: none; }
+.railLinks .link[aria-current="page"]:hover { background: #c4d3af; }
+
+.pane {
+  min-width: 0;
+  padding-bottom: 1.5rem;
+}
+
+.theme .paneBar {
+  background: transparent;
+  border-bottom: 0;
+}
+
+@media (max-width: 650px) {
+  .frame { display: block; }
+  .rail {
+    position: static;
+    height: auto;
+    overflow: visible;
+    align-items: stretch;
+    gap: .5rem;
+    padding: .4rem .75rem .5rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--bellroad-line);
+  }
+  .rail .mark { display: flex; justify-content: flex-start; gap: .6rem; padding: 0; border: 0; }
+  .rail .mark img { width: 2.7rem; }
+  .railLinks { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
+  .railLinks .link { flex-direction: column; justify-content: center; gap: 3px; padding: 5px 2px; font-size: .7rem; text-align: center; }
 }
 
 .masthead {

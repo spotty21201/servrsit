@@ -19,21 +19,39 @@ interface CareShellProps {
 }
 
 export function CareShell({ fixture, section, children }: CareShellProps) {
-  const decorated = isBellroadPage(section);
-  return (
-    <div className={decorated ? `${styles.shell} ${bellroad.theme} bellroad-theme` : styles.shell}>
-      <TopBanners fixture={fixture} />
-      <header className={styles.topbar}>
-        {decorated ? (
-          <>
+  if (isBellroadPage(section)) {
+    // Bellroad pages: the rail from the Overview (portrait, version, five links) beside the content.
+    // The breadcrumb and Sign out stay at the top of the content column, in their old tab order after the navigation.
+    return (
+      <div className={`${styles.shell} ${bellroad.theme} bellroad-theme`}>
+        <TopBanners fixture={fixture} />
+        <div className={bellroad.frame}>
+          <aside className={bellroad.rail}>
             <BellroadMark />
             <nav aria-label="Main navigation">
-              <BellroadLinks current={section} className={bellroad.careNav} />
+              <BellroadLinks current={section} className={bellroad.railLinks} />
             </nav>
-          </>
-        ) : (
+          </aside>
+          <div className={bellroad.pane}>
+            <header className={`${styles.topbar} ${bellroad.paneBar}`}>
+              <nav aria-label="Breadcrumb" className={styles.crumbs}>
+                <a href="/">Overview</a>
+                <span aria-hidden="true">/</span>
+                <span aria-current="page">{section}</span>
+              </nav>
+              <SignOutButton variant="bar" />
+            </header>
+            <main id="main-content" className={styles.main} tabIndex={-1}>{children}</main>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className={styles.shell}>
+      <TopBanners fixture={fixture} />
+      <header className={styles.topbar}>
         <a href="/" className={`${styles.brand} pixel-text`} aria-label="ServrSit, back to Overview">ServrSit</a>
-        )}
         <nav aria-label="Breadcrumb" className={styles.crumbs}>
           <a href="/">Overview</a>
           <span aria-hidden="true">/</span>

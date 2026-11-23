@@ -333,3 +333,13 @@ h1.noticeTitle { font-size: var(--text-section-title-size); line-height: var(--t
   .check:has(input:checked) { border: 2px solid Highlight; }
   .transcript { border: 1px solid CanvasText; }
 }
+
+/* Bellroad pages: the main action is amber with dark ink (T-097). Plan, operation and connect are not themed. */
+:global(.bellroad-theme) .primary {
+  background-color: var(--bellroad-amber);
+  border-color: #ffcb83;
+  color: var(--bellroad-button-ink);
+}
+:global(.bellroad-theme) .primary:hover:not(:disabled):not([aria-disabled="true"]) {
+  background-color: #ffc16c;
+}
