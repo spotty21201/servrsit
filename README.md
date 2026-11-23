@@ -34,7 +34,7 @@ The [product requirements](docs/product/02_ServerSit%20-%20PRD.md#63-perform-mai
 
 ## See ServrSit in action
 
-The screens below use labeled sample data.
+These screenshots show the live founder-alpha app.
 
 ### Fleet overview
 
@@ -44,15 +44,13 @@ See which servers need attention, when they were last checked, and where to ask 
 
 ### Review an update
 
-Review the target, package list, impact, and verification steps before approving the plan.
+The plan review shows the target, potential impact, and whether changes are allowed. This screenshot shows approval blocked because changes are switched off for Merauke.
 
-![ServrSit update plan with package scope, service interruption risks, and production approval controls](docs/images/update-plan.png)
+![ServrSit update plan for Merauke showing scope, possible service interruptions, and approval blocked because changes are switched off](docs/images/update-plan.png)
 
 ### Verify the result
 
 The operation timeline shows when the update ran and when the installed versions were checked. In a separate live test, ServrSit verified all 12 approved package versions on a disposable Ubuntu server.
-
-![ServrSit operation timeline showing installation, independent version checks, and a completed and verified result](docs/images/verified-update.png)
 
 ## What it does
 
