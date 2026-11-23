@@ -263,3 +263,21 @@
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
+
+:global(.bellroad-theme) .wrap { max-width: none; }
+:global(.bellroad-theme) .label { font-family: var(--font-pixel); }
+:global(.bellroad-theme) .console { background: #182d30; box-shadow: none; }
+:global(.bellroad-theme) .send:not(:disabled) {
+  background-color: var(--bellroad-amber);
+  color: var(--bellroad-button-ink);
+  border-color: var(--bellroad-amber);
+}
+:global(.bellroad-theme) .input { min-height: 4.75rem; resize: vertical; }
+@supports (field-sizing: content) {
+  :global(.bellroad-theme) .input {
+    field-sizing: content;
+    max-height: 14rem;
+    overflow: auto;
+    resize: none;
+  }
+}

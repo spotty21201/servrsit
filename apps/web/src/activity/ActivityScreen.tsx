@@ -26,6 +26,7 @@ import {
   countText, DEFAULT_FILTERS, exportErrorText, filterRecords, formatBytes, groupByDay, isDefault, PERIOD_LABEL, planExport, RESULT_LABEL, toRow, TRUNCATED_TEXT, TYPE_LABEL,
   type Filters, type Period,
 } from "./activityViewModel";
+import { BellroadPageHeader } from "../bellroad/Bellroad";
 import c from "../care/care.module.css";
 import s from "./activity.module.css";
 
@@ -117,10 +118,10 @@ export function ActivityScreen({ client: injected, fixture = false }: { client?:
 
   return (
     <CareShell fixture={fixture || fleet.data?.mode === "fixture"} section="Activity">
-      <header className={c.header}>
+      <BellroadPageHeader scene="Activity">
         <h1 className={c.title}>Activity</h1>
         <p className={c.small}>What ServrSit did and found, newest first. Times are in {tz}.</p>
-      </header>
+      </BellroadPageHeader>
 
       <form className={`${c.panel} ${s.filters}`} onSubmit={(e) => e.preventDefault()} role="search" aria-label="Filter activity">
         <div className={s.field}>

@@ -471,3 +471,44 @@
 /* The rail exists from 1200px: compact mark there, full wordmark in the top bar below it. */
 @media (min-width: 1200px) { .wordmarkText { display: none; } }
 @media (max-width: 1199px) { .railMark { display: none; } }
+
+/* Bellroad lets the composer and its reply expand in document flow. */
+.appShell:global(.bellroad-theme) {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+  --nav-rail-width: 8rem;
+}
+
+.appShell:global(.bellroad-theme) .nav {
+  background-color: var(--bellroad-rail);
+  border-color: var(--bellroad-line);
+}
+
+.appShell:global(.bellroad-theme) .navList {
+  overflow-y: auto;
+}
+
+.appShell:global(.bellroad-theme) .main {
+  overflow: visible;
+}
+
+.appShell:global(.bellroad-theme) .contentWrapper {
+  padding-top: 0;
+}
+
+.appShell:global(.bellroad-theme) .viewToggle button[aria-pressed="true"] {
+  background-color: #c4d3af;
+  color: #162123;
+}
+
+@media (max-width: 650px) {
+  .appShell:global(.bellroad-theme) .navItem {
+    flex-direction: column;
+    padding-inline: 2px;
+    gap: 4px;
+  }
+  .appShell:global(.bellroad-theme) .navLabel {
+    font-size: .7rem;
+  }
+}

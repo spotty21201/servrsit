@@ -7,6 +7,8 @@
 import type { ReactNode } from "react";
 import { TopBanners } from "../clock/TopBanners";
 import { SignOutButton } from "../auth/SignOutButton";
+import { BellroadLinks, BellroadMark, isBellroadPage } from "../bellroad/Bellroad";
+import bellroad from "../bellroad/Bellroad.module.css";
 import styles from "./care.module.css";
 
 interface CareShellProps {
@@ -17,11 +19,21 @@ interface CareShellProps {
 }
 
 export function CareShell({ fixture, section, children }: CareShellProps) {
+  const decorated = isBellroadPage(section);
   return (
-    <div className={styles.shell}>
+    <div className={decorated ? `${styles.shell} ${bellroad.theme} bellroad-theme` : styles.shell}>
       <TopBanners fixture={fixture} />
       <header className={styles.topbar}>
+        {decorated ? (
+          <>
+            <BellroadMark />
+            <nav aria-label="Main navigation">
+              <BellroadLinks current={section} className={bellroad.careNav} />
+            </nav>
+          </>
+        ) : (
         <a href="/" className={`${styles.brand} pixel-text`} aria-label="ServrSit, back to Overview">ServrSit</a>
+        )}
         <nav aria-label="Breadcrumb" className={styles.crumbs}>
           <a href="/">Overview</a>
           <span aria-hidden="true">/</span>

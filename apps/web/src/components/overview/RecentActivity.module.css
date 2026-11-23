@@ -186,3 +186,16 @@
   .section { min-height: 0; max-height: 100%; }
   .scroll { flex: 1 1 auto; overflow: auto; overscroll-behavior: contain; padding-right: var(--space-half); }
 }
+
+:global(.bellroad-theme) .section {
+  padding: .7rem .8rem;
+  border: 1px solid var(--bellroad-line);
+  border-radius: 10px;
+  background-color: var(--color-surface);
+}
+:global(.bellroad-theme) .heading {
+  font-family: var(--font-sans);
+}
+:global(.bellroad-theme) .heading::before {
+  content: none;
+}

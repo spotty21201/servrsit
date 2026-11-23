@@ -320,3 +320,16 @@
     padding: 0 var(--space-2);
   }
 }
+
+:global(.bellroad-theme) .card {
+  border-color: var(--bellroad-line);
+  background: linear-gradient(142deg, #263c3d, var(--color-surface));
+  box-shadow: 0 3px 0 #10212180;
+}
+:global(.bellroad-theme) .card:hover {
+  border-color: var(--color-control-boundary);
+}
+:global(.bellroad-theme) .primaryAction {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}

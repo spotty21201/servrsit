@@ -19,6 +19,7 @@ import type { CSSProperties } from "react";
 import type { DataSourceVM, IdentityColor, ServerCardVM } from "../overview/fleetViewModel.js";
 import { StatusBadge } from "../StatusBadge/index.js";
 import { PixelServerIcon } from "./PixelServerIcon.js";
+import { BellroadRack } from "../../bellroad/Bellroad";
 import styles from "./ServerCard.module.css";
 
 const IDENTITY_VAR: Record<IdentityColor, string> = {
@@ -113,9 +114,10 @@ function SourceBadge({ source }: { source: DataSourceVM }) {
 
 interface ServerCardProps {
   server: ServerCardVM;
+  appearance?: "bellroad";
 }
 
-export function ServerCard({ server: s }: ServerCardProps) {
+export function ServerCard({ server: s, appearance }: ServerCardProps) {
   const headingId = `server-${s.id}-name`;
   const isFresh = s.status === "fresh" || s.status === "partial";
 
@@ -126,7 +128,7 @@ export function ServerCard({ server: s }: ServerCardProps) {
       style={{ "--card-identity": IDENTITY_VAR[s.identity] } as CSSProperties}
     >
       <header className={styles.header}>
-        <PixelServerIcon variant={s.identity} className={styles.icon} />
+        {appearance === "bellroad" ? <BellroadRack state={s.statusKey} /> : <PixelServerIcon variant={s.identity} className={styles.icon} />}
         <div className={styles.identity}>
           <h2 id={headingId} className={`${styles.name} pixel-text`}>
             <a href={`/servers/${encodeURIComponent(s.id)}`} className={styles.nameLink} title={s.name}>

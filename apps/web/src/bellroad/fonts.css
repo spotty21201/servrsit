@@ -1,0 +1,35 @@
+/**
+ * Bellroad fonts (T-097). Declared here, and only loaded for the Bellroad
+ * screens, because the families are only referenced from the theme scope.
+ * Files and licences: apps/web/public/bellroad/fonts/ (all SIL OFL 1.1).
+ *
+ *   Geist Pixel Square  the "ServrSit" masthead wordmark and the "Ask the Sitter" label
+ *   Bitcount Single     prominent server names (Regular, wght 400, other axes at their defaults)
+ *   Almarai             the main interface (Regular only: emphasis comes from colour, size and spacing)
+ *
+ * font-display: swap, so text is never invisible while a file loads.
+ */
+@font-face {
+  font-family: "Geist Pixel Square";
+  src: url("/bellroad/fonts/GeistPixel-Square.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Bitcount Single";
+  src: url("/bellroad/fonts/BitcountSingle-Variable.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Almarai ships one weight. The range stops the browser from drawing a fake bold. */
+@font-face {
+  font-family: "Almarai";
+  src: url("/bellroad/fonts/Almarai-Regular.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}

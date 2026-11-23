@@ -34,6 +34,7 @@ import {
   baselineErrorText, canMarkIntentional, describeSetup, EXCLUSION_STATEMENT, groupRows, NOT_INCLUDED_REASON, referenceAge, SAVE_NOTE, setupScope, SOURCE_LABEL, splitCandidates, STATUS_LABEL, STATUS_TONE,
   summaryText, validateBaselineName,
 } from "./baselineLogic";
+import { BellroadPageHeader } from "../bellroad/Bellroad";
 import c from "../care/care.module.css";
 import s from "../servers/servers.module.css";
 import b from "./baselines.module.css";
@@ -171,10 +172,10 @@ export function BaselineScreen({ client: injected, fixture = false }: { client?:
 
   return (
     <CareShell fixture={fixture || fleet.data?.mode === "fixture" || servers.some((x) => x.simulated)} section="Baselines">
-      <header className={c.header}>
+      <BellroadPageHeader scene="Baselines">
         <h1 className={c.title} ref={titleRef} tabIndex={-1}>Baselines and server setup</h1>
         <p className={c.small}>Step {step + 1} of 4: {STEPS[step]}. Comparing copies and deletes nothing. A setup only ever happens through a plan you approve.</p>
-      </header>
+      </BellroadPageHeader>
 
       {load === "error" && <LoadFailure title="Couldn't load servers" text="Nothing is shown until real data arrives." onRetry={() => void loadServers()} heading={false} />}
       {load === "loading" && <p className={c.p} role="status">Loading servers…</p>}
