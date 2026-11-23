@@ -78,12 +78,15 @@ html {
   font-size: 100%;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  background-color: var(--color-page);
+  /* Every screen is Bellroad now: the document itself is the Bellroad page colour, so overscroll and the moment
+     before the styles load are dark, not white. The themed screens set the same colour through their own tokens. */
+  background-color: #142729;
+  color-scheme: dark;
 }
 
 body {
-  background-color: var(--color-page);
-  color: var(--color-ink);
+  background-color: #142729;
+  color: #f5e9d5;
   font-family: var(--font-sans);
   font-size: var(--text-body-size);
   line-height: var(--text-body-line-height);
