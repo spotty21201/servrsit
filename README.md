@@ -1,10 +1,34 @@
 # ServrSit
 
+<img src="apps/web/public/bellroad/milley.webp" alt="Millie, the pixel-art server sitter" width="140" align="right">
+
 **Your servers have a sitter. Less babysitting, more building.**
 
 ServrSit is a caretaker for a small fleet of Ubuntu servers (about 2 to 20), for people who need servers but don't want to spend their time administering them. It checks your machines, explains what it found in plain language, proposes maintenance, and makes changes only after you approve them, then verifies the result.
 
 > **Status: founder alpha, in development.** Not ready for other users. It runs privately on the founder's own machines. Changes are enabled on one disposable test server only.
+
+## See ServrSit in action
+
+Meet Millie, the pixel-art sitter who appears beside the assistant. The screens below use labeled sample data.
+
+### Fleet overview
+
+See which servers need attention, when they were last checked, and where to ask Millie about the fleet.
+
+![ServrSit fleet overview with server health, observation times, findings, and the Ask the Sitter panel](docs/images/fleet-overview.png)
+
+### Review an update
+
+Review the target, package list, impact, and verification steps before approving the plan.
+
+![ServrSit update plan with package scope, service interruption risks, and production approval controls](docs/images/update-plan.png)
+
+### Verify the result
+
+The operation timeline shows when the update ran and when the installed versions were checked. In a separate live test, ServrSit verified all 12 approved package versions on a disposable Ubuntu server.
+
+![ServrSit operation timeline showing installation, independent version checks, and a completed and verified result](docs/images/verified-update.png)
 
 ## What it does
 
@@ -14,7 +38,7 @@ The core loop is **inspect, explain, propose, approve, execute, verify.**
 - **Explain.** An AI assistant answers questions like "How's everyone?" from the latest checks. Every number it states is checked against the real data, and the reply is withheld if they don't match. The AI cannot run, approve or change anything.
 - **Propose.** Maintenance becomes a reviewable plan: exact packages and versions, impact, what will be verified, and a 15-minute expiry.
 - **Approve.** You approve one specific plan for one server. Chat replies like "yes, do it" never count as approval.
-- **Execute.** A small restricted helper on the server applies exactly the approved change. It accepts only signed requests, refuses replays, holds, locks, and anything that doesn't match the plan, and never restarts services as a side effect of an update.
+- **Execute.** A small restricted helper on the server applies exactly the approved change. It accepts only signed requests and refuses replays, holds, locks, and changes outside the plan. Package installation can restart services. A service restart requested through ServrSit requires a separate approval.
 - **Verify.** Installed versions are checked independently afterwards. "Command finished" is not treated as "verified".
 
 It also keeps a history of every check and operation (with export), tracks findings you can acknowledge or snooze, and compares servers against a baseline.
