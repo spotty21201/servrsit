@@ -112,6 +112,15 @@ function SourceBadge({ source }: { source: DataSourceVM }) {
   );
 }
 
+/**
+ * Rack lights are presentation only and follow the existing status: green for passed, amber for attention.
+ * Anything that is overdue, unobserved, historical or in another state stays dim.
+ */
+function rackState(s: ServerCardVM): "passed" | "attention" | "dim" {
+  if (s.tone === "no-data" || s.historical) return "dim";
+  return s.statusKey === "passed" || s.statusKey === "attention" ? s.statusKey : "dim";
+}
+
 interface ServerCardProps {
   server: ServerCardVM;
   appearance?: "bellroad";
@@ -128,7 +137,7 @@ export function ServerCard({ server: s, appearance }: ServerCardProps) {
       style={{ "--card-identity": IDENTITY_VAR[s.identity] } as CSSProperties}
     >
       <header className={styles.header}>
-        {appearance === "bellroad" ? <BellroadRack state={s.statusKey} /> : <PixelServerIcon variant={s.identity} className={styles.icon} />}
+        {appearance === "bellroad" ? <BellroadRack state={rackState(s)} /> : <PixelServerIcon variant={s.identity} className={styles.icon} />}
         <div className={styles.identity}>
           <h2 id={headingId} className={`${styles.name} pixel-text`}>
             <a href={`/servers/${encodeURIComponent(s.id)}`} className={styles.nameLink} title={s.name}>

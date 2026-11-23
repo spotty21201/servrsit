@@ -6,7 +6,19 @@
 .head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2); align-items: start; padding-bottom: var(--space-1); border-bottom: 2px solid var(--color-ink); }
 .icon { width: 48px; height: 48px; filter: drop-shadow(3px 3px 0 var(--card-identity, var(--color-lilac))); }
 .headText { display: flex; flex-direction: column; gap: var(--space-half); min-width: 0; }
-.name { font-family: var(--font-pixel); font-weight: var(--font-weight-regular); font-size: var(--text-page-title-size); line-height: var(--text-page-title-line-height); overflow-wrap: anywhere; }
+/* Bellroad server-name heading (T-097): Bitcount Single, uppercase, warm amber. The page keeps its light
+   styling, so the amber is the darker #9A5B00 (5.4:1 on white; #F1AD54 would be 2.0:1). */
+.name {
+  font-family: "Bitcount Single", var(--font-pixel);
+  font-weight: 400;
+  font-synthesis: none;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: #9a5b00;
+  font-size: var(--text-page-title-size);
+  line-height: var(--text-page-title-line-height);
+  overflow-wrap: anywhere;
+}
 .role { font-size: var(--text-compact-size); color: var(--color-muted-ink); }
 
 .jump { display: flex; flex-wrap: wrap; gap: var(--space-1); }

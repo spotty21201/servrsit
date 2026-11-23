@@ -477,7 +477,7 @@
   height: auto;
   min-height: 100dvh;
   overflow: visible;
-  --nav-rail-width: 8rem;
+  --nav-rail-width: 9.625rem;
 }
 
 .appShell:global(.bellroad-theme) .nav {
@@ -515,4 +515,21 @@
 
 @media (min-width: 1200px) and (min-height: 620px) {
   .appShell:global(.bellroad-theme) .lowerGrid { max-height: none; }
+}
+
+/* The rail reads like the reference: a row per page with its glyph, the current page in sage. */
+@media (min-width: 651px) {
+  .appShell:global(.bellroad-theme) .navItem {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: .55rem;
+    margin-inline: .6rem;
+    padding: .6rem .55rem;
+    border-radius: 7px;
+    color: var(--color-ink);
+  }
+  .appShell:global(.bellroad-theme) .navItem:hover { background-color: #293d3d; }
+  .appShell:global(.bellroad-theme) .navItemActive:hover { background-color: #c4d3af; }
+  .appShell:global(.bellroad-theme) .navItemActive::after { content: none; }
+  .appShell:global(.bellroad-theme) .navLabel { font-size: .94rem; line-height: 1.3; }
 }

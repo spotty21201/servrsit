@@ -38,6 +38,7 @@
 }
 
 .mark {
+  min-height: var(--touch-target-min);
   display: grid;
   justify-items: center;
   align-items: center;
@@ -51,6 +52,7 @@
   width: clamp(2.75rem, 5.8vw, 5.25rem);
   height: auto;
   image-rendering: pixelated;
+  pointer-events: none;
 }
 
 .links {
@@ -320,7 +322,7 @@
 @media (max-width: 650px) {
   .masthead { grid-template-columns: minmax(0, 1fr) auto; min-height: 8.125rem; }
   .headline { padding-block: .8rem; }
-  .house { grid-column: 1 / -1; width: 76%; filter: brightness(.62); }
+  .house { grid-column: 1 / -1; width: 76%; filter: brightness(.5); }
   .masthead .connect { grid-column: 2; align-self: end; margin-block-end: .8rem; padding-inline: .45rem; }
   .brandTitle { font-size: clamp(2.3rem, 9.4vw, 4.1rem); }
   .composer { margin-block-start: 4.7rem; grid-template-columns: minmax(0, 1fr); padding-inline: .7rem; }
