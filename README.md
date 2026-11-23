@@ -4,13 +4,21 @@
 
 **Your servers have a sitter. Less babysitting, more building.**
 
+## A home for your agents
+
+In the agentic era, one person can keep several agents working around the clock. One runs tests, another writes docs, and a third works through a backlog. They can work together on one server or run independently on separate machines and hand work to each other. There's usually a job for one more.
+
+You close your laptop at night and take it with you when you leave. Agents that need to keep working when the lid is shut need a home that stays on. That could be a rented cloud server, a remote machine you own, or a mini PC on a shelf at home.
+
+Soon you're keeping track of what every agent is doing while also dealing with full disks, failed services, and pending updates on the machines they live on. **That's when you hire a ServerSitter.**
+
 ServrSit is a caretaker for a small fleet of Ubuntu servers (about 2 to 20), for people who need servers but don't want to spend their time administering them. It checks your machines, explains what it found in plain language, proposes maintenance, and makes changes only after you approve them, then verifies the result.
 
 > **Status: founder alpha, in development.** Not ready for other users. It runs privately on the founder's own machines. Changes are enabled on one disposable test server only.
 
 ## See ServrSit in action
 
-Meet Millie, the pixel-art sitter who appears beside the assistant. The screens below use labeled sample data.
+The screens below use labeled sample data.
 
 ### Fleet overview
 
@@ -42,6 +50,16 @@ The core loop is **inspect, explain, propose, approve, execute, verify.**
 - **Verify.** Installed versions are checked independently afterwards. "Command finished" is not treated as "verified".
 
 It also keeps a history of every check and operation (with export), tracks findings you can acknowledge or snooze, and compares servers against a baseline.
+
+## The Bellroad crew
+
+The house on Bellroad got its first server when an agent needed somewhere to finish a job overnight. The spare computer went under the stairs. A second soon followed, and three neighbors started taking turns checking on them.
+
+| Character | Backstory |
+| --- | --- |
+| <img src="apps/web/public/bellroad/milley.webp" alt="Millie with her notebook" width="90"> | **Millie** was the neighbor everyone trusted with a spare key. Now she makes her rounds with a lantern and a notebook. Her first question is always, “When did we last see it working?” |
+| <img src="apps/web/public/bellroad/otis.webp" alt="Otis and his toy duck" width="90"> | **Otis** built the first server shelf after his toy duck slid off a crooked stack of blocks. He measures everything twice now. The duck supervises. |
+| <img src="apps/web/public/bellroad/agnes.webp" alt="Agnes launching a paper plane" width="90"> | **Agnes** used to fly paper planes over the garden fence to share the neighborhood news. Now she pins each check to the kitchen corkboard and saves her best planes for messages Millie needs to see right away. |
 
 ## Safety model, briefly
 
